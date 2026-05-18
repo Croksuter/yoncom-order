@@ -1,35 +1,44 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
+import { isSignedIn } from "~/lib/auth";
+import SignIn from "./components/sign-in";
+import SignOut from "./components/sign-out";
+import SignUp from "./components/sign-up";
+
 export default function AuthPage() {
+  const [signedIn, setSignedIn] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    void isSignedIn(
+      () => setSignedIn(true),
+      () => setSignedIn(false),
+    );
+  }, []);
+
   return (
-    <main className="grid">
-      <section className="panel stack">
-        <span className="pill">/auth</span>
-        <h1>Auth</h1>
-        <p className="muted">
-          The first parity target is sign-up, sign-in, session preservation,
-          and sign-out with Lucia-compatible cookies.
-        </p>
-      </section>
-      <section className="panel stack">
-        <h2>Server contract</h2>
-        <ul className="status-list">
-          <li>
-            <span className="label">POST</span>
-            <span>/api/auth/sign-up</span>
-          </li>
-          <li>
-            <span className="label">POST</span>
-            <span>/api/auth/sign-in</span>
-          </li>
-          <li>
-            <span className="label">GET</span>
-            <span>/api/auth/session</span>
-          </li>
-          <li>
-            <span className="label">POST</span>
-            <span>/api/auth/sign-out</span>
-          </li>
-        </ul>
-      </section>
+    <main className="screen fr items-center justify-center bg-white">
+      <div className="fit-content max-h-md max-w-md">
+        {signedIn === null ? (
+          <div>Loading...</div>
+        ) : signedIn ? (
+          <SignOut />
+        ) : (
+          <Tabs defaultValue="sign-in" className="m-2 w-[calc(100%_-_1rem)] flex-1 overflow-scroll fc">
+            <TabsList className="w-full justify-normal bg-blue-50 *:w-1/2">
+              <TabsTrigger value="sign-in">로그인</TabsTrigger>
+              <TabsTrigger value="sign-up">회원가입</TabsTrigger>
+            </TabsList>
+            <TabsContent value="sign-in" className="full">
+              <SignIn />
+            </TabsContent>
+            <TabsContent value="sign-up">
+              <SignUp />
+            </TabsContent>
+          </Tabs>
+        )}
+      </div>
     </main>
   );
 }

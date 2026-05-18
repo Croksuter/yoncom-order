@@ -405,6 +405,42 @@ Before considering migration equivalent:
 - Health endpoint has no data mutation.
 - Typecheck and production build pass.
 
+## Migration Progress - 2026-05-18 UI Slice
+
+Started the real UI migration on `codex/nextjs-migration`.
+
+Migrated into `apps/next`:
+
+- Legacy Tailwind/shadcn-style UI foundation: `components/ui`, `hooks`, `stores`, `lib/date`, `lib/utils`, `lib/ky-error-handler`.
+- Next-compatible same-origin client query/auth helpers: `apps/next/lib/query.ts`, `apps/next/lib/auth.ts`.
+- Route UI parity shells for `/auth`, `/client/table/[id]`, `/admin/pos`, and `/admin/cooker`.
+- Admin polling wrapper via `app/admin/layout.tsx` and `app/admin/admin-data-loader.tsx`.
+- Tailwind v3/PostCSS config for the copied legacy class names.
+- Initial DB-backed read-only API ports for `GET /api/menu`, `GET /api/table`, `GET /api/admin/menu`, and `GET /api/admin/table`.
+- Lazy Cloudflare D1 HTTP adapter in `apps/next/lib/server/db.ts` for Next server runtimes that do not expose Wrangler `c.env.DB`.
+
+Current behavior:
+
+- The routes now render the actual legacy screen structure instead of the previous migration status panels.
+- Client stores call same-origin `/api/*` paths instead of `shared/constants` production API URLs.
+- `NEXT_MIGRATION_NOT_IMPLEMENTED` responses are treated as expected migration placeholders in the app toast handler.
+- Read-only menu/table API handlers are implemented. After correcting `CLOUDFLARE_ACCOUNT_ID`, `GET /api/menu`, `GET /api/admin/menu`, and `GET /api/admin/table` return 200 against D1.
+- The live D1 database uses legacy `tableContext` while the current schema expects `tableContexts`; the Next read-only table query now detects both names and returns the app-facing `tableContexts` relation shape.
+- Mutation/auth/image/order API handlers are still placeholders, so browser network logs can still show 501 responses for non-migrated routes.
+
+Verification:
+
+- `pnpm --filter web-next typecheck` passed.
+- `pnpm --filter web-next build` passed.
+- Browser smoke verified `/`, `/auth`, `/admin/pos`, and `/client/table/demo-table` render under the Next dev server at `http://localhost:3000`.
+- `next start --port 3001` verified the read-only route handlers load root env variables and return 200 for menu/table list routes.
+
+Next migration slice:
+
+- Port server/API runtime from `apps/api` into Next Route Handlers, starting with read-only routes (`GET /api/table`, `GET /api/menu`, `GET /api/admin/table`, `GET /api/admin/menu`) before mutations.
+- Introduce lazy server DB/auth/storage adapters; do not initialize Drizzle, Lucia, D1, or object storage at module scope.
+- Add characterization tests for order creation/cancellation/payment before moving write endpoints.
+
 ## Do Not Forget
 
 - Current app has no tests; tests are not optional for the order/payment/table migration.

@@ -1,0 +1,170 @@
+import { loadEnvConfig } from "@next/env";
+import { drizzle } from "drizzle-orm/d1";
+import { resolve } from "node:path";
+import * as schema from "db/schema";
+
+type D1ApiRow = Record<string, unknown>;
+
+type D1ApiQueryResult<T = D1ApiRow> = {
+  results?: T[];
+  success: boolean;
+  meta?: Record<string, unknown>;
+  error?: string;
+};
+
+type D1ApiResponse<T = D1ApiRow> = {
+  success: boolean;
+  errors?: { code?: number; message: string }[];
+  messages?: { code?: number; message: string }[];
+  result?: D1ApiQueryResult<T>[];
+};
+
+class D1HttpPreparedStatement {
+  constructor(
+    private readonly database: D1HttpDatabase,
+    private readonly sql: string,
+    private readonly params: unknown[] = [],
+  ) {}
+
+  bind(...params: unknown[]) {
+    return new D1HttpPreparedStatement(this.database, this.sql, params);
+  }
+
+  async all<T = D1ApiRow>() {
+    return this.database.query<T>(this.sql, this.params);
+  }
+
+  async run<T = D1ApiRow>() {
+    return this.database.query<T>(this.sql, this.params);
+  }
+
+  async first<T = D1ApiRow>(column?: string) {
+    const result = await this.database.query<T>(this.sql, this.params);
+    const first = result.results?.[0] ?? null;
+
+    if (first && column && typeof first === "object" && column in first) {
+      return first[column as keyof T] as T[keyof T];
+    }
+
+    return first;
+  }
+
+  async raw<T = unknown>() {
+    const result = await this.database.query<Record<string, T>>(this.sql, this.params);
+    return (result.results ?? []).map((row) => Object.values(row));
+  }
+}
+
+class D1HttpDatabase {
+  private readonly endpoint: string;
+
+  constructor(
+    accountId: string,
+    databaseId: string,
+    private readonly token: string,
+  ) {
+    this.endpoint = `https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database/${databaseId}/query`;
+  }
+
+  prepare(sql: string) {
+    return new D1HttpPreparedStatement(this, sql);
+  }
+
+  async batch<T = D1ApiRow>(statements: D1HttpPreparedStatement[]) {
+    return Promise.all(statements.map((statement) => statement.all<T>()));
+  }
+
+  async exec(sql: string) {
+    const statements = sql
+      .split(";")
+      .map((statement) => statement.trim())
+      .filter(Boolean);
+
+    const results = await Promise.all(statements.map((statement) => this.query(statement, [])));
+    return {
+      count: results.reduce((count, result) => count + (result.results?.length ?? 0), 0),
+      duration: results.reduce((duration, result) => duration + Number(result.meta?.duration ?? 0), 0),
+    };
+  }
+
+  async query<T = D1ApiRow>(sql: string, params: unknown[]): Promise<D1ApiQueryResult<T>> {
+    const response = await fetch(this.endpoint, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${this.token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ sql, params }),
+      cache: "no-store",
+    });
+
+    const payload = (await response.json().catch(() => null)) as D1ApiResponse<T> | null;
+    const result = payload?.result?.[0];
+
+    if (!response.ok || !payload?.success || !result?.success) {
+      const message =
+        result?.error ??
+        payload?.errors?.map((error) => error.message).join(", ") ??
+        `D1 query failed with ${response.status}`;
+      throw new Error(message);
+    }
+
+    return result;
+  }
+}
+
+let cachedD1: D1HttpDatabase | null = null;
+let cachedDb: ReturnType<typeof drizzle<typeof schema>> | null = null;
+let envLoaded = false;
+
+function ensureEnvLoaded() {
+  if (envLoaded) {
+    return;
+  }
+
+  loadEnvConfig(resolve(process.cwd(), "../.."));
+  envLoaded = true;
+}
+
+export function getDb() {
+  if (cachedDb) {
+    return cachedDb;
+  }
+
+  cachedDb = drizzle(getD1Database() as never, {
+    schema,
+  });
+  return cachedDb;
+}
+
+function getD1Database() {
+  if (cachedD1) {
+    return cachedD1;
+  }
+
+  ensureEnvLoaded();
+
+  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+  const databaseId = process.env.CLOUDFLARE_DATABASE_ID;
+  const token = process.env.CLOUDFLARE_D1_TOKEN;
+
+  if (!accountId || !databaseId || !token) {
+    throw new Error("Cloudflare D1 environment variables are not configured.");
+  }
+
+  cachedD1 = new D1HttpDatabase(accountId, databaseId, token);
+  return cachedD1;
+}
+
+export async function queryD1<T = D1ApiRow>(sql: string, params: unknown[] = []) {
+  const result = await getD1Database().query<T>(sql, params);
+  return result.results ?? [];
+}
+
+export async function hasD1Table(name: string) {
+  const rows = await queryD1<{ name: string }>(
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+    [name],
+  );
+  return rows.length > 0;
+}

@@ -107,3 +107,11 @@ Database schema markers include:
 5. Rebuild UI flows by vertical slice: auth, client table ordering, admin POS, cooker.
 6. Re-run `build_or_update_graph` and context-mode indexing after each major slice.
 
+## 2026-05-18 Next.js Migration Slice
+
+- `apps/next` now renders migrated legacy UI for `/auth`, `/client/table/[id]`, `/admin/pos`, and `/admin/cooker`.
+- Copied the legacy UI primitives, hooks, Zustand stores, route component trees, Tailwind config, and same-origin client query/auth helpers into the Next workspace.
+- `pnpm --filter web-next typecheck` and `pnpm --filter web-next build` pass after this slice.
+- Runtime data is not migrated yet: most `/api/*` route handlers still return `NEXT_MIGRATION_NOT_IMPLEMENTED`, so migrated screens render structure but do not load real DB-backed rows.
+- Read-only menu/table API handlers have been started in Next with a lazy Cloudflare D1 HTTP adapter. After correcting `CLOUDFLARE_ACCOUNT_ID`, menu/admin-menu/admin-table list routes return 200. The live D1 schema still has legacy `tableContext`, so Next currently bridges it to the app-facing `tableContexts` shape in read-only queries.
+- Next migration notes and the next API-porting order are recorded in `docs/nextjs-migration-analysis.md`.

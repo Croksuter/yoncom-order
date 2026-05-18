@@ -1,10 +1,16 @@
 import { notMigrated } from "~/lib/server/responses";
+import { getValidation } from "shared/types/requests/admin/table";
+import { ok, parseSearchParams, routeError } from "~/lib/server/api";
+import { getTablesWithRelations } from "~/lib/server/table-queries";
 
-export async function GET() {
-  return notMigrated("GET /api/admin/table", {
-    requiresAdmin: true,
-    schema: "AdminTableRequest.getValidation",
-  });
+export async function GET(request: Request) {
+  try {
+    parseSearchParams(request, getValidation);
+
+    return ok(await getTablesWithRelations());
+  } catch (error) {
+    return routeError(error);
+  }
 }
 
 export async function POST() {

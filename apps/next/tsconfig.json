@@ -32,6 +32,9 @@
       ],
       "db/*": [
         "../../packages/db/*"
+      ],
+      "types/*": [
+        "../../packages/shared/types/*"
       ]
     }
   },
