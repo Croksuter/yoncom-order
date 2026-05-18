@@ -430,10 +430,19 @@ Current behavior:
 
 Verification:
 
+- Added Vitest network/unit tests for the Next migration workspace:
+  - client-side `queryStore` API request/response behavior
+  - Cloudflare D1 HTTP request/response adapter behavior
+  - invalid D1 account id rejection and D1 client rebuild when env values change during a dev session
+  - table relation query simulation, including legacy `tableContext` compatibility
+  - implemented Next route handler response behavior
+  - all not-yet-migrated API route contracts returning explicit 501 placeholders
 - `pnpm --filter web-next typecheck` passed.
 - `pnpm --filter web-next build` passed.
+- `pnpm run test` passed with 37 tests.
 - Browser smoke verified `/`, `/auth`, `/admin/pos`, and `/client/table/demo-table` render under the Next dev server at `http://localhost:3000`.
 - `next start --port 3001` verified the read-only route handlers load root env variables and return 200 for menu/table list routes.
+- A later localhost:3000 DBQuery error was traced to the long-running dev server keeping stale D1 env/client state after `.env.local` changed. `apps/next/lib/server/db.ts` now reloads local root `.env`/`.env.local` D1 keys in non-production server runtime and rebuilds the cached D1 client when the config changes.
 
 Next migration slice:
 

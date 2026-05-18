@@ -14,6 +14,7 @@ function getApiPrefixUrl() {
 export const api = ky.create({
   prefixUrl: getApiPrefixUrl(),
   credentials: "include",
+  retry: 0,
 });
 
 export default async function queryStore<Query, Result>({

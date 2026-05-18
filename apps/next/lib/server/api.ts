@@ -20,7 +20,11 @@ export function routeError(error: unknown) {
     return fail("Invalid request", 400);
   }
 
-  if (error instanceof Error && error.message.includes("Cloudflare D1 environment variables")) {
+  if (
+    error instanceof Error &&
+    (error.message.includes("Cloudflare D1 environment variables") ||
+      error.message.includes("Cloudflare D1 configuration"))
+  ) {
     return fail("NEXT_DB_NOT_CONFIGURED", 503);
   }
 

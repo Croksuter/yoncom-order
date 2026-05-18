@@ -1,5 +1,6 @@
 import { loadEnvConfig } from "@next/env";
 import { drizzle } from "drizzle-orm/d1";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import * as schema from "db/schema";
 
@@ -116,6 +117,15 @@ class D1HttpDatabase {
 let cachedD1: D1HttpDatabase | null = null;
 let cachedDb: ReturnType<typeof drizzle<typeof schema>> | null = null;
 let envLoaded = false;
+let cachedConfigKey: string | null = null;
+
+const d1EnvKeys = [
+  "CLOUDFLARE_ACCOUNT_ID",
+  "CLOUDFLARE_DATABASE_ID",
+  "CLOUDFLARE_D1_TOKEN",
+] as const;
+
+type D1Config = Record<(typeof d1EnvKeys)[number], string>;
 
 function ensureEnvLoaded() {
   if (envLoaded) {
@@ -127,37 +137,102 @@ function ensureEnvLoaded() {
 }
 
 export function getDb() {
-  if (cachedDb) {
+  const { database, configKey } = getD1Database();
+
+  if (cachedDb && cachedConfigKey === configKey) {
     return cachedDb;
   }
 
-  cachedDb = drizzle(getD1Database() as never, {
+  cachedDb = drizzle(database as never, {
     schema,
   });
+  cachedConfigKey = configKey;
   return cachedDb;
 }
 
 function getD1Database() {
-  if (cachedD1) {
-    return cachedD1;
+  ensureEnvLoaded();
+  applyLocalEnvOverrides();
+
+  const config = readD1Config();
+  const configKey = d1EnvKeys.map((key) => config[key]).join(":");
+
+  if (cachedD1 && cachedConfigKey === configKey) {
+    return { database: cachedD1, configKey };
   }
 
-  ensureEnvLoaded();
+  cachedD1 = new D1HttpDatabase(
+    config.CLOUDFLARE_ACCOUNT_ID,
+    config.CLOUDFLARE_DATABASE_ID,
+    config.CLOUDFLARE_D1_TOKEN,
+  );
+  cachedDb = null;
+  cachedConfigKey = configKey;
 
-  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
-  const databaseId = process.env.CLOUDFLARE_DATABASE_ID;
-  const token = process.env.CLOUDFLARE_D1_TOKEN;
+  return { database: cachedD1, configKey };
+}
 
-  if (!accountId || !databaseId || !token) {
+function readD1Config(): D1Config {
+  const config = Object.fromEntries(
+    d1EnvKeys.map((key) => [key, process.env[key] ?? ""]),
+  ) as D1Config;
+
+  if (!config.CLOUDFLARE_ACCOUNT_ID || !config.CLOUDFLARE_DATABASE_ID || !config.CLOUDFLARE_D1_TOKEN) {
     throw new Error("Cloudflare D1 environment variables are not configured.");
   }
 
-  cachedD1 = new D1HttpDatabase(accountId, databaseId, token);
-  return cachedD1;
+  if (config.CLOUDFLARE_ACCOUNT_ID.includes("@")) {
+    throw new Error("Cloudflare D1 configuration is invalid: account id must not be an email.");
+  }
+
+  return config;
+}
+
+function applyLocalEnvOverrides() {
+  if (process.env.NODE_ENV === "production" || process.env.NODE_ENV === "test") {
+    return;
+  }
+
+  for (const envFile of [".env", ".env.local"]) {
+    const envPath = resolve(process.cwd(), "../..", envFile);
+    if (!existsSync(envPath)) {
+      continue;
+    }
+
+    for (const [key, value] of parseEnvFile(envPath)) {
+      if (d1EnvKeys.includes(key as (typeof d1EnvKeys)[number])) {
+        process.env[key] = value;
+      }
+    }
+  }
+}
+
+function parseEnvFile(envPath: string) {
+  const content = readFileSync(envPath, "utf8");
+  const mtime = statSync(envPath).mtimeMs;
+  const values: [string, string][] = [];
+
+  for (const line of content.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#") || !trimmed.includes("=")) {
+      continue;
+    }
+
+    const index = trimmed.indexOf("=");
+    const key = trimmed.slice(0, index).trim();
+    const value = trimmed.slice(index + 1).trim().replace(/^['"]|['"]$/g, "");
+    values.push([key, value]);
+  }
+
+  // Touching the stat value makes the dependency on file freshness explicit
+  // without leaking env values into logs or cache keys.
+  void mtime;
+  return values;
 }
 
 export async function queryD1<T = D1ApiRow>(sql: string, params: unknown[] = []) {
-  const result = await getD1Database().query<T>(sql, params);
+  const { database } = getD1Database();
+  const result = await database.query<T>(sql, params);
   return result.results ?? [];
 }
 

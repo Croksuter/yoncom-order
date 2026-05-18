@@ -112,6 +112,8 @@ Database schema markers include:
 - `apps/next` now renders migrated legacy UI for `/auth`, `/client/table/[id]`, `/admin/pos`, and `/admin/cooker`.
 - Copied the legacy UI primitives, hooks, Zustand stores, route component trees, Tailwind config, and same-origin client query/auth helpers into the Next workspace.
 - `pnpm --filter web-next typecheck` and `pnpm --filter web-next build` pass after this slice.
+- Added `pnpm run test` for the Next migration workspace. Current Vitest suite covers client API calls, D1 HTTP query traffic, table relation response shaping, implemented route handlers, and placeholder API contracts.
+- Fixed the test-vs-runtime gap where Vitest used fresh stubbed D1 env values but the long-running Next dev server kept a stale cached D1 client after `.env.local` edits. The Next server D1 adapter now reloads local D1 env keys and rebuilds the cached client when values change.
 - Runtime data is not migrated yet: most `/api/*` route handlers still return `NEXT_MIGRATION_NOT_IMPLEMENTED`, so migrated screens render structure but do not load real DB-backed rows.
 - Read-only menu/table API handlers have been started in Next with a lazy Cloudflare D1 HTTP adapter. After correcting `CLOUDFLARE_ACCOUNT_ID`, menu/admin-menu/admin-table list routes return 200. The live D1 schema still has legacy `tableContext`, so Next currently bridges it to the app-facing `tableContexts` shape in read-only queries.
 - Next migration notes and the next API-porting order are recorded in `docs/nextjs-migration-analysis.md`.
