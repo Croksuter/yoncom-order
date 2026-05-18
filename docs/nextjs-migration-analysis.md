@@ -9,6 +9,7 @@ This document is the migration memory for moving the deprecated Remix/Hono proje
 - Current repo state, not older ctx memories, is the source of truth.
 - Current fork remote: `https://github.com/Croksuter/yoncom-order`
 - Current upstream remote: `https://github.com/jhyunwoo/yoncom-order`
+- Active migration branch: `codex/nextjs-migration`
 - Current baseline commit: `b0d5aba fix multiple ordering-problem`
 - Existing generated graph wiki: `.code-review-graph/wiki`
 - Existing rebuild baseline: `docs/rebuild-context.md`
@@ -276,6 +277,19 @@ Medium:
 
 Use App Router. Do not migrate to the legacy Pages Router.
 
+Migration has started in `apps/next`:
+
+- Next.js version: `16.2.6`
+- React version: `19.2.6`
+- Route contracts have skeleton Route Handlers under `apps/next/app/api` and `apps/next/app/image/[filename]/route.ts`.
+- User-facing route shells exist for `/`, `/auth`, `/admin`, `/admin/pos`, `/admin/cooker`, and `/client/table/[id]`.
+- `pnpm --filter web-next typecheck` passes.
+- `pnpm --filter web-next build` passes.
+- Browser smoke check passed for `/`, `/admin/pos`, `/client/table/demo-table`, and `/api`.
+- `GET /api` now returns a non-mutating migration health response in the Next workspace.
+- `POST /api/order` currently returns a typed `501 NEXT_MIGRATION_NOT_IMPLEMENTED` placeholder that marks `createOrder` as the protected hotspot.
+- Full `pnpm install` currently fails on Node `26.0.0` because existing root dependency `better-sqlite3@11.10.0` fails native compilation. The Next workspace was linked with `pnpm install --filter web-next --ignore-scripts` for migration verification.
+
 Recommended structure for a low-risk migration:
 
 ```text
@@ -394,4 +408,3 @@ Before considering migration equivalent:
 - The current shared constants force production URLs. This will break local Next development unless changed.
 - Proxy/middleware is not a full auth replacement. Keep real auth checks inside server code that can read sessions and roles.
 - Do not make every migrated component a Client Component by default. Use Client Components only for interactive boundaries.
-
