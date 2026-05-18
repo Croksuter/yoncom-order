@@ -283,8 +283,13 @@ Migration has started in `apps/next`:
 - React version: `19.2.6`
 - Route contracts have skeleton Route Handlers under `apps/next/app/api` and `apps/next/app/image/[filename]/route.ts`.
 - User-facing route shells exist for `/`, `/auth`, `/admin`, `/admin/pos`, `/admin/cooker`, and `/client/table/[id]`.
+- Root `pnpm run dev` now starts `web-next`.
+- Legacy Remix/Hono dev commands are preserved as `pnpm run dev:legacy` and `pnpm run dev:legacy:local`.
+- Root `pnpm run build` now builds `web-next`; the old concurrent build is preserved as `pnpm run build:legacy`.
 - `pnpm --filter web-next typecheck` passes.
 - `pnpm --filter web-next build` passes.
+- `pnpm run dev` starts successfully at `http://localhost:3000`.
+- `pnpm run build` passes.
 - Browser smoke check passed for `/`, `/admin/pos`, `/client/table/demo-table`, and `/api`.
 - `GET /api` now returns a non-mutating migration health response in the Next workspace.
 - `POST /api/order` currently returns a typed `501 NEXT_MIGRATION_NOT_IMPLEMENTED` placeholder that marks `createOrder` as the protected hotspot.
