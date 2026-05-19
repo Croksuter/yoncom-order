@@ -24,9 +24,10 @@ type OrderRow = BaseRow & {
 type PaymentRow = BaseRow & {
   paid: boolean | number;
   amount: number;
-  bank: string | null;
-  depositor: string | null;
-  orderId: string | null;
+  bank?: string | null;
+  depositor?: string | null;
+  method?: string | null;
+  orderId?: string | null;
 };
 
 type MenuOrderRow = BaseRow & {
@@ -135,7 +136,7 @@ export async function getTablesWithRelations(tableId?: string) {
   const menuOrders = await queryD1<MenuOrderRow>("SELECT * FROM menuOrders");
 
   const paymentsByOrderId = new Map(
-    payments.map((payment) => [payment.orderId, normalizePayment(payment)]),
+    payments.map((payment) => [payment.orderId ?? payment.id, normalizePayment(payment)]),
   );
 
   const menuOrdersByOrderId = new Map<string, ReturnType<typeof normalizeMenuOrder>[]>();

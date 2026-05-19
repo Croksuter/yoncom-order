@@ -426,7 +426,16 @@ Current behavior:
 - `NEXT_MIGRATION_NOT_IMPLEMENTED` responses are treated as expected migration placeholders in the app toast handler.
 - Read-only menu/table API handlers are implemented. After correcting `CLOUDFLARE_ACCOUNT_ID`, `GET /api/menu`, `GET /api/admin/menu`, and `GET /api/admin/table` return 200 against D1.
 - The live D1 database uses legacy `tableContext` while the current schema expects `tableContexts`; the Next read-only table query now detects both names and returns the app-facing `tableContexts` relation shape.
-- Mutation/auth/image/order API handlers are still placeholders, so browser network logs can still show 501 responses for non-migrated routes.
+- Core mutation API handlers are now DB-backed for order creation/cancellation, admin payment/deposit/complete/cancel, table create/update/remove/occupy/vacate, menu create/update/remove, and menu category create/update/remove.
+- Remaining explicit placeholders include image upload, payout, and the legacy read-only order detail/list routes that are not yet used by the migrated primary screens.
+- Auth sign-in, sign-up, sign-out, and session checks are now implemented in the Next workspace with a local `yoncom_session` cookie.
+- `/` redirects directly to `/admin/pos`; the migration/status landing copy is removed from the runtime path.
+- Invalid client table IDs are rejected in the client route before calling `/api/table`, which avoids noisy invalid-request errors for malformed URLs and clears stale client table state.
+- Admin POS keeps the legacy three-column layout on desktop and stacks orders, tables, and inventory at narrow in-app Browser widths.
+- `pnpm run seed:dummy` upserts a realistic `demo_` D1 fixture: admin user, menus, menu categories, tables, active/closed contexts, paid/unpaid orders, payments, and menu-order states.
+- Cooker now auto-monitors paid pending menu orders and uses a responsive narrow-width layout.
+- The new D1 mutation compatibility layer detects live schema differences before writes, including singular `tableContext`, legacy `userId` columns, and payments with either `orderId` or order-id-as-payment-id.
+- POS table count now excludes soft-deleted tables from the denominator; table mutations reload the store after successful writes.
 
 Verification:
 
@@ -439,16 +448,17 @@ Verification:
   - all not-yet-migrated API route contracts returning explicit 501 placeholders
 - `pnpm --filter web-next typecheck` passed.
 - `pnpm --filter web-next build` passed.
-- `pnpm run test` passed with 37 tests.
-- Browser smoke verified `/`, `/auth`, `/admin/pos`, and `/client/table/demo-table` render under the Next dev server at `http://localhost:3000`.
+- `pnpm run test` passed with 23 tests after replacing migrated placeholder contracts with focused mutation route tests.
+- Codex in-app Browser smoke verified `/auth` login, `/admin/pos`, `/admin/cooker`, `/client/table/demo_table_win1`, menu detail modal opening, and image loading under the Next dev server at `http://localhost:3000`.
+- Codex in-app Browser interaction verification confirmed click/input-to-D1 write paths for client order creation, POS payment, cooker completion, table occupy/vacate/create/update/remove, and menu create/update/remove.
 - `next start --port 3001` verified the read-only route handlers load root env variables and return 200 for menu/table list routes.
 - A later localhost:3000 DBQuery error was traced to the long-running dev server keeping stale D1 env/client state after `.env.local` changed. `apps/next/lib/server/db.ts` now reloads local root `.env`/`.env.local` D1 keys in non-production server runtime and rebuilds the cached D1 client when the config changes.
 
 Next migration slice:
 
-- Port server/API runtime from `apps/api` into Next Route Handlers, starting with read-only routes (`GET /api/table`, `GET /api/menu`, `GET /api/admin/table`, `GET /api/admin/menu`) before mutations.
-- Introduce lazy server DB/auth/storage adapters; do not initialize Drizzle, Lucia, D1, or object storage at module scope.
-- Add characterization tests for order creation/cancellation/payment before moving write endpoints.
+- Port the remaining non-primary API routes: image upload/storage, payout, and legacy order list/detail reads.
+- Add real admin authorization checks to all admin write routes. The current auth screen works, but admin route enforcement is still incomplete.
+- Decide final storage/runtime target for menu image uploads before replacing the image placeholder.
 
 ## Do Not Forget
 

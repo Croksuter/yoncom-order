@@ -9,7 +9,7 @@ export default function ShopIntro({ tableName, tableSeats }: { tableName: string
             <span className="text-xl font-semibold text-gray-500">{tableName}</span>
           </div>
         </div>
-        <img src={"/" + "favicon.ico"} alt="" width={100} height={100} className="p-2 rounded-2xl" />
+        <img src="/icon.svg" alt="" width={100} height={100} className="p-2 rounded-2xl" />
       </div>
     </>
   );

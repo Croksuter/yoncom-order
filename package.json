@@ -12,6 +12,7 @@
     "build": "pnpm --filter web-next build",
     "build:legacy": "concurrently -n api,web -c cyan,magenta \"pnpm --filter api build\" \"pnpm --filter web build\"",
     "build:next": "pnpm --filter web-next build",
+    "seed:dummy": "pnpm --filter web-next seed:dummy",
     "typecheck:next": "pnpm --filter web-next typecheck",
     "test": "pnpm --filter web-next test",
     "test:next": "pnpm --filter web-next test",

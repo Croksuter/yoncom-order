@@ -20,11 +20,11 @@ export default function Inventories() {
     <div className="full p-2">
       <Card className="full bg-[#F2F2F2] px-3 fc rounded-3xl">
         <CardHeader className="px-2">
-          <CardTitle className="text-2xl">재고 현황</CardTitle>
+          <CardTitle className="whitespace-nowrap text-xl sm:text-2xl">재고 현황</CardTitle>
         </CardHeader>
-        <div className="fr justify-end *:mx-1 mb-3">
-          <Button onClick={() => setCreateMenuModalOpen(true)}>메뉴 추가</Button>
-          <Button variant="outline" onClick={() => setRemoveMenuModalOpen(true)}>메뉴 제거</Button>
+        <div className="mb-3 flex flex-wrap justify-end gap-2">
+          <Button className="shrink-0" onClick={() => setCreateMenuModalOpen(true)}>메뉴 추가</Button>
+          <Button className="shrink-0" variant="outline" onClick={() => setRemoveMenuModalOpen(true)}>메뉴 제거</Button>
         </div>
         <CardContent className="p-0 overflow-y-auto">
           <Table className="rounded-xl overflow-hidden">

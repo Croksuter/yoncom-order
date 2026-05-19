@@ -117,3 +117,34 @@ Database schema markers include:
 - Runtime data is not migrated yet: most `/api/*` route handlers still return `NEXT_MIGRATION_NOT_IMPLEMENTED`, so migrated screens render structure but do not load real DB-backed rows.
 - Read-only menu/table API handlers have been started in Next with a lazy Cloudflare D1 HTTP adapter. After correcting `CLOUDFLARE_ACCOUNT_ID`, menu/admin-menu/admin-table list routes return 200. The live D1 schema still has legacy `tableContext`, so Next currently bridges it to the app-facing `tableContexts` shape in read-only queries.
 - Next migration notes and the next API-porting order are recorded in `docs/nextjs-migration-analysis.md`.
+- Browser verification now uses the Codex in-app Browser plugin (`plugin://browser@openai-bundled`) through `node_repl`, not the standalone Playwright MCP surface.
+- `/` now redirects to `/admin/pos` so the dev server opens the actual service screen instead of a migration/status page.
+- `/client/table/[id]` now rejects invalid non-15-character table IDs client-side before firing `/api/table`, preventing noisy invalid-request errors and stale table state.
+- The POS layout keeps its three-column desktop shape at `lg` and stacks orders/tables/inventory on narrow in-app Browser widths so Korean headings and controls do not wrap vertically.
+
+## 2026-05-19 Dummy Runtime Fixture
+
+- Added `pnpm run seed:dummy`, which upserts realistic `demo_` D1 rows without deleting existing data.
+- Current fixture rows: 1 admin user, 3 menu categories, 6 menus with real image URLs, 4 tables, 3 table contexts, 3 orders, 3 payments, and 7 menu-order rows.
+- Demo login: `demo.admin@yoncom.local` / `demo-admin-1234`.
+- Demo routes: `/admin/pos`, `/admin/cooker`, `/client/table/demo_table_win1`, `/client/table/demo_table_fam1`.
+- Implemented minimal Next auth routes for sign-in, sign-up, sign-out, and session cookie checks so the auth screen can be browser-tested.
+- Updated cooker defaults to auto-monitor paid pending menu orders, and made cooker cards responsive in the in-app Browser narrow viewport.
+- Verified in Codex in-app Browser that POS, cooker, client table, menu detail modal, and auth login render and respond using the dummy data.
+
+## 2026-05-19 Mutation Runtime Slice
+
+- Implemented DB-backed Next Route Handler mutations for client order create/cancel, admin order pay/cancel/complete, deposit matching, table create/update/remove/occupy/vacate, menu create/update/remove, and menu category create/update/remove.
+- Added `apps/next/lib/server/d1-mutations.ts` as the D1 write compatibility layer. It detects the live legacy schema (`tableContext`, optional `userId`, payments with or without `orderId`, optional `method/bank/depositor`) and filters inserts/updates to existing columns.
+- Client table mutations now reload admin table data after successful writes, so POS state follows D1 state without a manual refresh.
+- Fixed POS table count to use active non-deleted tables for the total, avoiding `(2/5)` after soft-deleting a table.
+- Fixed cart submission so failed validation or failed order creation resets the in-progress state instead of leaving the order button stuck.
+- Fixed POS occupied-table amount calculation to multiply item price by quantity.
+- Added mutation route tests that simulate D1 HTTP requests for order creation, deposit payment, and legacy `userId` table inserts.
+- Browser-verified actual UI click/input flows against live D1 on `localhost:3000`:
+  - client menu add-to-cart and `주문하기` created an unpaid D1 order, decremented stock, and appeared in POS
+  - POS `결제` marked the matching payment paid and moved the order to cooking state
+  - cooker `조리 완료` changed the menu order status to `SERVED`
+  - POS table detail `비활성화` cleared the active table context after all menu orders were served
+  - POS menu create/update/remove persisted a menu row and then soft-deleted it
+  - POS table create/update/occupy/vacate/remove persisted table rows/contexts and then soft-deleted the table

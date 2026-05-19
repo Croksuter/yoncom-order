@@ -1,9 +1,9 @@
-import { notMigrated } from "~/lib/server/responses";
 import { isNull } from "drizzle-orm";
 import { menuCategories } from "db/schema";
-import { getValidation } from "shared/types/requests/admin/menu";
-import { ok, parseSearchParams, routeError } from "~/lib/server/api";
+import { createValidation, getValidation, removeValidation, updateValidation } from "shared/types/requests/admin/menu";
+import { fail, ok, parseSearchParams, routeError } from "~/lib/server/api";
 import { getDb } from "~/lib/server/db";
+import { createAdminMenu, removeAdminMenu, updateAdminMenu } from "~/lib/server/d1-mutations";
 
 export async function GET(request: Request) {
   try {
@@ -22,23 +22,47 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST() {
-  return notMigrated("POST /api/admin/menu", {
-    requiresAdmin: true,
-    schema: "AdminMenuRequest.createValidation",
-  });
+export async function POST(request: Request) {
+  try {
+    const query = createValidation.parse(await request.json());
+    const result = await createAdminMenu(query.menuOptions);
+
+    if (result.error) {
+      return fail(result.error, result.status);
+    }
+
+    return ok(result.result, result.status);
+  } catch (error) {
+    return routeError(error);
+  }
 }
 
-export async function PUT() {
-  return notMigrated("PUT /api/admin/menu", {
-    requiresAdmin: true,
-    schema: "AdminMenuRequest.updateValidation",
-  });
+export async function PUT(request: Request) {
+  try {
+    const query = updateValidation.parse(await request.json());
+    const result = await updateAdminMenu(query.menuId, query.menuOptions);
+
+    if (result.error) {
+      return fail(result.error, result.status);
+    }
+
+    return ok(result.result, result.status);
+  } catch (error) {
+    return routeError(error);
+  }
 }
 
-export async function DELETE() {
-  return notMigrated("DELETE /api/admin/menu", {
-    requiresAdmin: true,
-    schema: "AdminMenuRequest.removeValidation",
-  });
+export async function DELETE(request: Request) {
+  try {
+    const query = removeValidation.parse(await request.json());
+    const result = await removeAdminMenu(query.menuId);
+
+    if (result.error) {
+      return fail(result.error, result.status);
+    }
+
+    return ok(result.result, result.status);
+  } catch (error) {
+    return routeError(error);
+  }
 }

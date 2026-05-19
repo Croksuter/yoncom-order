@@ -46,10 +46,10 @@ export default function MenuMonitor({
     );
 
   return (
-    <div className="full p-2">
+    <div className="min-h-[18rem] w-full p-2 sm:h-full sm:min-w-[16rem] sm:flex-1">
       <Card className="full bg-[#F2F2F2] px-3 fc rounded-3xl">
         <CardHeader className="px-2">
-          <CardTitle className="text-xl font-bold">{menu.name}</CardTitle>
+          <CardTitle className="text-xl font-bold [word-break:keep-all]">{menu.name}</CardTitle>
         </CardHeader>
         <CardContent className="p-0 overflow-y-auto *:hover:cursor-pointer">
           {menuOrders

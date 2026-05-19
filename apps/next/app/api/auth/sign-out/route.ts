@@ -1,5 +1,5 @@
-import { notMigrated } from "~/lib/server/responses";
+import { clearAuthResponse } from "~/lib/server/auth-session";
 
 export async function POST() {
-  return notMigrated("POST /api/auth/sign-out");
+  return clearAuthResponse({ result: "Success" });
 }

@@ -23,9 +23,9 @@ export default function Orders() {
   return (
     <div className="full p-2">
       <Card className="full bg-[#F2F2F2] px-3 fc rounded-3xl">
-        <CardHeader className="px-2 fr items-center justify-between">
-          <CardTitle className="text-2xl">주문 현황 <b className="font-light text-lg">({inProgressOrders.length})</b></CardTitle>
-          <Button variant="outline" className="bg-slate-600 text-white" onClick={() => {
+        <CardHeader className="flex flex-wrap items-center justify-between gap-2 px-2">
+          <CardTitle className="whitespace-nowrap text-xl sm:text-2xl">주문 현황 <b className="font-light text-lg">({inProgressOrders.length})</b></CardTitle>
+          <Button variant="outline" className="shrink-0 bg-slate-600 text-white" onClick={() => {
             window.open("/admin/cooker", "_blank");
           }}>요리 섹션</Button>
         </CardHeader>

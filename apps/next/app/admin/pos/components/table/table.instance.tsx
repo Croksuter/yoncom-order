@@ -27,7 +27,10 @@ export default function TableInstance({
       order.deletedAt === null
       && order.payment.paid
     ).map((order) => order.menuOrders).flat() || [];
-  const amount = menuOrders.reduce((acc, menuOrder) => acc + (menuId2menu(menuOrder.menuId)?.price ?? Infinity * menuOrder.quantity), 0) || 0;
+  const amount = menuOrders.reduce(
+    (acc, menuOrder) => acc + (menuId2menu(menuOrder.menuId)?.price ?? 0) * menuOrder.quantity,
+    0,
+  );
 
   const isOnOrder = activeTableContext?.orders.some((order) => 
     order.deletedAt === null

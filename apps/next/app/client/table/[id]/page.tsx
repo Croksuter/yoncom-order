@@ -16,10 +16,17 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
   const { id } = use(params);
   const { clientTable } = useTableStore();
   const { clientMenuCategories } = useMenuStore();
+  const isValidTableId = id.length === 15;
 
   useEffect(() => {
+    useTableStore.setState({ clientTable: null });
+
+    if (!isValidTableId) {
+      return;
+    }
+
     void useTableStore.getState().clientGetTable({ tableId: id });
-  }, [id]);
+  }, [id, isValidTableId]);
 
   useEffect(() => {
     if (!clientTable) {
@@ -42,7 +49,9 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
         </>
       ) : (
         <div className="p-6 text-center">
-          <h1 className="text-xl font-bold">존재하지 않는 테이블입니다.</h1>
+          <h1 className="text-xl font-bold">
+            {isValidTableId ? "존재하지 않는 테이블입니다." : "올바르지 않은 테이블 주소입니다."}
+          </h1>
           <p className="mt-2 text-sm text-slate-500">tableId: {id}</p>
         </div>
       )}

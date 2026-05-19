@@ -51,10 +51,14 @@ export default function CartModal({
     if (duringPurchase) return;
     setDuringPurchase(true);
     const isValid = await validateOrder(menuOrders);
-    if (!isValid) return;
+    if (!isValid) {
+      setDuringPurchase(false);
+      return;
+    }
     
     const res = await purchaseMenuOrders();
     if (res === null) {
+      setDuringPurchase(false);
       return;
     }
 

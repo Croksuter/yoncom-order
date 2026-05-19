@@ -12,7 +12,7 @@ export default function AuthPage() {
 
   useEffect(() => {
     void isSignedIn(
-      () => setSignedIn(true),
+      (res) => setSignedIn(Boolean(res.user)),
       () => setSignedIn(false),
     );
   }, []);

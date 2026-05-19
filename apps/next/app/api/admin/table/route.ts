@@ -1,6 +1,6 @@
-import { notMigrated } from "~/lib/server/responses";
-import { getValidation } from "shared/types/requests/admin/table";
-import { ok, parseSearchParams, routeError } from "~/lib/server/api";
+import { createValidation, getValidation, removeValidation, updateValidation } from "shared/types/requests/admin/table";
+import { fail, ok, parseSearchParams, routeError } from "~/lib/server/api";
+import { createAdminTable, removeAdminTable, updateAdminTable } from "~/lib/server/d1-mutations";
 import { getTablesWithRelations } from "~/lib/server/table-queries";
 
 export async function GET(request: Request) {
@@ -13,23 +13,47 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST() {
-  return notMigrated("POST /api/admin/table", {
-    requiresAdmin: true,
-    schema: "AdminTableRequest.createValidation",
-  });
+export async function POST(request: Request) {
+  try {
+    const query = createValidation.parse(await request.json());
+    const result = await createAdminTable(query.tableOptions.name, query.tableOptions.seats);
+
+    if (result.error) {
+      return fail(result.error, result.status);
+    }
+
+    return ok(result.result, result.status);
+  } catch (error) {
+    return routeError(error);
+  }
 }
 
-export async function PUT() {
-  return notMigrated("PUT /api/admin/table", {
-    requiresAdmin: true,
-    schema: "AdminTableRequest.updateValidation",
-  });
+export async function PUT(request: Request) {
+  try {
+    const query = updateValidation.parse(await request.json());
+    const result = await updateAdminTable(query.tableId, query.tableOptions);
+
+    if (result.error) {
+      return fail(result.error, result.status);
+    }
+
+    return ok(result.result, result.status);
+  } catch (error) {
+    return routeError(error);
+  }
 }
 
-export async function DELETE() {
-  return notMigrated("DELETE /api/admin/table", {
-    requiresAdmin: true,
-    schema: "AdminTableRequest.removeValidation",
-  });
+export async function DELETE(request: Request) {
+  try {
+    const query = removeValidation.parse(await request.json());
+    const result = await removeAdminTable(query.tableId);
+
+    if (result.error) {
+      return fail(result.error, result.status);
+    }
+
+    return ok(result.result, result.status);
+  } catch (error) {
+    return routeError(error);
+  }
 }

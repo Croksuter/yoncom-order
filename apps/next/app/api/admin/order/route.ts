@@ -1,15 +1,33 @@
-import { notMigrated } from "~/lib/server/responses";
+import { paidValidation, removeValidation } from "shared/types/requests/admin/order";
+import { fail, ok, routeError } from "~/lib/server/api";
+import { cancelOrder, markOrderPaid } from "~/lib/server/d1-mutations";
 
-export async function PUT() {
-  return notMigrated("PUT /api/admin/order", {
-    requiresAdmin: true,
-    schema: "AdminOrderRequest.paidValidation",
-  });
+export async function PUT(request: Request) {
+  try {
+    const query = paidValidation.parse(await request.json());
+    const result = await markOrderPaid(query.orderId);
+
+    if (result.error) {
+      return fail(result.error, result.status);
+    }
+
+    return ok(result.result, result.status);
+  } catch (error) {
+    return routeError(error);
+  }
 }
 
-export async function DELETE() {
-  return notMigrated("DELETE /api/admin/order", {
-    requiresAdmin: true,
-    hotspot: "deleteOrder",
-  });
+export async function DELETE(request: Request) {
+  try {
+    const query = removeValidation.parse(await request.json());
+    const result = await cancelOrder(query.orderId, { allowPaid: true });
+
+    if (result.error) {
+      return fail(result.error, result.status);
+    }
+
+    return ok(result.result, result.status);
+  } catch (error) {
+    return routeError(error);
+  }
 }

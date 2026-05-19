@@ -1,22 +1,49 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "~/components/ui/button";
 import useMenuStore from "~/stores/menu.store";
+import useTableStore from "~/stores/table.store";
 import MenuAddModal from "./components/menu.add.modal";
 import MenuMonitor from "./components/menu.monitor";
 import MenuRemoveModal from "./components/menu.remove.modal";
 
 export default function AdminCookerPage() {
   const { menus } = useMenuStore();
+  const { tables } = useTableStore();
 
   const [menuAddModalOpen, setMenuAddModalOpen] = useState(false);
   const [menuRemoveModalOpen, setMenuRemoveModalOpen] = useState(false);
   const [monitoringMenus, setMonitoringMenus] = useState<string[]>([]);
+  const pendingMenuIds = useMemo(() => {
+    const menuIds = new Set<string>();
+
+    for (const table of tables) {
+      for (const order of table.tableContexts[0]?.orders ?? []) {
+        if (!order?.payment?.paid || order.deletedAt !== null) {
+          continue;
+        }
+
+        for (const menuOrder of order.menuOrders) {
+          if (menuOrder.deletedAt === null && menuOrder.status === "PENDING") {
+            menuIds.add(menuOrder.menuId);
+          }
+        }
+      }
+    }
+
+    return [...menuIds].filter((menuId) => menus.some((menu) => menu.id === menuId));
+  }, [menus, tables]);
+
+  useEffect(() => {
+    if (monitoringMenus.length === 0 && pendingMenuIds.length > 0) {
+      setMonitoringMenus(pendingMenuIds);
+    }
+  }, [monitoringMenus.length, pendingMenuIds]);
 
   return (
-    <main className="h-screen w-screen bg-white p-2 fc">
-      <div className="items-center fr">
+    <main className="flex min-h-screen w-screen flex-col bg-white p-2">
+      <div className="flex flex-wrap items-center gap-2">
         <h1 className="mx-4 my-4 text-2xl font-bold">메뉴 모니터링</h1>
         <Button
           variant="outline"
@@ -28,7 +55,7 @@ export default function AdminCookerPage() {
           포스로 이동
         </Button>
       </div>
-      <div className="h-fit w-full justify-end *:mx-1 fr">
+      <div className="flex h-fit w-full flex-wrap justify-end gap-2">
         <Button disabled={menus.length === 0} onClick={() => setMenuAddModalOpen(true)}>
           메뉴 추가
         </Button>
@@ -40,7 +67,7 @@ export default function AdminCookerPage() {
           메뉴 제거
         </Button>
       </div>
-      <div className="w-full flex-1 p-2 fr">
+      <div className="flex w-full flex-1 flex-col gap-3 overflow-y-auto p-2 sm:flex-row">
         {monitoringMenus.map((menuId) => (
           <MenuMonitor key={menuId} menuId={menuId} />
         ))}

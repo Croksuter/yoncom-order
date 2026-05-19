@@ -16,26 +16,27 @@ export default function Tables() {
   const [removeTableModalOpen, setRemoveTableModalOpen] = useState(false);
 
   const { tables, isLoaded } = useTableStore();
+  const activeTables = tables.filter((table) => table.deletedAt === null);
+  const occupiedTableCount = activeTables.filter((table) => table.tableContexts[0]?.deletedAt === null).length;
 
   return (
     <>
       <div className="full p-2">
         <Card className="full bg-[#F2F2F2] px-3 pb-3 fc rounded-3xl">
           <CardHeader className="px-2">
-            <CardTitle className="text-2xl">테이블 현황 <b className="font-light text-lg">({tables.filter((table) => table.tableContexts[0]?.deletedAt === null).length}/{tables.length})</b></CardTitle>
+            <CardTitle className="whitespace-nowrap text-xl sm:text-2xl">테이블 현황 <b className="font-light text-lg">({occupiedTableCount}/{activeTables.length})</b></CardTitle>
           </CardHeader>
-          <div className="fr justify-end *:mx-1 mb-3">
-            <Button onClick={() => setCreateTableModalOpen(true)}>테이블 추가</Button>
+          <div className="mb-3 flex flex-wrap justify-end gap-2">
+            <Button className="shrink-0" onClick={() => setCreateTableModalOpen(true)}>테이블 추가</Button>
             {/* <Button className="!bg-slate-600" onClick={() => setUpdateTableModalOpen(true)}>테이블 변경</Button> */}
-            <Button variant="outline" onClick={() => setRemoveTableModalOpen(true)}>테이블 제거</Button>
+            <Button className="shrink-0" variant="outline" onClick={() => setRemoveTableModalOpen(true)}>테이블 제거</Button>
           </div>
           {(isLoaded || tables.length > 0) ? (
             <CardContent className="flex-1 p-2 overflow-y-auto">
               <div className={"grid gap-4"} style={{
-                gridTemplateColumns: `repeat(${min(ceil(sqrt(tables.filter((table) => table.deletedAt === null).length)), 4)}, minmax(0, 1fr))`,
+                gridTemplateColumns: `repeat(${min(ceil(sqrt(activeTables.length)), 4)}, minmax(0, 1fr))`,
               }}>
-                {tables
-                  .filter((table) => table.deletedAt === null)
+                {activeTables
                   .sort((a, b) => a.name.localeCompare(b.name))
                   .map(table =>
                     <TableInstance
