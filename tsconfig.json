@@ -1,4 +1,10 @@
 {
+  "files": [],
+  "references": [
+    {
+      "path": "./apps/next"
+    }
+  ],
   "compilerOptions": {
     "strict": true,
     "baseUrl": ".",
