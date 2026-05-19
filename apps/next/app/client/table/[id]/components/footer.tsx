@@ -5,6 +5,7 @@ import useCartStore from "~/stores/cart.store";
 import useTableStore from "~/stores/table.store";
 import OrderModal from "./order/order.modal";
 import OrderHistoryModal from "./order/order.history.modal";
+import { isPaymentInstructionOrder, isUnresolvedPaymentOrder } from "~/lib/order-status";
 
 export default function Footer() {
   const [purchaseModalOpen, setPurchaseModalOpen] = useState(false);
@@ -14,8 +15,13 @@ export default function Footer() {
   const { clientTable, clientGetTable } = useTableStore();
 
   const quantity = menuOrders.reduce((acc, menuOrder) => acc + menuOrder.quantity, 0);
+  const findUnresolvedPaymentOrder = (table: typeof clientTable) => (
+    table?.tableContexts.flatMap((tableContext) => tableContext.orders).find(isUnresolvedPaymentOrder)
+  );
+  const unresolvedPaymentOrder = findUnresolvedPaymentOrder(clientTable);
+  const inProgressOrderRemain = !!unresolvedPaymentOrder;
+  const needsManualReview = unresolvedPaymentOrder?.payment.status === "MANUAL_REVIEW";
 
-  const inProgressOrderRemain = clientTable?.tableContexts.some((tableContext) => tableContext.orders.some((order) => !order.payment.paid && order.deletedAt === null));
   useEffect(() => {
     if (inProgressOrderRemain) {
       const interval = setInterval(() => {
@@ -54,12 +60,17 @@ export default function Footer() {
                   tableId: clientTable!.id,
                 });
                 const newClientTable = useTableStore.getState().clientTable;
-                if (newClientTable?.tableContexts.some((tableContext) => tableContext.orders.some((order) => !order.payment.paid))) {
+                const latestUnresolvedPaymentOrder = findUnresolvedPaymentOrder(newClientTable);
+                if (latestUnresolvedPaymentOrder && isPaymentInstructionOrder(latestUnresolvedPaymentOrder)) {
                   setPurchaseModalOpen(true);
+                } else if (latestUnresolvedPaymentOrder) {
+                  setOrderHistoryModalOpen(true);
                 }
               }}
               className="fc flex-1 h-full rounded-3xl bg-gray-500 text-white text-2xl hover:cursor-pointer hover:bg-gray-600"
-            >입금 안내<br /><span className="-mt-2 text-sm text-gray-300">입금 확인 전 주문이 있습니다.</span>
+            >{needsManualReview ? "입금 확인 중" : "입금 안내"}<br /><span className="-mt-2 text-sm text-gray-300">
+              {needsManualReview ? "운영자 확인이 필요한 주문이 있습니다." : "입금 확인 전 주문이 있습니다."}
+            </span>
             </Button>
           ) : (
             <Button

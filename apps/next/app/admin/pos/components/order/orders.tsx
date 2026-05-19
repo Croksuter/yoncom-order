@@ -1,27 +1,36 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import useTableStore from "~/stores/table.store";
-import * as Schema from "db/schema";
 import OrderInstance from "./order.instance";
 import OrderDetailModal from "./order.detail.modal";
 import * as AdminTableResponse from "shared/types/responses/admin/table";
 import { Button } from "~/components/ui/button";
+import { isActiveOrder, isKitchenOrder, isUnresolvedPaymentOrder } from "~/lib/order-status";
 
 export default function Orders() {
   const [orderDetail, setOrderDetail] = useState<AdminTableResponse.Get["result"][number]["tableContexts"][number]["orders"][number] | null>(null);
   const [orderDetailModalOpenState, setOrderDetailModalOpenState] = useState(false);
 
   const { tables, bankTransactions } = useTableStore();
-  const orders = tables
+  const orderRows = tables
     .filter((table) => table.tableContexts[0]?.deletedAt === null)
-    .flatMap((table) => table.tableContexts[0].orders);
-  const inProgressOrders = orders.filter((order) => (
-    order.deletedAt === null
-    && order.menuOrders.some((menuOrder) => (
-      menuOrder.status === Schema.menuOrderStatus.PENDING
-      || menuOrder.status === Schema.menuOrderStatus.READY
-    )))
-  ).sort((a, b) => a.createdAt - b.createdAt);
+    .flatMap((table) => table.tableContexts[0].orders.map((order) => ({
+      tableName: table.name,
+      order,
+    })));
+  const orders = orderRows.map((row) => row.order);
+  const inProgressOrders = orders.filter((order) => {
+    if (!isActiveOrder(order)) return false;
+    if (isUnresolvedPaymentOrder(order)) return true;
+    if (!isKitchenOrder(order)) return false;
+    return order.menuOrders.some((menuOrder) => (
+      menuOrder.status === "PENDING"
+      || menuOrder.status === "READY"
+    ));
+  }).sort((a, b) => a.createdAt - b.createdAt);
+  const refundPendingOrders = orderRows
+    .filter(({ order }) => order.deletedAt === null && order.payment.status === "REFUND_PENDING")
+    .sort((a, b) => a.order.createdAt - b.order.createdAt);
   const reviewTransactions = bankTransactions.filter((transaction) => transaction.status !== "IGNORED");
   const candidateReasonLabel = (reason: string) => {
     if (reason === "EXPECTED_AMOUNT") return "입금금액 일치";
@@ -73,6 +82,28 @@ export default function Orders() {
                         </Button>
                       ))}
                     </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {refundPendingOrders.length > 0 && (
+            <div className="mb-3 rounded-md border border-rose-300 bg-rose-50 p-2">
+              <div className="mb-2 text-sm font-bold text-rose-900">환불 필요 ({refundPendingOrders.length})</div>
+              <div className="space-y-2">
+                {refundPendingOrders.map(({ tableName, order }) => (
+                  <div key={order.id} className="flex flex-wrap items-center justify-between gap-2 rounded bg-white p-2 text-sm">
+                    <div>
+                      <div className="font-semibold">{tableName} #{order.displayNumber ?? "-"} · {(order.payment.refundAmount ?? order.payment.expectedTransferAmount ?? order.payment.amount).toLocaleString()}원</div>
+                      <div className="text-neutral-600">{order.cancelReason ?? "취소 사유 없음"} · {order.cancelledAt ? new Date(order.cancelledAt).toLocaleString() : "-"}</div>
+                    </div>
+                    <Button
+                      size="sm"
+                      className="bg-rose-700 text-white"
+                      onClick={() => useTableStore.getState().adminRefundOrder({ orderId: order.id })}
+                    >
+                      환불 완료 처리
+                    </Button>
                   </div>
                 ))}
               </div>

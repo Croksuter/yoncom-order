@@ -18,6 +18,7 @@ export type GetOrderQuery = z.infer<typeof getValidation>;
 
 export const removeValidation = z.object({
   orderId: z.string().length(15),
+  cancelReason: z.string().trim().min(1).max(200).optional(),
 });
 
 export type RemoveOrderQuery = z.infer<typeof removeValidation>;
@@ -39,3 +40,10 @@ export const pickUpValidation = z.object({
 });
 
 export type PickUpOrder = z.infer<typeof pickUpValidation>;
+
+export const refundValidation = z.object({
+  orderId: z.string().length(15),
+  refundNote: z.string().trim().max(200).optional(),
+});
+
+export type RefundOrder = z.infer<typeof refundValidation>;

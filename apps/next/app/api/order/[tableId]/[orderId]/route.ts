@@ -1,11 +1,25 @@
-import { notMigrated } from "~/lib/server/responses";
+import { fail, ok, routeError } from "~/lib/server/api";
+import { getCustomerOrderResponse } from "~/lib/server/table-queries";
 
 type OrderDetailRouteContext = {
   params: Promise<{ tableId: string; orderId: string }>;
 };
 
 export async function GET(_request: Request, { params }: OrderDetailRouteContext) {
-  const { tableId, orderId } = await params;
+  try {
+    const { tableId, orderId } = await params;
+    const result = await getCustomerOrderResponse(tableId, orderId);
 
-  return notMigrated("GET /api/order/:tableId/:orderId", { tableId, orderId });
+    if (!result) {
+      return fail("Table Not Found", 404);
+    }
+
+    if (result.tableContextId === null || result.orders.length === 0) {
+      return fail("Order Not Found", 404);
+    }
+
+    return ok(result);
+  } catch (error) {
+    return routeError(error);
+  }
 }

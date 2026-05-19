@@ -26,3 +26,7 @@ export type Complete = {
 export type PickUp = {
   result: string;
 };
+
+export type Refund = {
+  result: string;
+};

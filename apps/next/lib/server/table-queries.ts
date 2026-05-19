@@ -23,6 +23,9 @@ type OrderRow = BaseRow & {
   displayNumber?: number | null;
   status?: string | null;
   expiresAt?: number | string | null;
+  cancelReason?: string | null;
+  cancelledAt?: number | string | null;
+  cancelledByUserId?: string | null;
 };
 
 type PaymentRow = BaseRow & {
@@ -37,6 +40,11 @@ type PaymentRow = BaseRow & {
   matchedBankTransactionId?: string | null;
   matchedBy?: string | null;
   depositorHint?: string | null;
+  refundAmount?: number | null;
+  refundRequestedAt?: number | string | null;
+  refundedAt?: number | string | null;
+  refundHandledByUserId?: string | null;
+  refundNote?: string | null;
   bank?: string | null;
   depositor?: string | null;
   method?: string | null;
@@ -48,6 +56,11 @@ type MenuOrderRow = BaseRow & {
   status: string;
   orderId: string;
   menuId: string;
+};
+
+type MenuRow = BaseRow & {
+  name: string;
+  price: number;
 };
 
 type OrderWithRelations = ReturnType<typeof normalizeOrder> & {
@@ -131,6 +144,8 @@ function normalizePayment(row: PaymentRow) {
     expectedTransferAmount: row.expectedTransferAmount ?? row.amount,
     expiresAt: normalizeTime(row.expiresAt ?? null),
     paidAt: normalizeTime(row.paidAt ?? null),
+    refundRequestedAt: normalizeTime(row.refundRequestedAt ?? null),
+    refundedAt: normalizeTime(row.refundedAt ?? null),
   };
 }
 
@@ -195,4 +210,67 @@ export async function getTablesWithRelations(tableId?: string) {
     ...normalizeTable(table),
     tableContexts: contextsByTableId.get(table.id) ?? [],
   }));
+}
+
+export async function getCustomerOrderResponse(tableId: string, orderId?: string) {
+  const table = (await getTablesWithRelations(tableId))[0];
+
+  if (!table) {
+    return null;
+  }
+
+  const activeContext = table.tableContexts.find((context) => context.deletedAt === null) ?? null;
+  if (!activeContext) {
+    return {
+      tableId: table.id,
+      tableName: table.name,
+      tableContextId: null,
+      orders: [],
+    };
+  }
+
+  const menus = await queryD1<MenuRow>("SELECT * FROM menus");
+  const menusById = new Map(menus.map((menu) => [menu.id, menu]));
+  const sourceOrders = orderId
+    ? activeContext.orders.filter((order) => order.id === orderId)
+    : activeContext.orders;
+
+  return {
+    tableId: table.id,
+    tableName: table.name,
+    tableContextId: activeContext.id,
+    orders: sourceOrders.map((order) => ({
+      id: order.id,
+      displayNumber: order.displayNumber ?? null,
+      status: order.status ?? "ACTIVE",
+      createdAt: order.createdAt,
+      expiresAt: normalizeTime(order.expiresAt ?? null),
+      cancelReason: order.cancelReason ?? null,
+      cancelledAt: normalizeTime(order.cancelledAt ?? null),
+      payment: {
+        id: order.payment?.id ?? "",
+        status: order.payment?.status ?? "PENDING",
+        paid: order.payment?.paid ?? false,
+        originalAmount: order.payment?.originalAmount ?? order.payment?.amount ?? 0,
+        expectedTransferAmount: order.payment?.expectedTransferAmount ?? order.payment?.amount ?? 0,
+        paymentCode: order.payment?.paymentCode ?? null,
+        expiresAt: order.payment?.expiresAt ?? null,
+        paidAt: order.payment?.paidAt ?? null,
+        refundAmount: order.payment?.refundAmount ?? null,
+        refundRequestedAt: order.payment?.refundRequestedAt ?? null,
+        refundedAt: order.payment?.refundedAt ?? null,
+      },
+      menuOrders: order.menuOrders.map((menuOrder) => {
+        const menu = menusById.get(menuOrder.menuId);
+        return {
+          id: menuOrder.id,
+          menuId: menuOrder.menuId,
+          menuName: menu?.name ?? "알 수 없는 메뉴",
+          price: menu?.price ?? 0,
+          quantity: menuOrder.quantity,
+          status: menuOrder.status,
+        };
+      }),
+    })),
+  };
 }

@@ -116,6 +116,8 @@ describe("table relation query network simulation", () => {
                   expectedTransferAmount: 12000,
                   expiresAt: null,
                   paidAt: null,
+                  refundRequestedAt: null,
+                  refundedAt: null,
                   createdAt: 1710000000002,
                   updatedAt: 1710000000002,
                   deletedAt: null,

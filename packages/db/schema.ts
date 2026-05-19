@@ -30,6 +30,8 @@ export const paymentStatus = {
   MANUAL_REVIEW: "MANUAL_REVIEW",
   EXPIRED: "EXPIRED",
   CANCELLED: "CANCELLED",
+  REFUND_PENDING: "REFUND_PENDING",
+  REFUNDED: "REFUNDED",
 } as const;
 export type PaymentStatus = (typeof paymentStatus)[keyof typeof paymentStatus];
 
@@ -212,6 +214,9 @@ export const orders = sqliteTable("orders", {
     .$type<OrderStatus>()
     .default(orderStatus.ACTIVE),
   expiresAt: integer("expiresAt"),
+  cancelReason: text("cancelReason"),
+  cancelledAt: integer("cancelledAt"),
+  cancelledByUserId: text("cancelledByUserId").references(() => users.id),
   tableContextId: text("tableContextId")
     .notNull()
     .references(() => tableContexts.id),
@@ -254,6 +259,11 @@ export const payments = sqliteTable("payments", {
   matchedBankTransactionId: text("matchedBankTransactionId"),
   matchedBy: text("matchedBy"),
   depositorHint: text("depositorHint"),
+  refundAmount: integer("refundAmount"),
+  refundRequestedAt: integer("refundRequestedAt"),
+  refundedAt: integer("refundedAt"),
+  refundHandledByUserId: text("refundHandledByUserId").references(() => users.id),
+  refundNote: text("refundNote"),
   bank: text("bank"),
   depositor: text("depositor"),
   orderId: text("orderId").references(() => orders.id),

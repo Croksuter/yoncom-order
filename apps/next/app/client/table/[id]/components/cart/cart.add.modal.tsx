@@ -10,6 +10,7 @@ import useTableStore from "~/stores/table.store";
 import { toast } from "~/hooks/use-toast";
 import { useValidateOrder } from "~/hooks/validate-order";
 import { API_BASE_URL } from "shared/constants";
+import { isUnresolvedPaymentOrder } from "~/lib/order-status";
 
 export default function CartAddModal({
   menu,
@@ -35,7 +36,9 @@ export default function CartAddModal({
       return;
     }
 
-    const inProgressOrder = clientTable?.tableContexts.some((tableContext) => tableContext.orders.some((order) => !order.payment.paid && order.deletedAt === null));
+    const inProgressOrder = clientTable?.tableContexts.some((tableContext) => tableContext.orders.some((order) => (
+      isUnresolvedPaymentOrder(order)
+    )));
     if (inProgressOrder) {
       toast({
         title: "입금 확인 전 주문이 있습니다.",

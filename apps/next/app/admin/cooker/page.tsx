@@ -7,6 +7,7 @@ import useTableStore from "~/stores/table.store";
 import MenuAddModal from "./components/menu.add.modal";
 import MenuMonitor from "./components/menu.monitor";
 import MenuRemoveModal from "./components/menu.remove.modal";
+import { isKitchenOrder } from "~/lib/order-status";
 
 export default function AdminCookerPage() {
   const { menus } = useMenuStore();
@@ -20,7 +21,7 @@ export default function AdminCookerPage() {
 
     for (const table of tables) {
       for (const order of table.tableContexts[0]?.orders ?? []) {
-        if (!order?.payment?.paid || order.deletedAt !== null) {
+        if (!isKitchenOrder(order)) {
           continue;
         }
 

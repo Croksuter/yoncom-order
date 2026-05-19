@@ -8,29 +8,6 @@ type ContractCase = {
 };
 
 const placeholderContracts: ContractCase[] = [
-  {
-    label: "GET /api/order/[tableId]",
-    importPath: "~/app/api/order/[tableId]/route",
-    method: "GET",
-    args: [
-      new Request("http://order.test/api/order/table_123456789"),
-      { params: Promise.resolve({ tableId: "table_123456789" }) },
-    ],
-  },
-  {
-    label: "GET /api/order/[tableId]/[orderId]",
-    importPath: "~/app/api/order/[tableId]/[orderId]/route",
-    method: "GET",
-    args: [
-      new Request("http://order.test/api/order/table_123456789/order_1234567"),
-      {
-        params: Promise.resolve({
-          tableId: "table_123456789",
-          orderId: "order_1234567",
-        }),
-      },
-    ],
-  },
   { label: "GET /api/admin/payout", importPath: "~/app/api/admin/payout/route", method: "GET" },
   { label: "PUT /api/admin/image", importPath: "~/app/api/admin/image/route", method: "PUT" },
   {

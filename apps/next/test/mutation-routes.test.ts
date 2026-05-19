@@ -18,6 +18,11 @@ const paymentColumns = [
   "matchedBankTransactionId",
   "matchedBy",
   "depositorHint",
+  "refundAmount",
+  "refundRequestedAt",
+  "refundedAt",
+  "refundHandledByUserId",
+  "refundNote",
   "createdAt",
   "updatedAt",
   "deletedAt",
@@ -30,6 +35,9 @@ const orderColumns = [
   "displayNumber",
   "status",
   "expiresAt",
+  "cancelReason",
+  "cancelledAt",
+  "cancelledByUserId",
   "createdAt",
   "updatedAt",
   "deletedAt",
@@ -45,6 +53,7 @@ describe("implemented mutation route handlers", () => {
     vi.clearAllMocks();
     vi.doMock("~/lib/server/auth-session", () => ({
       requireAdmin: vi.fn(async () => null),
+      requireAdminUser: vi.fn(async () => ({ user: { id: "user_admin0000", role: "ADMIN" }, response: null })),
     }));
     stubCloudflareEnv();
   });
@@ -296,5 +305,141 @@ describe("implemented mutation route handlers", () => {
 
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({ error: "Forbidden" });
+  });
+
+  it("DELETE /api/admin/order keeps a paid cancelled order visible and marks its payment refund pending", async () => {
+    const { requests } = installD1FetchMock(({ sql }) => {
+      if (sql === "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?") {
+        return d1Success([{ name: "paymentCodeLeases" }]);
+      }
+      if (sql === "PRAGMA table_info(\"payments\")") {
+        return tableInfo(paymentColumns);
+      }
+      if (sql === "PRAGMA table_info(\"menuOrders\")") {
+        return tableInfo(["id", "quantity", "status", "orderId", "menuId", "createdAt", "updatedAt", "deletedAt"]);
+      }
+      if (sql === "PRAGMA table_info(\"orders\")") {
+        return tableInfo(orderColumns);
+      }
+      if (sql === "SELECT * FROM orders WHERE id = ? AND deletedAt IS NULL LIMIT 1") {
+        return d1Success([{
+          id: "ord_paid_000001",
+          tableContextId: "ctx_12345678901",
+          displayNumber: 7,
+          status: "ACTIVE",
+          createdAt: 1,
+          updatedAt: 1,
+          deletedAt: null,
+        }]);
+      }
+      if (sql === "SELECT * FROM payments WHERE orderId = ? AND deletedAt IS NULL LIMIT 1") {
+        return d1Success([{
+          id: "pay_paid_000001",
+          paid: 1,
+          amount: 11999,
+          orderId: "ord_paid_000001",
+          status: "PAID",
+          originalAmount: 12000,
+          expectedTransferAmount: 11999,
+          createdAt: 1,
+          updatedAt: 1,
+          deletedAt: null,
+        }]);
+      }
+      if (sql === "SELECT * FROM menuOrders WHERE orderId = ? AND deletedAt IS NULL") {
+        return d1Success([{
+          id: "menuorder_12345",
+          quantity: 1,
+          status: "PENDING",
+          orderId: "ord_paid_000001",
+          menuId: "menu_1234567890",
+          createdAt: 1,
+          updatedAt: 1,
+          deletedAt: null,
+        }]);
+      }
+      if (sql === "UPDATE menus SET quantity = quantity + ?, updatedAt = ? WHERE id = ?") {
+        return d1Success([], { duration: 1, changes: 1 });
+      }
+      if (sql.startsWith("UPDATE \"menuOrders\"")) {
+        return d1Success([], { duration: 1, changes: 1 });
+      }
+      if (sql.startsWith("UPDATE \"payments\"")) {
+        return d1Success([], { duration: 1, changes: 1 });
+      }
+      if (sql.startsWith("UPDATE \"orders\"")) {
+        return d1Success([], { duration: 1, changes: 1 });
+      }
+      if (sql === "DELETE FROM paymentCodeLeases WHERE paymentId = ?") {
+        return d1Success([], { duration: 1, changes: 1 });
+      }
+      throw new Error(`Unexpected SQL: ${sql}`);
+    });
+
+    const { DELETE } = await import("~/app/api/admin/order/route");
+    const response = await DELETE(new Request("http://order.test/api/admin/order", {
+      method: "DELETE",
+      body: JSON.stringify({ orderId: "ord_paid_000001", cancelReason: "고객 요청" }),
+    }));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ result: "Order cancelled; refund pending" });
+    const paymentUpdate = requests.find((request) => request.sql.startsWith("UPDATE \"payments\""));
+    expect(paymentUpdate?.sql).not.toContain("\"deletedAt\"");
+    expect(paymentUpdate?.params).toContain("REFUND_PENDING");
+    expect(paymentUpdate?.params).toContain(11999);
+    const orderUpdate = requests.find((request) => request.sql.startsWith("UPDATE \"orders\""));
+    expect(orderUpdate?.sql).not.toContain("\"deletedAt\"");
+    expect(orderUpdate?.params).toContain("고객 요청");
+    expect(orderUpdate?.params).toContain("user_admin0000");
+  });
+
+  it("PUT /api/admin/order/refund only completes refund pending payments", async () => {
+    const { requests } = installD1FetchMock(({ sql }) => {
+      if (sql === "PRAGMA table_info(\"payments\")") {
+        return tableInfo(paymentColumns);
+      }
+      if (sql === "SELECT * FROM orders WHERE id = ? AND deletedAt IS NULL LIMIT 1") {
+        return d1Success([{
+          id: "ord_refund_0001",
+          tableContextId: "ctx_12345678901",
+          status: "CANCELLED",
+          createdAt: 1,
+          updatedAt: 1,
+          deletedAt: null,
+        }]);
+      }
+      if (sql === "SELECT * FROM payments WHERE orderId = ? AND deletedAt IS NULL LIMIT 1") {
+        return d1Success([{
+          id: "pay_refund0001",
+          paid: 1,
+          amount: 11999,
+          orderId: "ord_refund_0001",
+          status: "REFUND_PENDING",
+          refundAmount: 11999,
+          createdAt: 1,
+          updatedAt: 1,
+          deletedAt: null,
+        }]);
+      }
+      if (sql.startsWith("UPDATE \"payments\"")) {
+        return d1Success([], { duration: 1, changes: 1 });
+      }
+      throw new Error(`Unexpected SQL: ${sql}`);
+    });
+
+    const { PUT } = await import("~/app/api/admin/order/refund/route");
+    const response = await PUT(new Request("http://order.test/api/admin/order/refund", {
+      method: "PUT",
+      body: JSON.stringify({ orderId: "ord_refund_0001", refundNote: "계좌 환불 완료" }),
+    }));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ result: "Order refund completed" });
+    const paymentUpdate = requests.find((request) => request.sql.startsWith("UPDATE \"payments\""));
+    expect(paymentUpdate?.params).toContain(0);
+    expect(paymentUpdate?.params).toContain("REFUNDED");
+    expect(paymentUpdate?.params).toContain("user_admin0000");
+    expect(paymentUpdate?.params).toContain("계좌 환불 완료");
   });
 });

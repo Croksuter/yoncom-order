@@ -1,18 +1,17 @@
-import { removeValidation } from "shared/types/requests/admin/order";
+import { refundValidation } from "shared/types/requests/admin/order";
 import { fail, ok, routeError } from "~/lib/server/api";
 import { requireAdminUser } from "~/lib/server/auth-session";
-import { cancelOrder } from "~/lib/server/d1-mutations";
+import { completeOrderRefund } from "~/lib/server/d1-mutations";
 
 export async function PUT(request: Request) {
   const admin = await requireAdminUser();
   if (admin.response) return admin.response;
 
   try {
-    const query = removeValidation.parse(await request.json());
-    const result = await cancelOrder(query.orderId, {
-      allowPaid: true,
+    const query = refundValidation.parse(await request.json());
+    const result = await completeOrderRefund(query.orderId, {
       adminUserId: admin.user?.id ?? null,
-      cancelReason: query.cancelReason,
+      refundNote: query.refundNote,
     });
 
     if (result.error) {

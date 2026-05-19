@@ -35,6 +35,7 @@ type TableState = {
   
   adminDeposit: (query: AdminDepositRequest.Create) => Promise<AdminDepositResponse.Create | null>;
   adminPayOrder: (query: AdminOrderRequest.PaidOrder) => Promise<AdminOrderResponse.Paid | null>;
+  adminRefundOrder: (query: AdminOrderRequest.RefundOrder) => Promise<AdminOrderResponse.Refund | null>;
   loadBankTransactions: () => Promise<AdminDepositResponse.Get | null>;
   adminConfirmBankTransaction: (query: AdminDepositRequest.Confirm) => Promise<AdminDepositResponse.Confirm | null>;
   adminIgnoreBankTransaction: (query: AdminDepositRequest.Ignore) => Promise<AdminDepositResponse.Ignore | null>;
@@ -180,9 +181,9 @@ const useTableStore = create<TableState>((set, get) => ({
     setter: set,
     onSuccess: (res) => {
       toast({
-      title: "주문 취소 완료",
-      description: "주문을 취소했습니다. 결제 완료 건은 환불 내역을 별도로 확인해주세요.",
-      duration: 3000,
+        title: "주문 취소 완료",
+        description: "주문 상태를 취소로 변경했습니다. 결제 완료 건은 환불 대기 목록을 확인해주세요.",
+        duration: 3000,
       });
       get().load({});
     },
@@ -252,6 +253,21 @@ const useTableStore = create<TableState>((set, get) => ({
       });
       get().load({});
       get().loadBankTransactions();
+    },
+  }),
+
+  adminRefundOrder: async (query: AdminOrderRequest.RefundOrder) => await queryStore<AdminOrderRequest.RefundOrder, AdminOrderResponse.Refund>({
+    route: "admin/order/refund",
+    method: "put",
+    query,
+    setter: set,
+    onSuccess: () => {
+      toast({
+        title: "환불 완료",
+        description: "선택한 주문을 환불 완료로 처리했습니다.",
+        duration: 3000,
+      });
+      get().load({});
     },
   }),
 

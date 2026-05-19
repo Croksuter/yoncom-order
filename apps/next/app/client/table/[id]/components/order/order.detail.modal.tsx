@@ -4,6 +4,7 @@ import { DialogContent } from "~/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
 import useMenuStore from "~/stores/menu.store";
 import * as ClientTableResponse from "shared/types/responses/client/table";
+import { getMenuOrderStatusLabel, getPaymentStatusLabel } from "~/lib/order-status";
 
 export default function OrderDetailModal({
   openState, setOpenState,
@@ -30,20 +31,6 @@ export default function OrderDetailModal({
   })
   const originalAmount = orderDetail.payment.originalAmount ?? orderDetail.payment.amount;
   const expectedTransferAmount = orderDetail.payment.expectedTransferAmount ?? orderDetail.payment.amount;
-  const paymentStatusLabel = () => {
-    if (orderDetail.payment.status === "EXPIRED") return "입금 기한 만료";
-    if (orderDetail.payment.status === "CANCELLED") return "주문취소";
-    if (orderDetail.payment.status === "MANUAL_REVIEW") return "입금 확인 필요";
-    if (!orderDetail.payment.paid) return "입금 대기";
-    return "결제 완료";
-  };
-  const menuOrderStatusLabel = (status: string) => {
-    if (status === "PENDING") return "조리 중";
-    if (status === "READY") return "준비 완료";
-    if (status === "PICKED_UP") return "수령 완료";
-    if (status === "CANCELLED") return "취소";
-    return status;
-  };
 
   const handleClose = () => {
     setOpenState(false);
@@ -64,8 +51,18 @@ export default function OrderDetailModal({
                 minute: "2-digit",
               })}</DialogDescription>
               <DialogDescription className="text-center">
-                {paymentStatusLabel()} · 주문금액 {originalAmount.toLocaleString()}원 · 결제코드 {orderDetail.payment.paymentCode ?? "-"} · 입금금액 {expectedTransferAmount.toLocaleString()}원
+                {getPaymentStatusLabel(orderDetail.payment, orderDetail)} · 주문금액 {originalAmount.toLocaleString()}원 · 결제코드 {orderDetail.payment.paymentCode ?? "-"} · 입금금액 {expectedTransferAmount.toLocaleString()}원
               </DialogDescription>
+              {orderDetail.payment.status === "REFUND_PENDING" && (
+                <DialogDescription className="text-center text-amber-600">
+                  운영자가 환불 확인 중입니다.
+                </DialogDescription>
+              )}
+              {orderDetail.payment.status === "REFUNDED" && (
+                <DialogDescription className="text-center text-emerald-600">
+                  환불 완료 처리되었습니다.
+                </DialogDescription>
+              )}
             </DialogHeader>
             <Table>
               <TableHeader className="bg-gray-200">
@@ -88,7 +85,7 @@ export default function OrderDetailModal({
                       <TableCell className="text-right">{menuOrderInfo!.menuPrice.toLocaleString()}</TableCell>
                       <TableCell className="text-right">{menuOrderInfo!.quantity}</TableCell>
                       <TableCell className="text-right">{menuOrderInfo!.totalPrice.toLocaleString()}</TableCell>
-                      <TableCell className="text-center">{menuOrder ? menuOrderStatusLabel(menuOrder.status) : "-"}</TableCell>
+                      <TableCell className="text-center">{menuOrder ? getMenuOrderStatusLabel(menuOrder, orderDetail) : "-"}</TableCell>
                     </TableRow>
                   );
                 })}

@@ -4,6 +4,7 @@ import * as ClientTableResponse from "shared/types/responses/client/table";
 import * as AdminTableResponse from "shared/types/responses/admin/table";
 import { menuOrderStatus } from "db/schema";
 import * as AdminMenuResponse from "shared/types/responses/admin/menu";
+import { isPaymentPaid } from "./order-status";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -33,7 +34,7 @@ export function filterOrders(orders: ClientTableResponse.Get["result"]["tableCon
     return (
       (
         (option.paid === undefined) 
-        || (order.payment.paid === option.paid)
+        || (isPaymentPaid(order.payment) === option.paid)
       ) && (
         (option.cancelled === undefined) 
         || (option.cancelled ? order.deletedAt !== null : order.deletedAt === null)

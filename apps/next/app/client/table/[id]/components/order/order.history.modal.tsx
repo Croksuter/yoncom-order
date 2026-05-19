@@ -8,6 +8,7 @@ import useMenuStore from "~/stores/menu.store";
 import useTableStore from "~/stores/table.store";
 import OrderDetailModal from "./order.detail.modal";
 import * as ClientTableResponse from "shared/types/responses/client/table"
+import { getOrderStatusLabel } from "~/lib/order-status";
 
 export default function OrderHistoryModal({
   openState, setOpenState,
@@ -44,18 +45,6 @@ export default function OrderHistoryModal({
       order: order,
     }
   })
-
-  const orderStatusLabel = (order: ClientTableResponse.Get["result"]["tableContexts"][number]["orders"][number]) => {
-    if (order.status === "EXPIRED" || order.payment.status === "EXPIRED") return "입금 기한 만료";
-    if (order.deletedAt !== null || order.status === "CANCELLED" || order.payment.status === "CANCELLED") return "주문취소";
-    if (order.payment.status === "MANUAL_REVIEW") return "입금 확인 필요";
-    if (!order.payment.paid) return "입금 대기";
-
-    const activeMenuOrders = order.menuOrders.filter((menuOrder) => menuOrder.deletedAt === null);
-    if (activeMenuOrders.length > 0 && activeMenuOrders.every((menuOrder) => menuOrder.status === "PICKED_UP")) return "수령 완료";
-    if (activeMenuOrders.some((menuOrder) => menuOrder.status === "READY")) return "준비 완료";
-    return "결제 완료";
-  };
 
   const handleConfirm = () => {
     setOpenState(false);
@@ -108,7 +97,7 @@ export default function OrderHistoryModal({
                         second: "2-digit",
                         hour12: false,
                       })}</TableCell>
-                      <TableCell className="text-center">{orderStatusLabel(orderHistory.order)}</TableCell>
+                      <TableCell className="text-center">{getOrderStatusLabel(orderHistory.order)}</TableCell>
                       <TableCell className="text-right">{orderHistory.totalPrice.toLocaleString()}</TableCell>
                     </TableRow>
                   ))}

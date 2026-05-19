@@ -6,6 +6,7 @@ import OrderPaymentModal from "./order.payment.modal";
 import useMenuStore from "~/stores/menu.store";
 import useTableStore from "~/stores/table.store";
 import { toast } from "~/hooks/use-toast";
+import { isPaymentInstructionOrder, isPaymentPaid } from "~/lib/order-status";
 
 export default function OrderModal({
   openState, setOpenState,
@@ -18,7 +19,7 @@ export default function OrderModal({
   const { clientMenuCategories } = useMenuStore();
 
   const menus = clientMenuCategories!.flatMap((menuCategory) => menuCategory.menus);
-  const order = clientTable?.tableContexts[0]?.orders[0];
+  const order = clientTable?.tableContexts[0]?.orders.find(isPaymentInstructionOrder);
   const menuOrders = order?.menuOrders;
   if (!menuOrders || !order) return;
 
@@ -42,11 +43,11 @@ export default function OrderModal({
       });
       return;
     }
-    const latestOrder = success.result.tableContexts[0]?.orders[0];
-    if (!latestOrder || latestOrder.payment.paid) {
+    const latestOrder = success.result.tableContexts[0]?.orders.find(isPaymentInstructionOrder);
+    if (!latestOrder || isPaymentPaid(latestOrder.payment)) {
       toast({
         title: "결제 안내가 종료되었습니다.",
-        description: latestOrder?.payment.paid ? "이미 결제 완료된 주문입니다." : "확인할 주문이 없습니다.",
+        description: isPaymentPaid(latestOrder?.payment) ? "이미 결제 완료된 주문입니다." : "확인할 주문이 없습니다.",
       });
       handleClose();
       return;
@@ -69,11 +70,11 @@ export default function OrderModal({
       });
       return;
     }
-    const latestOrder = success.result.tableContexts[0]?.orders[0];
-    if (!latestOrder || latestOrder.payment.paid) {
+    const latestOrder = success.result.tableContexts[0]?.orders.find(isPaymentInstructionOrder);
+    if (!latestOrder || isPaymentPaid(latestOrder.payment)) {
       toast({
         title: "결제 안내가 종료되었습니다.",
-        description: latestOrder?.payment.paid ? "이미 결제 완료된 주문입니다." : "확인할 주문이 없습니다.",
+        description: isPaymentPaid(latestOrder?.payment) ? "이미 결제 완료된 주문입니다." : "확인할 주문이 없습니다.",
       });
       handleClose();
       return;
@@ -94,11 +95,11 @@ export default function OrderModal({
       });
       return;
     }
-    const latestOrder = success.result.tableContexts[0]?.orders[0];
-    if (!latestOrder || latestOrder.payment.paid) {
+    const latestOrder = success.result.tableContexts[0]?.orders.find(isPaymentInstructionOrder);
+    if (!latestOrder || isPaymentPaid(latestOrder.payment)) {
       toast({
         title: "주문을 취소할 수 없습니다.",
-        description: latestOrder?.payment.paid ? "이미 결제 완료된 주문은 운영자에게 문의해주세요." : "취소할 주문이 없습니다.",
+        description: isPaymentPaid(latestOrder?.payment) ? "이미 결제 완료된 주문은 운영자에게 문의해주세요." : "취소할 주문이 없습니다.",
       });
       handleClose();
       return;

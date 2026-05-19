@@ -5,6 +5,7 @@ import MenuInstance from "./menu.instance";
 import MenuCompleteModal from "./menu.complete.modal";
 import { useState } from "react";
 import { menuOrderStatus } from "db/schema";
+import { isKitchenOrder } from "~/lib/order-status";
 
 export default function MenuMonitor({
   menuId,
@@ -27,7 +28,7 @@ export default function MenuMonitor({
       tableName: table.name,
     }))
     .flatMap(({ orders, tableName }) => orders
-        .filter((order) => order?.payment?.paid && order?.deletedAt === null)
+        .filter(isKitchenOrder)
         .flatMap(
           (order) => order.menuOrders
             .filter(menuOrder => menuOrder.menuId === menuId)

@@ -2,12 +2,12 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import * as AdminTableResponse from "shared/types/responses/admin/table";
 import TableSetModal from "./table.set.modal";
-import * as Schema from "db/schema";
 import { dateDiffString } from "~/lib/date";
 import useMenuStore from "~/stores/menu.store";
 import { TimerIcon } from "lucide-react";
 import { Table, TableBody, TableCell, TableRow } from "~/components/ui/table";
 import TableDetailModal from "./table.detail.modal";
+import { getMenuOrderStatusIcon, isKitchenOrder, isUnresolvedPaymentOrder } from "~/lib/order-status";
 
 export default function TableInstance({
   table
@@ -23,30 +23,20 @@ export default function TableInstance({
 
   const menuId2menu = (menuId: string) => menus.find((menu) => menu.id === menuId);
   const menuOrders = activeTableContext?.orders
-    .filter((order) => 
-      order.deletedAt === null
-      && order.payment.paid
-    ).map((order) => order.menuOrders).flat() || [];
+    .filter((order) => isKitchenOrder(order) || isUnresolvedPaymentOrder(order))
+    .flatMap((order) => order.menuOrders.map((menuOrder) => ({ menuOrder, order }))) || [];
   const amount = menuOrders.reduce(
-    (acc, menuOrder) => acc + (menuId2menu(menuOrder.menuId)?.price ?? 0) * menuOrder.quantity,
+    (acc, { menuOrder }) => acc + (menuId2menu(menuOrder.menuId)?.price ?? 0) * menuOrder.quantity,
     0,
   );
 
   const isOnOrder = activeTableContext?.orders.some((order) => 
-    order.deletedAt === null
-    && order.payment.paid
+    isKitchenOrder(order)
     && order.menuOrders.some((menuOrder) => (
-      menuOrder.status === Schema.menuOrderStatus.PENDING
-      || menuOrder.status === Schema.menuOrderStatus.READY
+      menuOrder.status === "PENDING"
+      || menuOrder.status === "READY"
     ))
   ) || false;
-
-  const menuOrderIcon = (status: string) => {
-    if (status === Schema.menuOrderStatus.PENDING) return "⌛";
-    if (status === Schema.menuOrderStatus.READY) return "🔔";
-    if (status === Schema.menuOrderStatus.PICKED_UP) return "✅";
-    return "❌";
-  };
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -96,9 +86,9 @@ export default function TableInstance({
               <div className="w-full flex-1 overflow-y-auto fc bg-[#F2F2F2]">
                 <Table>
                   <TableBody>
-                    {menuOrders.map((menuOrder) => (
+                    {menuOrders.map(({ menuOrder, order }) => (
                       <TableRow key={menuOrder.id} className="*:py-1">
-                        <TableCell>{menuOrderIcon(menuOrder.status)} {menuId2menu(menuOrder.menuId)?.name}</TableCell>
+                        <TableCell>{getMenuOrderStatusIcon(menuOrder, order)} {menuId2menu(menuOrder.menuId)?.name}</TableCell>
                         <TableCell className="font-bold">{menuOrder.quantity}</TableCell>
                       </TableRow>
                     ))}

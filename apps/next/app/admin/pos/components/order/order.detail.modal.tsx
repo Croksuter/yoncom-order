@@ -1,11 +1,13 @@
-
+import { useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "~/components/ui/dialog";
 import { DialogContent } from "~/components/ui/dialog";
+import { Input } from "~/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
 import useMenuStore from "~/stores/menu.store";
 import * as AdminTableResponse from "shared/types/responses/admin/table";
 import useTableStore from "~/stores/table.store";
+import { getMenuOrderStatusLabel, getPaymentStatusLabel, isUnresolvedPaymentOrder } from "~/lib/order-status";
 
 export default function OrderDetailModal({
   openState, setOpenState,
@@ -16,6 +18,7 @@ export default function OrderDetailModal({
   order: AdminTableResponse.Get["result"][number]["tableContexts"][number]["orders"][number];
 }) {
   const { menus } = useMenuStore();
+  const [cancelReason, setCancelReason] = useState("");
 
   const menuOrderInfos = order.menuOrders.map((menuOrder) => {
     const menu = menus.find((menu) => menu.id === menuOrder.menuId);
@@ -32,23 +35,20 @@ export default function OrderDetailModal({
   
   const originalAmount = order.payment.originalAmount ?? menuOrderInfos.reduce((acc, menuOrderInfo) => acc + menuOrderInfo!.totalPrice, 0);
   const expectedTransferAmount = order.payment.expectedTransferAmount ?? order.payment.amount;
-  const paymentStatus = order.payment.paid ? "결제 완료" :
-    order.payment.status === "MANUAL_REVIEW" ? "입금 확인 필요" :
-    order.payment.status === "EXPIRED" ? "입금 기한 만료" :
-    order.payment.status === "CANCELLED" ? "취소" :
-    "입금 대기";
-
-  const menuOrderStatusLabel = (status: string) => {
-    if (status === "PENDING") return "조리 중";
-    if (status === "READY") return "준비 완료";
-    if (status === "PICKED_UP") return "수령 완료";
-    if (status === "CANCELLED") return "취소";
-    return status;
-  };
+  const paymentStatus = getPaymentStatusLabel(order.payment, order);
+  const isPaidActive = order.payment.status === "PAID";
+  const isRefundPending = order.payment.status === "REFUND_PENDING";
+  const isRefunded = order.payment.status === "REFUNDED";
+  const hasPickedUp = isPaidActive && order.menuOrders.some((menuOrder) => menuOrder.status === "PICKED_UP");
 
   const handelOrderCancel = async () => {
+    if (isPaidActive && cancelReason.trim().length === 0) {
+      return;
+    }
+
     await useTableStore.getState().adminCancelOrder({
       orderId: order.id,
+      cancelReason: isPaidActive ? cancelReason.trim() : undefined,
     });
     handleClose();
   }
@@ -84,7 +84,9 @@ export default function OrderDetailModal({
               <span><span className="font-bold">결제 상태</span>: {paymentStatus}</span>
               <span><span className="font-bold">주문금액</span>: {originalAmount.toLocaleString()}원</span>
               <span><span className="font-bold">결제코드</span>: {order.payment.paymentCode ?? "-"} / <span className="font-bold">입금금액</span>: {expectedTransferAmount.toLocaleString()}원</span>
-              {order.payment.paid && <span className="text-xs text-neutral-500">결제 완료 주문을 취소하면 환불은 별도 확인이 필요합니다.</span>}
+              {isPaidActive && <span className="text-xs text-neutral-500">결제 완료 주문을 취소하면 환불 대기 상태로 남습니다.</span>}
+              {isRefundPending && <span className="text-xs text-amber-600">환불 완료 처리 전에는 테이블을 비울 수 없습니다.</span>}
+              {hasPickedUp && <span className="text-xs text-neutral-500">수령 완료된 주문은 시스템에서 취소할 수 없습니다.</span>}
             </DialogDescription>
           </DialogHeader>
           <Table className="w-full">
@@ -113,7 +115,7 @@ export default function OrderDetailModal({
                     <TableCell className="text-right">{menuOrderInfo!.menuPrice.toLocaleString()}</TableCell>
                     <TableCell className="text-right">{menuOrderInfo!.quantity}</TableCell>
                     <TableCell className="text-right">{menuOrderInfo!.totalPrice.toLocaleString()}</TableCell>
-                    <TableCell className="text-center">{menuOrder ? menuOrderStatusLabel(menuOrder.status) : "-"}</TableCell>
+                    <TableCell className="text-center">{menuOrder ? getMenuOrderStatusLabel(menuOrder, order) : "-"}</TableCell>
                     <TableCell className="text-center">
                       {menuOrder?.status === "READY" ? (
                         <Button size="sm" onClick={() => handlePickUp(menuOrder.id)}>수령 완료</Button>
@@ -130,10 +132,27 @@ export default function OrderDetailModal({
               {menuOrderInfos.reduce((acc, menuOrderInfo) => acc + menuOrderInfo!.totalPrice, 0).toLocaleString()} 원
             </span>
           </div>
+          {isPaidActive && !hasPickedUp && (
+            <div className="w-full space-y-1 text-sm">
+              <label className="font-semibold" htmlFor="cancel-reason">취소 사유</label>
+              <Input
+                id="cancel-reason"
+                value={cancelReason}
+                onChange={(event) => setCancelReason(event.target.value)}
+                placeholder="예: 고객 요청, 메뉴 품절, 중복 주문"
+              />
+            </div>
+          )}
           <DialogFooter className="w-full h-fit fr justify-end items-end">
             <div className="w-fit *:mx-1">
-              <Button className="dangerBG dangerB" onClick={handelOrderCancel}>주문 취소</Button>
-              {!order.payment.paid && (
+              <Button
+                className="dangerBG dangerB"
+                disabled={hasPickedUp || isRefundPending || isRefunded || (isPaidActive && cancelReason.trim().length === 0)}
+                onClick={handelOrderCancel}
+              >
+                {isRefundPending ? "환불 대기 중" : isRefunded ? "환불 완료" : isPaidActive ? "취소 및 환불 대기 처리" : "주문 취소"}
+              </Button>
+              {isUnresolvedPaymentOrder(order) && (
                 <Button className="dangerBG dangerB" onClick={handlePay}>관리자 결제 완료 처리</Button>
               )}
               <Button onClick={handleClose}>닫기</Button>

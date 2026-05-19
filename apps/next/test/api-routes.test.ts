@@ -91,6 +91,92 @@ describe("implemented Next API route handlers", () => {
     });
   });
 
+  it("GET /api/order/[tableId] returns the migrated customer order DTO", async () => {
+    const getCustomerOrderResponse = vi.fn(async () => ({
+      tableId: "table_123456789",
+      tableName: "A1",
+      tableContextId: "ctx_12345678901",
+      orders: [
+        {
+          id: "order_1234567",
+          displayNumber: 3,
+          status: "CANCELLED",
+          createdAt: 1710000000001,
+          expiresAt: null,
+          cancelReason: "고객 요청",
+          cancelledAt: 1710000000002,
+          payment: {
+            id: "payment_12345",
+            status: "REFUND_PENDING",
+            paid: true,
+            originalAmount: 12000,
+            expectedTransferAmount: 11999,
+            paymentCode: 1,
+            expiresAt: null,
+            paidAt: 1710000000000,
+            refundAmount: 11999,
+            refundRequestedAt: 1710000000002,
+            refundedAt: null,
+          },
+          menuOrders: [
+            {
+              id: "menuorder_123",
+              menuId: "menu_1234567890",
+              menuName: "비빔밥",
+              price: 12000,
+              quantity: 1,
+              status: "CANCELLED",
+            },
+          ],
+        },
+      ],
+    }));
+    vi.doMock("~/lib/server/table-queries", () => ({ getCustomerOrderResponse }));
+
+    const { GET } = await import("~/app/api/order/[tableId]/route");
+    const response = await GET(new Request("http://order.test/api/order/table_123456789"), {
+      params: Promise.resolve({ tableId: "table_123456789" }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      result: expect.objectContaining({
+        tableId: "table_123456789",
+        tableContextId: "ctx_12345678901",
+        orders: [
+          expect.objectContaining({
+            displayNumber: 3,
+            cancelReason: "고객 요청",
+            payment: expect.objectContaining({
+              status: "REFUND_PENDING",
+              refundAmount: 11999,
+            }),
+          }),
+        ],
+      }),
+    });
+    expect(getCustomerOrderResponse).toHaveBeenCalledWith("table_123456789");
+  });
+
+  it("GET /api/order/[tableId]/[orderId] rejects wrong table/order pairs as not found", async () => {
+    const getCustomerOrderResponse = vi.fn(async () => ({
+      tableId: "table_123456789",
+      tableName: "A1",
+      tableContextId: "ctx_12345678901",
+      orders: [],
+    }));
+    vi.doMock("~/lib/server/table-queries", () => ({ getCustomerOrderResponse }));
+
+    const { GET } = await import("~/app/api/order/[tableId]/[orderId]/route");
+    const response = await GET(new Request("http://order.test/api/order/table_123456789/order_missing1"), {
+      params: Promise.resolve({ tableId: "table_123456789", orderId: "order_missing1" }),
+    });
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({ error: "Order Not Found" });
+    expect(getCustomerOrderResponse).toHaveBeenCalledWith("table_123456789", "order_missing1");
+  });
+
   it("all admin API route handlers are wired through requireAdmin", () => {
     const routeFiles: string[] = [];
     const walk = (directory: string) => {
@@ -110,7 +196,7 @@ describe("implemented Next API route handlers", () => {
     for (const routeFile of routeFiles) {
       const source = readFileSync(routeFile, "utf8");
       expect(source, routeFile).toContain("requireAdmin");
-      expect(source, routeFile).toContain("await requireAdmin()");
+      expect(source, routeFile).toMatch(/await requireAdmin(?:User)?\(\)/);
     }
   });
 });

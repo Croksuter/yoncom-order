@@ -5,7 +5,7 @@ import useTableStore from "~/stores/table.store";
 import * as AdminTableResponse from "shared/types/responses/admin/table";
 import { dateDiffString } from "~/lib/date";
 import { useEffect, useState } from "react";
-import * as Schema from "db/schema";
+import { getMenuOrderStatusIcon, getOrderStatusLabel } from "~/lib/order-status";
 
 export default function OrderInstance({ 
   order,
@@ -45,19 +45,15 @@ export default function OrderInstance({
           <ul className="flex-1">
             {order.menuOrders.map((menuOrder) => {
               const menu = menus.find((menu) => menu.id === menuOrder.menuId);
-              const status = menuOrder.status === Schema.menuOrderStatus.PENDING ? "⌛"
-                : menuOrder.status === Schema.menuOrderStatus.READY ? "🔔"
-                : menuOrder.status === Schema.menuOrderStatus.PICKED_UP ? "✅"
-                : "❌"; // 취소됨
 
               return (
                 <li key={menuOrder.menuId} className="text-sm my-1">
-                  {status} {menu?.name} x{menuOrder.quantity}
+                  {getMenuOrderStatusIcon(menuOrder, order)} {menu?.name} x{menuOrder.quantity}
                 </li>
               )
             })}
           </ul>
-          <span className="w-fit font-bold my-1">{order.payment?.paid ? "진행 중" : "결제 대기"}</span>
+          <span className="w-fit font-bold my-1">{getOrderStatusLabel(order)}</span>
         </CardContent>
       </Card>
     </>

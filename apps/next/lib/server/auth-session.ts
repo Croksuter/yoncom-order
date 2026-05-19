@@ -20,17 +20,22 @@ export async function getSessionUser() {
 }
 
 export async function requireAdmin() {
+  const result = await requireAdminUser();
+  return result.response;
+}
+
+export async function requireAdminUser() {
   const user = await getSessionUser();
 
   if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return { user: null, response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
   }
 
   if (user.role !== userRole.ADMIN) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    return { user: null, response: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
   }
 
-  return null;
+  return { user, response: null };
 }
 
 export function authResponse(body: unknown, userId?: string) {

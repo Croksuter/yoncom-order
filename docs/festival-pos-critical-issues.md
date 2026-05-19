@@ -44,29 +44,42 @@ P0 계획은 `apps/next`를 source of truth로 두고 구현했다. 레거시 `a
 | 조리/수령 상태 분리 | 완료 | `menuOrders.status`를 `PENDING -> READY -> PICKED_UP`로 분리했다. 기존 `SERVED`는 migration/backfill에서 `PICKED_UP` 의미로 해석한다. | 운영 화면에서 `준비 완료`와 `수령 완료` 버튼을 혼동하지 않도록 라벨을 유지해야 한다. |
 | 관리자 API guard | 완료 | `/api/admin/*` route에 `requireAdmin()`을 적용하고 비로그인, `USER`, `UNVERIFIED` 접근 거부 테스트를 추가했다. | 운영 전 관리자 계정/세션 생성 절차를 고정해야 한다. |
 | 결제 후보 POS 처리 | 완료 | POS에 `입금 확인 필요` 패널을 추가했고 후보 확정/무시 API를 연결했다. | 원금액 입금이나 100원 미만 오차는 자동 확정하지 않고 운영자 판단이 필요하다. |
-| paid 주문 취소/환불 추적 | 부분 완료 | 결제 완료 주문을 단순 삭제하지 않도록 상태 기반 취소 흐름과 안내 문구를 정리했다. | 별도 `refundNeeded`, `refundCompleted`, `cancelReason`, 환불 확인 UI/로그는 아직 남아 있다. |
-| 고객 주문 조회 route 마이그레이션 | 남음 | 현재 고객 화면은 새 table 조회 데이터로 필요한 상태를 표시한다. | 기존 placeholder 성격의 `GET /api/order/[tableId]`류 조회 route가 남아 있으면 제거하거나 새 계약으로 마이그레이션해야 한다. |
+| paid 주문 취소/환불 추적 | 완료 | P1에서 `REFUND_PENDING`, `REFUNDED`, 취소 사유/시각/처리자, 환불 금액/요청/완료 정보를 추가했다. paid 취소는 삭제하지 않고 환불 대기 상태로 남는다. | 수령 완료 주문은 시스템 취소를 막고 운영자 수기 예외로 둔다. |
+| 고객 주문 조회 route 마이그레이션 | 완료 | P1에서 `GET /api/order/:tableId`, `GET /api/order/:tableId/:orderId` placeholder를 제거하고 새 customer order DTO를 반환한다. | 현재 고객 화면은 기존 table 조회를 계속 쓰지만 외부/향후 호출 경로는 새 route로 받을 수 있다. |
 
 ### 구현 반영 파일
 
-- 스키마/마이그레이션: `packages/db/schema.ts`, `packages/db/.migrations/0001_p0_troubleshooting.sql`
+- 스키마/마이그레이션: `packages/db/schema.ts`, `packages/db/.migrations/0001_p0_troubleshooting.sql`, `packages/db/.migrations/0002_p1_refund_tracking.sql`
 - 서버 mutation: `apps/next/lib/server/d1-mutations.ts`
 - 주문/입금 API: `apps/next/app/api/order/*`, `apps/next/app/api/admin/order/*`, `apps/next/app/api/admin/deposit/*`
 - 관리자 guard: `apps/next/lib/server/auth.ts`, `/api/admin/*` route handlers
 - 조회 데이터: `apps/next/lib/server/table-queries.ts`
 - 고객 UI 문구: `apps/next/app/client/table/[id]/components/*`
 - POS/조리 UI: `apps/next/app/admin/pos/*`, `apps/next/app/admin/cooker/*`
-- 테스트: `apps/next/lib/server/__tests__/*`
-- 더미 데이터: `apps/next/scripts/seed-dummy-data.ts`
+- 테스트: `apps/next/test/*`
+- 더미 데이터: `apps/next/scripts/seed-dummy-data.mjs`
 
 ### 검증 현황
 
-- `pnpm test`: 통과. API/unit 테스트 25개 통과.
+- `pnpm test`: 통과. API/unit 테스트 27개 통과.
 - `pnpm typecheck:next`: 통과.
 - `pnpm build`: 통과.
 - `pnpm seed:dummy`: 새 스키마 기준 더미 데이터 생성 확인.
 - Codex Browser: 고객 주문/입금 안내, POS 입금 후보 패널 문구와 상태 표시 확인.
 - 참고: 로컬 migration CLI는 `drizzle-kit`, `wrangler` 설치/설정 부재로 실패했으나, migration SQL은 저장되어 있고 현재 D1 테스트 DB에는 D1 HTTP 경로로 idempotent schema 적용을 완료했다.
+
+## 2026-05-20 P1 구현 현황
+
+| 영역 | 상태 | 해결 내용 | 남은 주의점 |
+| --- | --- | --- | --- |
+| 관리자 화면 redirect | 완료 | `/admin/*` layout에서 서버 세션을 확인하고 비관리자는 `/auth`로 보낸다. 기존 client-side `AdminDataLoader` guard도 유지한다. | 운영 전 demo admin 계정과 실제 관리자 계정 절차를 다시 확인한다. |
+| paid 취소/환불 대기 | 완료 | paid active 주문 취소 시 `orders.status = CANCELLED`, `cancelReason`, `cancelledAt`, `cancelledByUserId`를 남기고 `payments.status = REFUND_PENDING`으로 전환한다. | `PICKED_UP` 주문 취소는 `409 Picked Up Order Cannot Be Cancelled`로 막는다. |
+| 환불 완료 처리 | 완료 | `PUT /api/admin/order/refund`를 추가했고 `REFUND_PENDING -> REFUNDED`만 허용한다. 환불 완료 시 `paid = false`, `refundedAt`, `refundHandledByUserId`, `refundNote`를 저장한다. | 실제 환불 송금 자체는 시스템 밖에서 수행하고, 이 버튼은 운영 기록 확정 용도다. |
+| 테이블 비우기 guard | 완료 | `REFUND_PENDING` 주문이 남아 있으면 `Refund Pending Orders Exist`로 table vacate를 막는다. | 환불 완료 후 비우기 가능 여부를 현장 flow에서 다시 확인한다. |
+| 고객 주문 조회 route | 완료 | `GET /api/order/:tableId`와 `GET /api/order/:tableId/:orderId`가 table/context/order/payment/menu DTO를 반환한다. wrong table/order pair는 404다. | 고객 화면은 아직 `GET /api/table` 기반이므로 추후 단일 source로 정리할 수 있다. |
+| POS 환불 UI | 완료 | POS 주문 상세에서 paid 주문 취소 사유 입력을 받고, 별도 `환불 필요` 패널에서 환불 완료 처리한다. | refund panel은 현재 active context 기준이다. 과거 context까지 보는 정산 화면은 후순위다. |
+| 고객 상태 문구 | 완료 | 고객 주문 내역/상세에서 `주문 취소됨 · 환불 대기`, `주문 취소됨 · 환불 완료`를 구분한다. | 현장 안내 문구와 운영자 설명도 같은 용어로 맞춘다. |
+| 더미 데이터 | 완료 | seed에 `REFUND_PENDING`, `REFUNDED`, paid active, unpaid pending fixture를 포함했다. | live D1에는 `0002_p1_refund_tracking` SQL을 적용한 뒤 seed해야 한다. |
 
 ## P0. 결제 매칭을 금액 기준으로 하지 않기
 
@@ -567,9 +580,9 @@ WHERE id = ?
 7. [완료] 결제 처리 API를 `orderId/paymentId` 기준으로 변경하고 `/api/admin/deposit`를 입금내역 ingestion + matcher로 변경
 8. [완료] POS 입금 후보 확인 UI 추가
 9. [완료] `PENDING -> READY -> PICKED_UP` 상태 전이 추가
-10. [남음] 고객 주문 조회 route 마이그레이션. 현재 화면 동작은 table 조회 데이터로 커버되지만 placeholder route 정리가 필요
+10. [완료] 고객 주문 조회 route 마이그레이션. `GET /api/order/:tableId`, `GET /api/order/:tableId/:orderId`가 새 DTO를 반환
 11. [완료] 관리자 API guard 추가
-12. [부분 완료] paid 주문 취소/환불 필요 상태 기록. 삭제 방지는 반영했지만 환불 ledger와 확인 UI는 남음
+12. [완료] paid 주문 취소/환불 필요 상태 기록. `REFUND_PENDING`, `REFUNDED`, 취소 사유, 환불 처리 UI까지 반영
 
 ## 다음 작업 시작 시 체크리스트
 
@@ -579,5 +592,5 @@ WHERE id = ?
 - 현장 고객 안내 문구, 계좌 안내 이미지, 운영자 구두 안내를 모두 `주문금액 - 결제코드 = 입금금액`으로 통일한다.
 - Browser로 실제 UI 클릭, API 호출, DB 반영, 새로고침 후 UI 반영까지 다시 확인한다.
 - 같은 금액 주문, paymentCode 고갈, 원금액 그대로 입금, 100원 미만 오차 입금, 동시 주문, 더블 클릭, 미결제 방치, 조리 완료 후 수령 미완료 케이스를 반드시 시뮬레이션한다.
-- 환불 필요 주문의 운영 기록 방식(`refundNeeded`, `refundCompleted`, `cancelReason`, 담당자)을 정한 뒤 paid 취소 흐름을 마저 닫는다.
+- 환불 대기 주문은 `환불 필요` 패널에서 반드시 `환불 완료 처리`까지 닫은 뒤 테이블을 비운다.
 - 레거시 `apps/api`, `apps/web`가 같은 DB를 건드릴 가능성이 있으면 배포/실행에서 비활성화하거나 동일 정책으로 별도 이식한다.

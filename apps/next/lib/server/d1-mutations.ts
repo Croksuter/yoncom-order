@@ -25,6 +25,9 @@ type OrderRow = BaseRow & {
   displayNumber?: number | null;
   status?: string | null;
   expiresAt?: number | string | null;
+  cancelReason?: string | null;
+  cancelledAt?: number | string | null;
+  cancelledByUserId?: string | null;
 };
 
 type MenuRow = BaseRow & {
@@ -51,6 +54,11 @@ type PaymentRow = BaseRow & {
   matchedBankTransactionId?: string | null;
   matchedBy?: string | null;
   depositorHint?: string | null;
+  refundAmount?: number | null;
+  refundRequestedAt?: number | string | null;
+  refundedAt?: number | string | null;
+  refundHandledByUserId?: string | null;
+  refundNote?: string | null;
 };
 
 type MenuOrderRow = BaseRow & {
@@ -280,7 +288,12 @@ function normalizeNumber(value: number | string | null | undefined) {
 }
 
 function isPaymentPaid(payment: PaymentRow | null | undefined) {
-  return payment?.status === paymentStatus.PAID || payment?.paid === true || payment?.paid === 1;
+  return (
+    payment?.status === paymentStatus.PAID ||
+    payment?.status === paymentStatus.REFUND_PENDING ||
+    payment?.paid === true ||
+    payment?.paid === 1
+  );
 }
 
 function isActiveUnpaidPayment(payment: PaymentRow | null | undefined) {
@@ -625,6 +638,8 @@ export async function cancelOrder(
     allowPaid: boolean;
     terminalStatus?: typeof paymentStatus.CANCELLED | typeof paymentStatus.EXPIRED;
     orderTerminalStatus?: typeof orderStatus.CANCELLED | typeof orderStatus.EXPIRED;
+    adminUserId?: string | null;
+    cancelReason?: string | null;
   },
 ): Promise<MutationResult> {
   const order = (await queryD1<OrderRow>(
@@ -649,6 +664,76 @@ export async function cancelOrder(
   const timestamp = now();
   const terminalPaymentStatus = options.terminalStatus ?? paymentStatus.CANCELLED;
   const terminalOrderStatus = options.orderTerminalStatus ?? orderStatus.CANCELLED;
+  const currentPaymentStatus = payment?.status ?? (isPaymentPaid(payment) ? paymentStatus.PAID : paymentStatus.PENDING);
+
+  if (options.allowPaid && payment && isPaymentPaid(payment) && terminalPaymentStatus === paymentStatus.CANCELLED) {
+    if (currentPaymentStatus === paymentStatus.REFUND_PENDING) {
+      return { error: "Refund Already Pending", status: 409 };
+    }
+
+    if (currentPaymentStatus === paymentStatus.REFUNDED) {
+      return { error: "Order Already Refunded", status: 409 };
+    }
+
+    if (currentPaymentStatus !== paymentStatus.PAID) {
+      return { error: "Paid Order Cannot Be Deleted", status: 403 };
+    }
+
+    const cancelReason = options.cancelReason?.trim();
+    if (!cancelReason) {
+      return { error: "Cancel Reason Required", status: 400 };
+    }
+
+    if (menuOrders.some((menuOrder) => menuOrder.status === menuOrderStatus.PICKED_UP)) {
+      return { error: "Picked Up Order Cannot Be Cancelled", status: 409 };
+    }
+
+    const shouldRestoreStock = menuOrders.length > 0 && menuOrders.every((menuOrder) => menuOrder.status === menuOrderStatus.PENDING);
+    if (shouldRestoreStock) {
+      for (const menuOrder of menuOrders) {
+        await queryD1(
+          "UPDATE menus SET quantity = quantity + ?, updatedAt = ? WHERE id = ?",
+          [menuOrder.quantity, timestamp, menuOrder.menuId],
+        );
+      }
+    }
+
+    await updateD1Rows(
+      "menuOrders",
+      { status: menuOrderStatus.CANCELLED, updatedAt: timestamp },
+      "orderId = ?",
+      [orderId],
+    );
+
+    const paymentWhere = await paymentWhereForOrder(orderId);
+    await updateD1Rows(
+      "payments",
+      {
+        paid: 1,
+        status: paymentStatus.REFUND_PENDING,
+        refundAmount: payment.expectedTransferAmount ?? payment.amount,
+        refundRequestedAt: timestamp,
+        updatedAt: timestamp,
+      },
+      paymentWhere.sql,
+      paymentWhere.params,
+    );
+    await updateD1Rows(
+      "orders",
+      {
+        status: orderStatus.CANCELLED,
+        cancelReason,
+        cancelledAt: timestamp,
+        cancelledByUserId: options.adminUserId ?? null,
+        updatedAt: timestamp,
+      },
+      "id = ?",
+      [orderId],
+    );
+    await releasePaymentCodeLease(payment.id);
+
+    return { result: "Order cancelled; refund pending", status: 200 };
+  }
 
   for (const menuOrder of menuOrders) {
     await queryD1(
@@ -668,6 +753,7 @@ export async function cancelOrder(
   await updateD1Rows(
     "payments",
     {
+      paid: 0,
       status: terminalPaymentStatus,
       deletedAt: timestamp,
       updatedAt: timestamp,
@@ -677,7 +763,14 @@ export async function cancelOrder(
   );
   await updateD1Rows(
     "orders",
-    { status: terminalOrderStatus, deletedAt: timestamp, updatedAt: timestamp },
+    {
+      status: terminalOrderStatus,
+      cancelReason: options.cancelReason?.trim() || null,
+      cancelledAt: terminalOrderStatus === orderStatus.CANCELLED ? timestamp : null,
+      cancelledByUserId: options.adminUserId ?? null,
+      deletedAt: timestamp,
+      updatedAt: timestamp,
+    },
     "id = ?",
     [orderId],
   );
@@ -938,13 +1031,14 @@ export async function setMenuOrderStatus(menuOrderId: string, status: string): P
 
   if (status === menuOrderStatus.READY) {
     const paymentJoin = await paymentJoinSql("o", "p");
-    const paidOrders = await queryD1<{ paid: boolean | number; status?: string | null }>(
-      `SELECT p.paid, p.status FROM orders o INNER JOIN payments p ON ${paymentJoin} WHERE o.id = ? AND p.deletedAt IS NULL LIMIT 1`,
+    const paidOrders = await queryD1<{ paid: boolean | number; status?: string | null; orderStatus?: string | null }>(
+      `SELECT p.paid, p.status, o.status AS orderStatus FROM orders o INNER JOIN payments p ON ${paymentJoin} WHERE o.id = ? AND p.deletedAt IS NULL LIMIT 1`,
       [menuOrder.orderId],
     );
     const payment = paidOrders[0];
+    const currentPaymentStatus = payment?.status ?? (isPaymentPaid(payment as PaymentRow) ? paymentStatus.PAID : paymentStatus.PENDING);
 
-    if (!payment || !isPaymentPaid(payment as PaymentRow)) {
+    if (!payment || payment.orderStatus !== orderStatus.ACTIVE || currentPaymentStatus !== paymentStatus.PAID) {
       return { error: "Order is not paid yet", status: 409 };
     }
   }
@@ -960,8 +1054,58 @@ export async function markOrderPaid(orderId: string): Promise<MutationResult> {
     return { error: "Payment Not Found", status: 404 };
   }
 
+  const currentPaymentStatus = payment.status ?? (isPaymentPaid(payment) ? paymentStatus.PAID : paymentStatus.PENDING);
+  if (
+    currentPaymentStatus === paymentStatus.REFUND_PENDING ||
+    currentPaymentStatus === paymentStatus.REFUNDED ||
+    currentPaymentStatus === paymentStatus.CANCELLED ||
+    currentPaymentStatus === paymentStatus.EXPIRED
+  ) {
+    return { error: "Payment Cannot Be Marked Paid", status: 409 };
+  }
+
   await markPaymentPaidById(payment.id);
   return { result: "Order marked as paid", status: 200 };
+}
+
+export async function completeOrderRefund(
+  orderId: string,
+  options: { adminUserId?: string | null; refundNote?: string | null } = {},
+): Promise<MutationResult> {
+  const order = (await queryD1<OrderRow>(
+    "SELECT * FROM orders WHERE id = ? AND deletedAt IS NULL LIMIT 1",
+    [orderId],
+  ))[0];
+
+  if (!order) {
+    return { error: "Order Not Found", status: 404 };
+  }
+
+  const payment = await getPaymentForOrder(orderId);
+  if (!payment) {
+    return { error: "Payment Not Found", status: 404 };
+  }
+
+  if (payment.status !== paymentStatus.REFUND_PENDING) {
+    return { error: "Refund is not pending", status: 409 };
+  }
+
+  const timestamp = now();
+  await updateD1Rows(
+    "payments",
+    {
+      paid: 0,
+      status: paymentStatus.REFUNDED,
+      refundedAt: timestamp,
+      refundHandledByUserId: options.adminUserId ?? null,
+      refundNote: options.refundNote?.trim() || null,
+      updatedAt: timestamp,
+    },
+    "id = ?",
+    [payment.id],
+  );
+
+  return { result: "Order refund completed", status: 200 };
 }
 
 export async function createAdminTable(name: string, seats: number): Promise<MutationResult> {
@@ -1052,6 +1196,16 @@ export async function vacateAdminTable(tableId: string): Promise<MutationResult>
 
   if (pendingMenuOrders.length > 0) {
     return { error: "There are unfinished orders", status: 409 };
+  }
+
+  const paymentJoin = await paymentJoinSql("o", "p");
+  const refundPendingOrders = await queryD1<OrderRow>(
+    `SELECT o.* FROM orders o INNER JOIN payments p ON ${paymentJoin} WHERE o.tableContextId = ? AND o.deletedAt IS NULL AND p.deletedAt IS NULL AND p.status = ? LIMIT 1`,
+    [activeContext.id, paymentStatus.REFUND_PENDING],
+  );
+
+  if (refundPendingOrders.length > 0) {
+    return { error: "Refund Pending Orders Exist", status: 409 };
   }
 
   const contextTable = await getTableContextTableName();
