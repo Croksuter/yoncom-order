@@ -27,7 +27,46 @@
 - POS 화면: `apps/next/app/admin/pos/*`
 - 고객 테이블 화면: `apps/next/app/client/table/[id]/*`
 
-현재 도메인 모델은 대략 `tables`, `tableContexts`, `orders`, `payments`, `menuOrders`, `menus` 중심이다. 하루 부스 운영에는 이 정도가 출발점으로는 충분하지만, 아래 상태와 제약은 반드시 보강해야 한다.
+현재 도메인 모델은 대략 `tables`, `tableContexts`, `orders`, `payments`, `menuOrders`, `menus` 중심이다. 하루 부스 운영에는 이 정도가 출발점으로는 충분하지만, 아래 상태와 제약은 반드시 추적한다.
+
+## 2026-05-20 P0 구현 현황
+
+P0 계획은 `apps/next`를 source of truth로 두고 구현했다. 레거시 `apps/api`, `apps/web`는 새 결제/주문 정책에 연결하지 않는다.
+
+| 영역 | 상태 | 해결 내용 | 남은 주의점 |
+| --- | --- | --- | --- |
+| 금액 단독 결제 매칭 제거 | 완료 | 입금 이벤트는 `bankTransactions`에 저장하고, 정확히 1건만 `expectedTransferAmount`와 일치할 때 자동 매칭한다. 원금액 입금, 100원 미만 오차, 복수 후보는 POS 확인이 필요하다. | 실제 은행 크롤러/수동 입력기가 `/api/admin/deposit` 새 계약만 사용해야 한다. |
+| 테이블 번호 기반 입금액 편법 제거 | 완료 | 주문별 `paymentCode`와 `paymentCodeLeases`를 도입했다. 입금 요청 금액은 `expectedTransferAmount = originalAmount - paymentCode`다. | 고객 안내 문구는 모두 새 정책 기준으로 갱신했다. 현장 안내판/구두 안내도 같은 문구로 맞춰야 한다. |
+| 가장 작은 paymentCode 발급 | 완료 | 활성 미결제 주문 기준으로 `1..99`를 오름차순 탐색하고 lease unique constraint로 확보한다. 결제/취소/만료 후 재사용 가능하다. | 99개 고갈 시 `409 Payment Code Exhausted`가 난다. 러시 타임 전 운영자가 이 메시지를 볼 수 있어야 한다. |
+| 조건부 재고 차감 | 완료 | 주문 생성 시 `quantity >= ?`, `available = 1`, `deletedAt IS NULL` 조건부 update를 수행하고 changed row를 확인한다. 실패 시 부분 생성 데이터를 보상 복구한다. | D1 HTTP 결과의 changed row/meta 해석이 중요하므로 관련 helper 변경을 유지해야 한다. |
+| 미결제 주문 TTL | 부분 완료 | `orders.expiresAt`, `payments.expiresAt`, `expireStalePendingOrders(now)`를 추가했고 주문 생성/paymentCode 발급 경로에서 만료 미결제 주문을 정리한다. | 백그라운드 cron/주기적 sweep은 아직 없다. 주문이 오래 방치될 수 있는 화면 진입/관리자 작업 시 sweep 호출을 더 늘리는 것이 좋다. |
+| 주문 생성 idempotency | 완료 | `clientOrderId UNIQUE`를 추가했고 같은 `clientOrderId` 재시도는 기존 order/payment를 반환한다. 재고와 메뉴 주문을 중복 생성하지 않는다. | 클라이언트가 새 주문마다 안정적인 `clientOrderId`를 유지해야 한다. |
+| 조리/수령 상태 분리 | 완료 | `menuOrders.status`를 `PENDING -> READY -> PICKED_UP`로 분리했다. 기존 `SERVED`는 migration/backfill에서 `PICKED_UP` 의미로 해석한다. | 운영 화면에서 `준비 완료`와 `수령 완료` 버튼을 혼동하지 않도록 라벨을 유지해야 한다. |
+| 관리자 API guard | 완료 | `/api/admin/*` route에 `requireAdmin()`을 적용하고 비로그인, `USER`, `UNVERIFIED` 접근 거부 테스트를 추가했다. | 운영 전 관리자 계정/세션 생성 절차를 고정해야 한다. |
+| 결제 후보 POS 처리 | 완료 | POS에 `입금 확인 필요` 패널을 추가했고 후보 확정/무시 API를 연결했다. | 원금액 입금이나 100원 미만 오차는 자동 확정하지 않고 운영자 판단이 필요하다. |
+| paid 주문 취소/환불 추적 | 부분 완료 | 결제 완료 주문을 단순 삭제하지 않도록 상태 기반 취소 흐름과 안내 문구를 정리했다. | 별도 `refundNeeded`, `refundCompleted`, `cancelReason`, 환불 확인 UI/로그는 아직 남아 있다. |
+| 고객 주문 조회 route 마이그레이션 | 남음 | 현재 고객 화면은 새 table 조회 데이터로 필요한 상태를 표시한다. | 기존 placeholder 성격의 `GET /api/order/[tableId]`류 조회 route가 남아 있으면 제거하거나 새 계약으로 마이그레이션해야 한다. |
+
+### 구현 반영 파일
+
+- 스키마/마이그레이션: `packages/db/schema.ts`, `packages/db/.migrations/0001_p0_troubleshooting.sql`
+- 서버 mutation: `apps/next/lib/server/d1-mutations.ts`
+- 주문/입금 API: `apps/next/app/api/order/*`, `apps/next/app/api/admin/order/*`, `apps/next/app/api/admin/deposit/*`
+- 관리자 guard: `apps/next/lib/server/auth.ts`, `/api/admin/*` route handlers
+- 조회 데이터: `apps/next/lib/server/table-queries.ts`
+- 고객 UI 문구: `apps/next/app/client/table/[id]/components/*`
+- POS/조리 UI: `apps/next/app/admin/pos/*`, `apps/next/app/admin/cooker/*`
+- 테스트: `apps/next/lib/server/__tests__/*`
+- 더미 데이터: `apps/next/scripts/seed-dummy-data.ts`
+
+### 검증 현황
+
+- `pnpm test`: 통과. API/unit 테스트 25개 통과.
+- `pnpm typecheck:next`: 통과.
+- `pnpm build`: 통과.
+- `pnpm seed:dummy`: 새 스키마 기준 더미 데이터 생성 확인.
+- Codex Browser: 고객 주문/입금 안내, POS 입금 후보 패널 문구와 상태 표시 확인.
+- 참고: 로컬 migration CLI는 `drizzle-kit`, `wrangler` 설치/설정 부재로 실패했으나, migration SQL은 저장되어 있고 현재 D1 테스트 DB에는 D1 HTTP 경로로 idempotent schema 적용을 완료했다.
 
 ## P0. 결제 매칭을 금액 기준으로 하지 않기
 
@@ -517,24 +556,28 @@ WHERE id = ?
 - 취소 시각과 사유
 - 환불 필요 여부
 
-## 권장 구현 순서
+## 구현 순서별 현황
 
-1. `displayNumber`와 `clientOrderId` 추가
-2. 주문별 `paymentCode`, `originalAmount`, `expectedTransferAmount` 추가
-3. `paymentCodeLeases`와 `bankTransactions` 추가
-4. 주문 생성 idempotency 적용
-5. 재고 조건부 차감 적용
-6. 미결제 주문 TTL 또는 결제 확인 후 확정 정책 적용
-7. 결제 처리 API를 `orderId/paymentId` 기준으로 변경하고 `/api/admin/deposit`를 입금내역 ingestion + matcher로 변경
-8. POS 입금 후보 확인 UI 추가
-9. `PENDING -> READY -> PICKED_UP` 상태 전이 추가
-10. 고객 주문 조회 route 마이그레이션
-11. 관리자 API guard 추가
-12. paid 주문 취소/환불 필요 상태 기록
+1. [완료] `displayNumber`와 `clientOrderId` 추가
+2. [완료] 주문별 `paymentCode`, `originalAmount`, `expectedTransferAmount` 추가
+3. [완료] `paymentCodeLeases`와 `bankTransactions` 추가
+4. [완료] 주문 생성 idempotency 적용
+5. [완료] 재고 조건부 차감 적용
+6. [부분 완료] 미결제 주문 TTL 적용. 주문 생성/코드 발급 경로의 stale cleanup은 있으나 cron 또는 관리자 sweep은 추가 필요
+7. [완료] 결제 처리 API를 `orderId/paymentId` 기준으로 변경하고 `/api/admin/deposit`를 입금내역 ingestion + matcher로 변경
+8. [완료] POS 입금 후보 확인 UI 추가
+9. [완료] `PENDING -> READY -> PICKED_UP` 상태 전이 추가
+10. [남음] 고객 주문 조회 route 마이그레이션. 현재 화면 동작은 table 조회 데이터로 커버되지만 placeholder route 정리가 필요
+11. [완료] 관리자 API guard 추가
+12. [부분 완료] paid 주문 취소/환불 필요 상태 기록. 삭제 방지는 반영했지만 환불 ledger와 확인 UI는 남음
 
 ## 다음 작업 시작 시 체크리스트
 
-- 현재 DB schema와 live D1 schema가 다를 수 있으므로 migration 전에 실제 컬럼을 확인한다.
-- 기존 `d1-mutations.ts`는 live schema 호환을 위해 분기 로직이 많다. 새 컬럼 추가 시 legacy/live 양쪽 호환을 고려한다.
-- 테스트는 API unit test만으로 부족하다. Browser로 실제 UI 클릭, API 호출, DB 반영, 새로고침 후 UI 반영까지 확인한다.
+- live D1 schema와 migration SQL이 동일한지 운영 전 한 번 더 확인한다. 특히 수동 D1 HTTP 적용과 migration CLI 적용이 섞이지 않게 한다.
+- `drizzle-kit`, `wrangler` 기반 migration 명령을 복구해 같은 schema를 재현 가능하게 만든다.
+- 실제 KB 국민은행 ingestion 또는 수동 입금 입력 흐름이 `/api/admin/deposit` 새 계약만 호출하는지 확인한다.
+- 현장 고객 안내 문구, 계좌 안내 이미지, 운영자 구두 안내를 모두 `주문금액 - 결제코드 = 입금금액`으로 통일한다.
+- Browser로 실제 UI 클릭, API 호출, DB 반영, 새로고침 후 UI 반영까지 다시 확인한다.
 - 같은 금액 주문, paymentCode 고갈, 원금액 그대로 입금, 100원 미만 오차 입금, 동시 주문, 더블 클릭, 미결제 방치, 조리 완료 후 수령 미완료 케이스를 반드시 시뮬레이션한다.
+- 환불 필요 주문의 운영 기록 방식(`refundNeeded`, `refundCompleted`, `cancelReason`, 담당자)을 정한 뒤 paid 취소 흐름을 마저 닫는다.
+- 레거시 `apps/api`, `apps/web`가 같은 DB를 건드릴 가능성이 있으면 배포/실행에서 비활성화하거나 동일 정책으로 별도 이식한다.
