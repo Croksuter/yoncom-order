@@ -1,6 +1,13 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 
 describe("implemented Next API route handlers", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.clearAllMocks();
+  });
+
   it("GET /api/menu returns menu categories from the DB query layer", async () => {
     const findMany = vi.fn(async () => [
       {
@@ -46,6 +53,9 @@ describe("implemented Next API route handlers", () => {
   });
 
   it("GET /api/admin/table returns the app-facing table relation payload", async () => {
+    vi.doMock("~/lib/server/auth-session", () => ({
+      requireAdmin: vi.fn(async () => null),
+    }));
     vi.doMock("~/lib/server/table-queries", () => ({
       getTablesWithRelations: vi.fn(async () => [
         {
@@ -79,5 +89,28 @@ describe("implemented Next API route handlers", () => {
         },
       ],
     });
+  });
+
+  it("all admin API route handlers are wired through requireAdmin", () => {
+    const routeFiles: string[] = [];
+    const walk = (directory: string) => {
+      for (const entry of readdirSync(directory, { withFileTypes: true })) {
+        const target = join(directory, entry.name);
+        if (entry.isDirectory()) {
+          walk(target);
+        } else if (entry.name === "route.ts") {
+          routeFiles.push(target);
+        }
+      }
+    };
+
+    walk(join(process.cwd(), "app/api/admin"));
+
+    expect(routeFiles.length).toBeGreaterThan(0);
+    for (const routeFile of routeFiles) {
+      const source = readFileSync(routeFile, "utf8");
+      expect(source, routeFile).toContain("requireAdmin");
+      expect(source, routeFile).toContain("await requireAdmin()");
+    }
   });
 });

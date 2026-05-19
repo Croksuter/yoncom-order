@@ -29,12 +29,12 @@ export default function MenuCompleteModal({
     <Dialog open={openState} onOpenChange={setOpenState}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{tableName} - {menuName} 조리 완료 처리</DialogTitle>
-          <DialogDescription>조리 완료 처리 하시겠습니까?</DialogDescription>
+          <DialogTitle>{tableName} - {menuName} 준비 완료 처리</DialogTitle>
+          <DialogDescription>준비 완료 처리 하시겠습니까?</DialogDescription>
         </DialogHeader>
         <DialogFooter>
           <Button variant="outline" onClick={handleClose}>취소</Button>
-          <Button className="dangerBG dangerB" onClick={handleConfirm}>조리 완료</Button>
+          <Button className="dangerBG dangerB" onClick={handleConfirm}>준비 완료</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog> 

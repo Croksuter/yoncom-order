@@ -10,11 +10,46 @@ export const userRole = {
 export type UserRole = (typeof userRole)[keyof typeof userRole];
 export const menuOrderStatus = {
   PENDING: "PENDING",
-  SERVED: "SERVED",
+  READY: "READY",
+  PICKED_UP: "PICKED_UP",
   CANCELLED: "CANCELLED",
 } as const;
 export type MenuOrderStatus =
   (typeof menuOrderStatus)[keyof typeof menuOrderStatus];
+
+export const orderStatus = {
+  ACTIVE: "ACTIVE",
+  CANCELLED: "CANCELLED",
+  EXPIRED: "EXPIRED",
+} as const;
+export type OrderStatus = (typeof orderStatus)[keyof typeof orderStatus];
+
+export const paymentStatus = {
+  PENDING: "PENDING",
+  PAID: "PAID",
+  MANUAL_REVIEW: "MANUAL_REVIEW",
+  EXPIRED: "EXPIRED",
+  CANCELLED: "CANCELLED",
+} as const;
+export type PaymentStatus = (typeof paymentStatus)[keyof typeof paymentStatus];
+
+export const bankTransactionStatus = {
+  UNMATCHED: "UNMATCHED",
+  AUTO_MATCHED: "AUTO_MATCHED",
+  NEEDS_REVIEW: "NEEDS_REVIEW",
+  IGNORED: "IGNORED",
+} as const;
+export type BankTransactionStatus =
+  (typeof bankTransactionStatus)[keyof typeof bankTransactionStatus];
+
+export const bankTransactionSource = {
+  KB_PUSH: "KB_PUSH",
+  KB_SMS: "KB_SMS",
+  SELENIUM: "SELENIUM",
+  MANUAL: "MANUAL",
+} as const;
+export type BankTransactionSource =
+  (typeof bankTransactionSource)[keyof typeof bankTransactionSource];
 
 export const sessions = sqliteTable("sessions", {
   id: text("id").primaryKey().notNull(),
@@ -170,6 +205,13 @@ export const orders = sqliteTable("orders", {
     .primaryKey()
     .notNull()
     .$defaultFn(() => generateId(15)),
+  clientOrderId: text("clientOrderId").unique(),
+  displayNumber: integer("displayNumber"),
+  status: text("status")
+    .notNull()
+    .$type<OrderStatus>()
+    .default(orderStatus.ACTIVE),
+  expiresAt: integer("expiresAt"),
   tableContextId: text("tableContextId")
     .notNull()
     .references(() => tableContexts.id),
@@ -200,6 +242,18 @@ export const payments = sqliteTable("payments", {
     .$defaultFn(() => generateId(15)),
   paid: integer("paid", { mode: "boolean" }).notNull().default(false),
   amount: integer("amount").notNull(),
+  status: text("status")
+    .notNull()
+    .$type<PaymentStatus>()
+    .default(paymentStatus.PENDING),
+  paymentCode: integer("paymentCode"),
+  originalAmount: integer("originalAmount"),
+  expectedTransferAmount: integer("expectedTransferAmount"),
+  expiresAt: integer("expiresAt"),
+  paidAt: integer("paidAt"),
+  matchedBankTransactionId: text("matchedBankTransactionId"),
+  matchedBy: text("matchedBy"),
+  depositorHint: text("depositorHint"),
   bank: text("bank"),
   depositor: text("depositor"),
   orderId: text("orderId").references(() => orders.id),
@@ -220,6 +274,50 @@ export const paymentsRelations = relations(payments, ({ one }) => ({
 }));
 
 export type Payment = typeof payments.$inferSelect;
+
+export const paymentCodeLeases = sqliteTable("paymentCodeLeases", {
+  code: integer("code").primaryKey().notNull(),
+  paymentId: text("paymentId").notNull().unique(),
+  expiresAt: integer("expiresAt").notNull(),
+  createdAt: integer("createdAt")
+    .notNull()
+    .$defaultFn(() => Date.now()),
+});
+
+export type PaymentCodeLease = typeof paymentCodeLeases.$inferSelect;
+
+export const bankTransactions = sqliteTable("bankTransactions", {
+  id: text("id")
+    .primaryKey()
+    .notNull()
+    .$defaultFn(() => generateId(15)),
+  dedupeKey: text("dedupeKey").notNull().unique(),
+  amount: integer("amount").notNull(),
+  depositor: text("depositor").notNull(),
+  receivedAt: integer("receivedAt").notNull(),
+  rawText: text("rawText").notNull(),
+  source: text("source")
+    .notNull()
+    .$type<BankTransactionSource>()
+    .default(bankTransactionSource.MANUAL),
+  status: text("status")
+    .notNull()
+    .$type<BankTransactionStatus>()
+    .default(bankTransactionStatus.UNMATCHED),
+  matchedPaymentId: text("matchedPaymentId").references(() => payments.id),
+  createdAt: integer("createdAt")
+    .notNull()
+    .$defaultFn(() => Date.now()),
+});
+
+export const bankTransactionsRelations = relations(bankTransactions, ({ one }) => ({
+  payment: one(payments, {
+    fields: [bankTransactions.matchedPaymentId],
+    references: [payments.id],
+  }),
+}));
+
+export type BankTransaction = typeof bankTransactions.$inferSelect;
 
 export const menuOrders = sqliteTable("menuOrders", {
   id: text("id")

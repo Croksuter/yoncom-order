@@ -18,13 +18,17 @@ export default function OrderModal({
   const { clientMenuCategories } = useMenuStore();
 
   const menus = clientMenuCategories!.flatMap((menuCategory) => menuCategory.menus);
-  const menuOrders = clientTable?.tableContexts[0]?.orders[0]?.menuOrders;
-  if (!menuOrders) return;
+  const order = clientTable?.tableContexts[0]?.orders[0];
+  const menuOrders = order?.menuOrders;
+  if (!menuOrders || !order) return;
 
-  const amount = menuOrders.reduce((acc, menuOrder) => {
+  const calculatedAmount = menuOrders.reduce((acc, menuOrder) => {
     return acc + menus.find((menu) => menu.id === menuOrder.menuId)!.price * menuOrder.quantity;
   }, 0);
-  const amountWithKey = amount - clientTable!.key;
+  const originalAmount = order.payment.originalAmount ?? calculatedAmount;
+  const expectedTransferAmount = order.payment.expectedTransferAmount ?? order.payment.amount;
+  const paymentCode = order.payment.paymentCode ?? null;
+  const expiresAt = typeof order.payment.expiresAt === "number" ? order.payment.expiresAt : null;
 
   const handleTossPayment = async () => {
     const success = await useTableStore.getState().clientGetTable({
@@ -47,10 +51,8 @@ export default function OrderModal({
       return;
     }
 
-    // TODO: 토스 이체 계좌 변경 필요
-    // window.open(`supertoss://send?amount=${amountWithKey}&bank=국민은행&accountNo=11110204273566`, "_blank");
-    // window.open(`supertoss://send?amount=${amountWithKey}&bank=국민은행&accountNo=94320201650240`, "_blank");
-    window.open(`supertoss://send?amount=${amountWithKey}&bank=국민은행&accountNo=94580201548620`, "_blank");
+    const transferAmount = latestOrder.payment.expectedTransferAmount ?? latestOrder.payment.amount;
+    window.open(`supertoss://send?amount=${transferAmount}&bank=국민은행&accountNo=94580201548620`, "_blank");
     handleClose();
   }
 
@@ -139,7 +141,10 @@ export default function OrderModal({
       <OrderPaymentModal
         openState={orderPaymentModalOpen}
         setOpenState={setOrderPaymentModalOpen}
-        amount={amountWithKey}
+        originalAmount={originalAmount}
+        paymentCode={paymentCode}
+        expectedTransferAmount={expectedTransferAmount}
+        expiresAt={expiresAt}
       />
     </>
   );

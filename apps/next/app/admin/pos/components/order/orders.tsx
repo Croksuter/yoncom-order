@@ -11,14 +11,18 @@ export default function Orders() {
   const [orderDetail, setOrderDetail] = useState<AdminTableResponse.Get["result"][number]["tableContexts"][number]["orders"][number] | null>(null);
   const [orderDetailModalOpenState, setOrderDetailModalOpenState] = useState(false);
 
-  const { tables } = useTableStore();
+  const { tables, bankTransactions } = useTableStore();
   const orders = tables
     .filter((table) => table.tableContexts[0]?.deletedAt === null)
     .flatMap((table) => table.tableContexts[0].orders);
   const inProgressOrders = orders.filter((order) => (
     order.deletedAt === null
-    && order.menuOrders.some((menuOrder) => menuOrder.status === Schema.menuOrderStatus.PENDING))
+    && order.menuOrders.some((menuOrder) => (
+      menuOrder.status === Schema.menuOrderStatus.PENDING
+      || menuOrder.status === Schema.menuOrderStatus.READY
+    )))
   ).sort((a, b) => a.createdAt - b.createdAt);
+  const reviewTransactions = bankTransactions.filter((transaction) => transaction.status !== "IGNORED");
 
   return (
     <div className="full p-2">
@@ -29,7 +33,45 @@ export default function Orders() {
             window.open("/admin/cooker", "_blank");
           }}>요리 섹션</Button>
         </CardHeader>
-        <CardContent className="p-0 overflow-y-auto *:hover:cursor-pointer [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+        <CardContent className="p-0 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+          {reviewTransactions.length > 0 && (
+            <div className="mb-3 rounded-md border border-amber-300 bg-amber-50 p-2">
+              <div className="mb-2 text-sm font-bold text-amber-900">입금 확인 필요 ({reviewTransactions.length})</div>
+              <div className="space-y-2">
+                {reviewTransactions.map((transaction) => (
+                  <div key={transaction.id} className="rounded bg-white p-2 text-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-semibold">{transaction.amount.toLocaleString()}원 · {transaction.depositor}</span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => useTableStore.getState().adminIgnoreBankTransaction({ bankTransactionId: transaction.id })}
+                      >
+                        무시
+                      </Button>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {transaction.candidates.length === 0 ? (
+                        <span className="text-neutral-500">매칭 후보 없음</span>
+                      ) : transaction.candidates.map((candidate) => (
+                        <Button
+                          key={candidate.paymentId}
+                          size="sm"
+                          className="bg-slate-700 text-white"
+                          onClick={() => useTableStore.getState().adminConfirmBankTransaction({
+                            bankTransactionId: transaction.id,
+                            paymentId: candidate.paymentId,
+                          })}
+                        >
+                          {candidate.tableName} #{candidate.displayNumber ?? "-"} · {candidate.reason} · 차이 {candidate.diff.toLocaleString()}원
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           {inProgressOrders.map((order) => 
             <OrderInstance 
               key={order.id} 

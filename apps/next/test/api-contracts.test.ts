@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 type ContractCase = {
   label: string;
@@ -45,6 +45,14 @@ const placeholderContracts: ContractCase[] = [
 ];
 
 describe("not-yet-migrated API contracts", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.clearAllMocks();
+    vi.doMock("~/lib/server/auth-session", () => ({
+      requireAdmin: vi.fn(async () => null),
+    }));
+  });
+
   it.each(placeholderContracts)("$label advertises an explicit 501 migration placeholder", async (contract) => {
     const routeModule = (await import(contract.importPath)) as Record<
       string,

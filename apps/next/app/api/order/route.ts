@@ -5,7 +5,7 @@ import { cancelOrder, createClientOrder } from "~/lib/server/d1-mutations";
 export async function POST(request: Request) {
   try {
     const query = createValidation.parse(await request.json());
-    const result = await createClientOrder(query.tableId, query.menuOrders);
+    const result = await createClientOrder(query.tableId, query.clientOrderId, query.menuOrders);
 
     if (result.error) {
       return fail(result.error, result.status);

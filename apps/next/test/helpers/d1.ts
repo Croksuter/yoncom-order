@@ -8,7 +8,7 @@ export type D1Request = {
   params: unknown[];
 };
 
-export function d1Success(results: unknown[]) {
+export function d1Success(results: unknown[], meta: Record<string, unknown> = { duration: 1 }) {
   return Response.json({
     success: true,
     errors: [],
@@ -16,7 +16,7 @@ export function d1Success(results: unknown[]) {
       {
         success: true,
         results,
-        meta: { duration: 1 },
+        meta,
       },
     ],
   });

@@ -46,7 +46,8 @@ export default function OrderInstance({
             {order.menuOrders.map((menuOrder) => {
               const menu = menus.find((menu) => menu.id === menuOrder.menuId);
               const status = menuOrder.status === Schema.menuOrderStatus.PENDING ? "⌛"
-                : menuOrder.status === Schema.menuOrderStatus.SERVED ? "✅"
+                : menuOrder.status === Schema.menuOrderStatus.READY ? "🔔"
+                : menuOrder.status === Schema.menuOrderStatus.PICKED_UP ? "✅"
                 : "❌"; // 취소됨
 
               return (
@@ -56,7 +57,7 @@ export default function OrderInstance({
               )
             })}
           </ul>
-          <span className="w-fit font-bold my-1">{order.payment?.paid ? "조리 중" : "결제 대기"}</span>
+          <span className="w-fit font-bold my-1">{order.payment?.paid ? "진행 중" : "결제 대기"}</span>
         </CardContent>
       </Card>
     </>

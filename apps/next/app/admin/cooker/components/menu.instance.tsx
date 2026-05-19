@@ -53,14 +53,14 @@ export default function MenuInstance({
             type="button"
             size="sm"
             className="shrink-0 bg-emerald-600 text-white hover:bg-emerald-700"
-            aria-label={`${order.tableName} ${order.menuName} 조리 완료`}
+            aria-label={`${order.tableName} ${order.menuName} 준비 완료`}
             onClick={(event) => {
               event.stopPropagation();
               onClick();
             }}
           >
             <CheckCircle2Icon />
-            조리 완료
+            준비 완료
           </Button>
         </CardContent>
       </Card>

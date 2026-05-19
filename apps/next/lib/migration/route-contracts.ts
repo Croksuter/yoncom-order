@@ -61,8 +61,12 @@ export const apiRouteContracts = [
   "PUT /api/admin/order",
   "PUT /api/admin/order/cancel",
   "PUT /api/admin/order/complete",
+  "PUT /api/admin/order/pick-up",
   "DELETE /api/admin/order",
+  "GET /api/admin/deposit",
   "POST /api/admin/deposit",
+  "PUT /api/admin/deposit/confirm",
+  "PUT /api/admin/deposit/ignore",
   "GET /api/admin/payout",
   "PUT /api/admin/image",
 ] as const;

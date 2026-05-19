@@ -2,10 +2,14 @@ import { isNull } from "drizzle-orm";
 import { menuCategories } from "db/schema";
 import { createValidation, getValidation, removeValidation, updateValidation } from "shared/types/requests/admin/menu";
 import { fail, ok, parseSearchParams, routeError } from "~/lib/server/api";
+import { requireAdmin } from "~/lib/server/auth-session";
 import { getDb } from "~/lib/server/db";
 import { createAdminMenu, removeAdminMenu, updateAdminMenu } from "~/lib/server/d1-mutations";
 
 export async function GET(request: Request) {
+  const adminError = await requireAdmin();
+  if (adminError) return adminError;
+
   try {
     parseSearchParams(request, getValidation);
 
@@ -23,6 +27,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const adminError = await requireAdmin();
+  if (adminError) return adminError;
+
   try {
     const query = createValidation.parse(await request.json());
     const result = await createAdminMenu(query.menuOptions);
@@ -38,6 +45,9 @@ export async function POST(request: Request) {
 }
 
 export async function PUT(request: Request) {
+  const adminError = await requireAdmin();
+  if (adminError) return adminError;
+
   try {
     const query = updateValidation.parse(await request.json());
     const result = await updateAdminMenu(query.menuId, query.menuOptions);
@@ -53,6 +63,9 @@ export async function PUT(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const adminError = await requireAdmin();
+  if (adminError) return adminError;
+
   try {
     const query = removeValidation.parse(await request.json());
     const result = await removeAdminMenu(query.menuId);

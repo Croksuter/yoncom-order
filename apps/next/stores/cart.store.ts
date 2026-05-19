@@ -9,6 +9,7 @@ type MenuOrderQuery = ClientOrderRequest.Create["menuOrders"][number];
 
 export type CartState = {
   menuOrders: MenuOrderQuery[];
+  clientOrderId: string | null;
 
   addMenuOrder: (menuOrder: MenuOrderQuery) => void;
   removeMenuOrder: (menuId: string) => void;
@@ -20,6 +21,7 @@ export type CartState = {
 
 const useCartStore = create<CartState>((set, get) => ({
   menuOrders: [],
+  clientOrderId: null,
 
   addMenuOrder: (menuOrder: MenuOrderQuery) => {
     const recentOrder = get().menuOrders.find((order) => order.menuId === menuOrder.menuId);
@@ -50,6 +52,12 @@ const useCartStore = create<CartState>((set, get) => ({
   purchaseMenuOrders: async () => {
     const table = useTableStore.getState().clientTable;
     const nonZeroMenuOrders = get().menuOrders.filter((menuOrder) => menuOrder.quantity > 0);
+    const clientOrderId = get().clientOrderId ?? crypto.randomUUID();
+
+    if (!get().clientOrderId) {
+      set({ clientOrderId });
+    }
+
     if (!table || nonZeroMenuOrders.length === 0) {
       toast({
         title: "올바르지 않은 주문 요청입니다.",
@@ -64,6 +72,7 @@ const useCartStore = create<CartState>((set, get) => ({
       method: "post",
       query: {
         tableId: table.id,
+        clientOrderId,
         menuOrders: nonZeroMenuOrders,
       },
       onSuccess: () => {
@@ -78,8 +87,9 @@ const useCartStore = create<CartState>((set, get) => ({
   },
 
   clearMenuOrders: () => {
-    set((state) => ({
+    set(() => ({
       menuOrders: [],
+      clientOrderId: null,
     }))
   },
 }))

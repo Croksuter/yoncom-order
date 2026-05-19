@@ -1,7 +1,14 @@
 import * as Schema from "db/schema";
 
 export type Create = {
-  result: string;
+  result: {
+    orderId: string;
+    displayNumber: number | null;
+    payment: Pick<
+      Schema.Payment,
+      "id" | "status" | "originalAmount" | "paymentCode" | "expectedTransferAmount" | "expiresAt"
+    >;
+  };
 };
 
 export type Get = {

@@ -1,6 +1,6 @@
 import { generateId } from "lucia";
-import { menuOrderStatus } from "db/schema";
-import { hasD1Table, queryD1 } from "~/lib/server/db";
+import { bankTransactionStatus, menuOrderStatus, orderStatus, paymentStatus } from "db/schema";
+import { executeD1, hasD1Table, queryD1 } from "~/lib/server/db";
 
 type BaseRow = {
   id: string;
@@ -19,6 +19,14 @@ type TableContextRow = BaseRow & {
   tableId: string;
 };
 
+type OrderRow = BaseRow & {
+  tableContextId: string;
+  clientOrderId?: string | null;
+  displayNumber?: number | null;
+  status?: string | null;
+  expiresAt?: number | string | null;
+};
+
 type MenuRow = BaseRow & {
   name: string;
   price: number;
@@ -31,6 +39,18 @@ type PaymentRow = BaseRow & {
   paid: boolean | number;
   amount: number;
   orderId?: string | null;
+  bank?: string | null;
+  depositor?: string | null;
+  method?: string | null;
+  status?: string | null;
+  paymentCode?: number | null;
+  originalAmount?: number | null;
+  expectedTransferAmount?: number | null;
+  expiresAt?: number | string | null;
+  paidAt?: number | string | null;
+  matchedBankTransactionId?: string | null;
+  matchedBy?: string | null;
+  depositorHint?: string | null;
 };
 
 type MenuOrderRow = BaseRow & {
@@ -41,15 +61,43 @@ type MenuOrderRow = BaseRow & {
 };
 
 type MutationResult = {
-  result?: string;
+  result?: unknown;
   error?: string;
   status: number;
+};
+
+type CreateOrderResult = {
+  orderId: string;
+  displayNumber: number | null;
+  payment: {
+    id: string;
+    status: string;
+    originalAmount: number | null;
+    paymentCode: number | null;
+    expectedTransferAmount: number | null;
+    expiresAt: number | null;
+  };
 };
 
 type MenuOrderInput = {
   menuId: string;
   quantity: number;
 };
+
+type BankTransactionInput = {
+  amount: number;
+  bank: string;
+  depositor: string;
+  timestamp: number;
+  rawText?: string;
+  source?: string;
+  dedupeKey?: string;
+};
+
+const paymentCodeMin = 1;
+const paymentCodeMax = 99;
+const pendingOrderTtlMs = 5 * 60 * 1000;
+const activePaymentStatuses = [paymentStatus.PENDING, paymentStatus.MANUAL_REVIEW];
 
 let tableContextTableName: string | null = null;
 const columnCache = new Map<string, Set<string>>();
@@ -122,7 +170,7 @@ export async function insertD1Row(tableName: string, row: Record<string, unknown
   const columnSql = insertColumns.map(quoteIdentifier).join(", ");
   const placeholders = insertColumns.map(() => "?").join(", ");
 
-  await queryD1(
+  return await executeD1(
     `INSERT INTO ${quoteIdentifier(tableName)} (${columnSql}) VALUES (${placeholders})`,
     insertColumns.map((column) => rowWithUser[column]),
   );
@@ -142,7 +190,7 @@ export async function updateD1Rows(
   }
 
   const setSql = updateColumns.map((column) => `${quoteIdentifier(column)} = ?`).join(", ");
-  await queryD1(
+  return await executeD1(
     `UPDATE ${quoteIdentifier(tableName)} SET ${setSql} WHERE ${whereSql}`,
     [...updateColumns.map((column) => values[column]), ...params],
   );
@@ -222,11 +270,216 @@ async function getPaymentForOrder(orderId: string) {
   return payments[0] ?? null;
 }
 
-export async function createClientOrder(tableId: string, menuOrders: MenuOrderInput[]): Promise<MutationResult> {
+function normalizeNumber(value: number | string | null | undefined) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function isPaymentPaid(payment: PaymentRow | null | undefined) {
+  return payment?.status === paymentStatus.PAID || payment?.paid === true || payment?.paid === 1;
+}
+
+function isActiveUnpaidPayment(payment: PaymentRow | null | undefined) {
+  if (!payment || isPaymentPaid(payment)) {
+    return false;
+  }
+
+  const status = payment.status ?? paymentStatus.PENDING;
+  return activePaymentStatuses.includes(status as typeof activePaymentStatuses[number]);
+}
+
+function buildCreateOrderResult(order: Pick<OrderRow, "id" | "displayNumber">, payment: PaymentRow): CreateOrderResult {
+  return {
+    orderId: order.id,
+    displayNumber: order.displayNumber ?? null,
+    payment: {
+      id: payment.id,
+      status: payment.status ?? (isPaymentPaid(payment) ? paymentStatus.PAID : paymentStatus.PENDING),
+      originalAmount: payment.originalAmount ?? payment.amount ?? null,
+      paymentCode: payment.paymentCode ?? null,
+      expectedTransferAmount: payment.expectedTransferAmount ?? payment.amount ?? null,
+      expiresAt: normalizeNumber(payment.expiresAt),
+    },
+  };
+}
+
+async function getExistingOrderByClientOrderId(clientOrderId: string) {
+  const orderColumns = await getD1Columns("orders");
+  if (!orderColumns.has("clientOrderId")) {
+    return null;
+  }
+
+  const order = (await queryD1<OrderRow>(
+    "SELECT * FROM orders WHERE clientOrderId = ? AND deletedAt IS NULL LIMIT 1",
+    [clientOrderId],
+  ))[0];
+
+  if (!order) {
+    return null;
+  }
+
+  const payment = await getPaymentForOrder(order.id);
+  return payment ? buildCreateOrderResult(order, payment) : null;
+}
+
+async function getNextDisplayNumber() {
+  const orderColumns = await getD1Columns("orders");
+  if (!orderColumns.has("displayNumber")) {
+    return null;
+  }
+
+  const rows = await queryD1<{ nextDisplayNumber: number | null }>(
+    "SELECT COALESCE(MAX(displayNumber), 0) + 1 AS nextDisplayNumber FROM orders",
+  );
+  return rows[0]?.nextDisplayNumber ?? 1;
+}
+
+async function releasePaymentCodeLease(paymentId: string) {
+  if (!(await hasD1Table("paymentCodeLeases"))) {
+    return;
+  }
+
+  await executeD1("DELETE FROM paymentCodeLeases WHERE paymentId = ?", [paymentId]);
+}
+
+async function expireStalePaymentCodeLeases(timestamp: number) {
+  if (!(await hasD1Table("paymentCodeLeases"))) {
+    return;
+  }
+
+  await executeD1("DELETE FROM paymentCodeLeases WHERE expiresAt <= ?", [timestamp]);
+}
+
+export async function expireStalePendingOrders(timestamp = now()) {
+  const paymentColumns = await getD1Columns("payments");
+  if (!paymentColumns.has("expiresAt")) {
+    return;
+  }
+
+  const expiredPayments = await queryD1<PaymentRow>(
+    `SELECT * FROM payments WHERE deletedAt IS NULL AND paid = 0 AND expiresAt IS NOT NULL AND expiresAt <= ? AND COALESCE(status, ?) IN (?, ?)`,
+    [timestamp, paymentStatus.PENDING, paymentStatus.PENDING, paymentStatus.MANUAL_REVIEW],
+  );
+
+  for (const payment of expiredPayments) {
+    const orderId = payment.orderId ?? payment.id;
+    await cancelOrder(orderId, { allowPaid: false, terminalStatus: paymentStatus.EXPIRED, orderTerminalStatus: orderStatus.EXPIRED });
+  }
+
+  await expireStalePaymentCodeLeases(timestamp);
+}
+
+async function allocatePaymentCode(paymentId: string, originalAmount: number, expiresAt: number) {
+  await expireStalePaymentCodeLeases(now());
+
+  const paymentColumns = await getD1Columns("payments");
+  const hasPaymentCodeColumns =
+    paymentColumns.has("paymentCode") && paymentColumns.has("expectedTransferAmount");
+
+  if (!hasPaymentCodeColumns) {
+    return {
+      code: null,
+      expectedTransferAmount: originalAmount,
+    };
+  }
+
+  const activePayments = await queryD1<PaymentRow>(
+    `SELECT * FROM payments WHERE deletedAt IS NULL AND paid = 0 AND COALESCE(status, ?) IN (?, ?)`,
+    [paymentStatus.PENDING, paymentStatus.PENDING, paymentStatus.MANUAL_REVIEW],
+  );
+  const usedCodes = new Set(activePayments.map((payment) => payment.paymentCode).filter((code): code is number => code !== null && code !== undefined));
+  const usedExpectedAmounts = new Set(activePayments.map((payment) => payment.expectedTransferAmount ?? payment.amount));
+  const leaseTableExists = await hasD1Table("paymentCodeLeases");
+
+  for (const allowExpectedAmountCollision of [false, true]) {
+    for (let code = paymentCodeMin; code <= paymentCodeMax; code += 1) {
+      const expectedTransferAmount = originalAmount - code;
+
+      if (usedCodes.has(code)) {
+        continue;
+      }
+
+      if (!allowExpectedAmountCollision && usedExpectedAmounts.has(expectedTransferAmount)) {
+        continue;
+      }
+
+      if (!leaseTableExists) {
+        return { code, expectedTransferAmount };
+      }
+
+      const inserted = await executeD1(
+        "INSERT OR IGNORE INTO paymentCodeLeases (code, paymentId, expiresAt, createdAt) VALUES (?, ?, ?, ?)",
+        [code, paymentId, expiresAt, now()],
+      );
+
+      if (!inserted || inserted.changed > 0) {
+        return { code, expectedTransferAmount };
+      }
+    }
+  }
+
+  return null;
+}
+
+async function restoreStock(menuOrders: MenuOrderInput[], timestamp = now()) {
+  for (const menuOrder of menuOrders) {
+    await executeD1(
+      "UPDATE menus SET quantity = quantity + ?, updatedAt = ? WHERE id = ?",
+      [menuOrder.quantity, timestamp, menuOrder.menuId],
+    );
+  }
+}
+
+async function markPaymentPaidById(
+  paymentId: string,
+  options: {
+    bank?: string;
+    depositor?: string;
+    timestamp?: number;
+    matchedBankTransactionId?: string | null;
+    matchedBy?: string;
+  } = {},
+) {
+  const timestamp = options.timestamp ?? now();
+  await updateD1Rows(
+    "payments",
+    {
+      paid: 1,
+      status: paymentStatus.PAID,
+      bank: options.bank ?? "수동 확인",
+      depositor: options.depositor ?? "관리자",
+      method: `${options.bank ?? "수동 확인"} ${options.depositor ?? "관리자"}`,
+      paidAt: timestamp,
+      matchedBankTransactionId: options.matchedBankTransactionId ?? null,
+      matchedBy: options.matchedBy ?? "MANUAL",
+      updatedAt: timestamp,
+    },
+    "id = ?",
+    [paymentId],
+  );
+  await releasePaymentCodeLease(paymentId);
+}
+
+export async function createClientOrder(
+  tableId: string,
+  clientOrderId: string,
+  menuOrders: MenuOrderInput[],
+): Promise<MutationResult> {
   const requestedMenuOrders = aggregateMenuOrders(menuOrders);
 
   if (requestedMenuOrders.length === 0) {
     return { error: "Invalid request", status: 400 };
+  }
+
+  await expireStalePendingOrders();
+
+  const existingOrder = await getExistingOrderByClientOrderId(clientOrderId);
+  if (existingOrder) {
+    return { result: existingOrder, status: 200 };
   }
 
   const table = (await queryD1<TableRow>(
@@ -240,12 +493,13 @@ export async function createClientOrder(tableId: string, menuOrders: MenuOrderIn
 
   const tableContext = (await findActiveTableContext(tableId)) ?? (await createTableContext(tableId));
   const paymentJoin = await paymentJoinSql("o", "p");
-  const activeOrders = await queryD1<{ id: string; paid: boolean | number | null }>(
-    `SELECT o.id, p.paid FROM orders o LEFT JOIN payments p ON ${paymentJoin} AND p.deletedAt IS NULL WHERE o.tableContextId = ? AND o.deletedAt IS NULL`,
-    [tableContext.id],
+  const activeOrders = await queryD1<{ id: string; paid: boolean | number | null; status?: string | null; paymentStatus?: string | null }>(
+    `SELECT o.id, o.status, p.paid, p.status AS paymentStatus FROM orders o LEFT JOIN payments p ON ${paymentJoin} AND p.deletedAt IS NULL WHERE o.tableContextId = ? AND o.deletedAt IS NULL AND COALESCE(o.status, ?) NOT IN (?, ?)`,
+    [tableContext.id, orderStatus.ACTIVE, orderStatus.CANCELLED, orderStatus.EXPIRED],
   );
 
-  if (activeOrders.some((order) => order.paid !== true && order.paid !== 1)) {
+  const inactivePaymentStatuses: string[] = [paymentStatus.CANCELLED, paymentStatus.EXPIRED];
+  if (activeOrders.some((order) => order.paid !== true && order.paid !== 1 && !inactivePaymentStatuses.includes(String(order.paymentStatus)))) {
     return { error: "Unpaid Order Exists", status: 409 };
   }
 
@@ -269,60 +523,111 @@ export async function createClientOrder(tableId: string, menuOrders: MenuOrderIn
   }
 
   const timestamp = now();
+  const expiresAt = timestamp + pendingOrderTtlMs;
   const orderId = newId();
+  const paymentHasOrderId = await paymentUsesOrderIdColumn();
+  const paymentId = paymentHasOrderId ? newId() : orderId;
+  const originalAmount = requestedMenuOrders.reduce((total, menuOrder) => {
+    const menu = menusById.get(menuOrder.menuId);
+    return total + (menu?.price ?? 0) * menuOrder.quantity;
+  }, 0);
+  const paymentCode = await allocatePaymentCode(paymentId, originalAmount, expiresAt);
 
-  for (const menuOrder of requestedMenuOrders) {
-    await queryD1(
-      "UPDATE menus SET quantity = quantity - ?, updatedAt = ? WHERE id = ?",
-      [menuOrder.quantity, timestamp, menuOrder.menuId],
-    );
+  if (!paymentCode) {
+    return { error: "Payment Code Exhausted", status: 409 };
   }
 
-  await insertD1Row("orders", {
-    id: orderId,
-    tableContextId: tableContext.id,
-    createdAt: timestamp,
-    updatedAt: timestamp,
-    deletedAt: null,
-  });
+  const deducted: MenuOrderInput[] = [];
 
-  for (const menuOrder of requestedMenuOrders) {
-    await insertD1Row("menuOrders", {
-      id: newId(),
-      orderId,
-      menuId: menuOrder.menuId,
-      quantity: menuOrder.quantity,
-      status: menuOrderStatus.PENDING,
+  try {
+    for (const menuOrder of requestedMenuOrders) {
+      const result = await executeD1(
+        "UPDATE menus SET quantity = quantity - ?, updatedAt = ? WHERE id = ? AND deletedAt IS NULL AND available = 1 AND quantity >= ?",
+        [menuOrder.quantity, timestamp, menuOrder.menuId, menuOrder.quantity],
+      );
+
+      if (result.changed <= 0) {
+        await restoreStock(deducted, timestamp);
+        await releasePaymentCodeLease(paymentId);
+        return { error: "Menu Not Enough", status: 409 };
+      }
+
+      deducted.push(menuOrder);
+    }
+
+    const displayNumber = await getNextDisplayNumber();
+
+    await insertD1Row("orders", {
+      id: orderId,
+      clientOrderId,
+      displayNumber,
+      status: orderStatus.ACTIVE,
+      expiresAt,
+      tableContextId: tableContext.id,
       createdAt: timestamp,
       updatedAt: timestamp,
       deletedAt: null,
     });
+
+    for (const menuOrder of requestedMenuOrders) {
+      await insertD1Row("menuOrders", {
+        id: newId(),
+        orderId,
+        menuId: menuOrder.menuId,
+        quantity: menuOrder.quantity,
+        status: menuOrderStatus.PENDING,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        deletedAt: null,
+      });
+    }
+
+    const payment: PaymentRow = {
+      id: paymentId,
+      paid: 0,
+      amount: paymentCode.expectedTransferAmount,
+      status: paymentStatus.PENDING,
+      paymentCode: paymentCode.code,
+      originalAmount,
+      expectedTransferAmount: paymentCode.expectedTransferAmount,
+      expiresAt,
+      paidAt: null,
+      matchedBankTransactionId: null,
+      matchedBy: null,
+      depositorHint: null,
+      bank: null,
+      depositor: null,
+      orderId,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      deletedAt: null,
+    };
+
+    await insertD1Row("payments", {
+      ...payment,
+      method: "미결제",
+    });
+
+    return {
+      result: buildCreateOrderResult({ id: orderId, displayNumber }, payment),
+      status: 200,
+    };
+  } catch (error) {
+    await restoreStock(deducted, timestamp);
+    await releasePaymentCodeLease(paymentId);
+    throw error;
   }
-
-  const paymentHasOrderId = await paymentUsesOrderIdColumn();
-  const amount = requestedMenuOrders.reduce((total, menuOrder) => {
-    const menu = menusById.get(menuOrder.menuId);
-    return total + (menu?.price ?? 0) * menuOrder.quantity;
-  }, 0) - table.key;
-
-  await insertD1Row("payments", {
-    id: paymentHasOrderId ? newId() : orderId,
-    paid: 0,
-    amount,
-    method: "미결제",
-    bank: null,
-    depositor: null,
-    orderId,
-    createdAt: timestamp,
-    updatedAt: timestamp,
-    deletedAt: null,
-  });
-
-  return { result: "Order Created", status: 200 };
 }
 
-export async function cancelOrder(orderId: string, options: { allowPaid: boolean }): Promise<MutationResult> {
-  const order = (await queryD1<BaseRow>(
+export async function cancelOrder(
+  orderId: string,
+  options: {
+    allowPaid: boolean;
+    terminalStatus?: typeof paymentStatus.CANCELLED | typeof paymentStatus.EXPIRED;
+    orderTerminalStatus?: typeof orderStatus.CANCELLED | typeof orderStatus.EXPIRED;
+  },
+): Promise<MutationResult> {
+  const order = (await queryD1<OrderRow>(
     "SELECT * FROM orders WHERE id = ? AND deletedAt IS NULL LIMIT 1",
     [orderId],
   ))[0];
@@ -342,6 +647,8 @@ export async function cancelOrder(orderId: string, options: { allowPaid: boolean
     [orderId],
   );
   const timestamp = now();
+  const terminalPaymentStatus = options.terminalStatus ?? paymentStatus.CANCELLED;
+  const terminalOrderStatus = options.orderTerminalStatus ?? orderStatus.CANCELLED;
 
   for (const menuOrder of menuOrders) {
     await queryD1(
@@ -350,46 +657,265 @@ export async function cancelOrder(orderId: string, options: { allowPaid: boolean
     );
   }
 
-  await updateD1Rows("menuOrders", { deletedAt: timestamp, updatedAt: timestamp }, "orderId = ?", [orderId]);
+  await updateD1Rows(
+    "menuOrders",
+    { status: menuOrderStatus.CANCELLED, deletedAt: timestamp, updatedAt: timestamp },
+    "orderId = ?",
+    [orderId],
+  );
 
   const paymentWhere = await paymentWhereForOrder(orderId);
-  await updateD1Rows("payments", { deletedAt: timestamp, updatedAt: timestamp }, paymentWhere.sql, paymentWhere.params);
-  await updateD1Rows("orders", { deletedAt: timestamp, updatedAt: timestamp }, "id = ?", [orderId]);
+  await updateD1Rows(
+    "payments",
+    {
+      status: terminalPaymentStatus,
+      deletedAt: timestamp,
+      updatedAt: timestamp,
+    },
+    paymentWhere.sql,
+    paymentWhere.params,
+  );
+  await updateD1Rows(
+    "orders",
+    { status: terminalOrderStatus, deletedAt: timestamp, updatedAt: timestamp },
+    "id = ?",
+    [orderId],
+  );
+  if (payment) {
+    await releasePaymentCodeLease(payment.id);
+  }
 
   return { result: "Order Deleted", status: 200 };
 }
 
-export async function markDepositPaid(
-  amount: number,
-  bank: string,
-  depositor: string,
-  timestamp: number,
-): Promise<MutationResult> {
-  const payments = await queryD1<PaymentRow>(
-    "SELECT * FROM payments WHERE amount = ? AND paid = 0 AND deletedAt IS NULL ORDER BY createdAt DESC LIMIT 1",
-    [amount],
-  );
-  const payment = payments[0];
+type BankTransactionCandidate = {
+  paymentId: string;
+  orderId: string;
+  tableName: string;
+  displayNumber: number | null;
+  paymentCode: number | null;
+  originalAmount: number;
+  expectedTransferAmount: number;
+  diff: number;
+  reason: string;
+};
 
-  if (!payment) {
-    return { error: "Payment Not Found", status: 400 };
+type BankTransactionRow = {
+  id: string;
+  amount: number;
+  depositor: string;
+  receivedAt: number | string;
+  rawText: string;
+  source: string;
+  status: string;
+  matchedPaymentId?: string | null;
+  createdAt: number | string;
+};
+
+function makeBankTransactionDedupeKey(input: BankTransactionInput) {
+  return input.dedupeKey ?? [
+    input.source ?? "MANUAL",
+    input.timestamp,
+    input.amount,
+    input.depositor.trim(),
+    input.rawText?.trim() ?? "",
+  ].join(":");
+}
+
+async function findPaymentCandidates(amount: number): Promise<BankTransactionCandidate[]> {
+  const contextTable = await getTableContextTableName();
+  const paymentJoin = await paymentJoinSql("o", "p");
+  const rows = await queryD1<PaymentRow & {
+    orderId: string;
+    tableName: string;
+    displayNumber?: number | null;
+  }>(
+    `SELECT p.*, o.id AS orderId, o.displayNumber, t.name AS tableName
+     FROM payments p
+     INNER JOIN orders o ON ${paymentJoin}
+     INNER JOIN ${quoteIdentifier(contextTable)} tc ON tc.id = o.tableContextId
+     INNER JOIN tables t ON t.id = tc.tableId
+     WHERE p.deletedAt IS NULL
+       AND o.deletedAt IS NULL
+       AND p.paid = 0
+       AND COALESCE(p.status, ?) IN (?, ?)`,
+    [paymentStatus.PENDING, paymentStatus.PENDING, paymentStatus.MANUAL_REVIEW],
+  );
+
+  return rows.flatMap((payment) => {
+    const expectedTransferAmount = payment.expectedTransferAmount ?? payment.amount;
+    const originalAmount = payment.originalAmount ?? payment.amount;
+    const candidates: BankTransactionCandidate[] = [];
+
+    if (amount === expectedTransferAmount) {
+      candidates.push({
+        paymentId: payment.id,
+        orderId: payment.orderId,
+        tableName: payment.tableName,
+        displayNumber: payment.displayNumber ?? null,
+        paymentCode: payment.paymentCode ?? null,
+        originalAmount,
+        expectedTransferAmount,
+        diff: 0,
+        reason: "EXPECTED_AMOUNT",
+      });
+    } else if (amount === originalAmount) {
+      candidates.push({
+        paymentId: payment.id,
+        orderId: payment.orderId,
+        tableName: payment.tableName,
+        displayNumber: payment.displayNumber ?? null,
+        paymentCode: payment.paymentCode ?? null,
+        originalAmount,
+        expectedTransferAmount,
+        diff: amount - expectedTransferAmount,
+        reason: "ORIGINAL_AMOUNT",
+      });
+    } else if (Math.abs(amount - expectedTransferAmount) < 100) {
+      candidates.push({
+        paymentId: payment.id,
+        orderId: payment.orderId,
+        tableName: payment.tableName,
+        displayNumber: payment.displayNumber ?? null,
+        paymentCode: payment.paymentCode ?? null,
+        originalAmount,
+        expectedTransferAmount,
+        diff: amount - expectedTransferAmount,
+        reason: "WITHIN_100",
+      });
+    }
+
+    return candidates;
+  });
+}
+
+export async function ingestBankTransaction(input: BankTransactionInput): Promise<MutationResult> {
+  const transactionId = newId();
+  const timestamp = now();
+  const dedupeKey = makeBankTransactionDedupeKey(input);
+  const candidates = await findPaymentCandidates(input.amount);
+  const exactCandidates = candidates.filter((candidate) => candidate.reason === "EXPECTED_AMOUNT");
+  const autoCandidate = exactCandidates.length === 1 ? exactCandidates[0] : null;
+  const status = autoCandidate
+    ? bankTransactionStatus.AUTO_MATCHED
+    : candidates.length > 0
+      ? bankTransactionStatus.NEEDS_REVIEW
+      : bankTransactionStatus.UNMATCHED;
+
+  const existing = (await queryD1<BankTransactionRow>(
+    "SELECT * FROM bankTransactions WHERE dedupeKey = ? LIMIT 1",
+    [dedupeKey],
+  ))[0];
+
+  if (existing) {
+    return {
+      result: {
+        bankTransactionId: existing.id,
+        status: existing.status,
+        matchedPaymentId: existing.matchedPaymentId ?? null,
+        candidateCount: candidates.length,
+      },
+      status: 200,
+    };
   }
 
-  await updateD1Rows(
-    "payments",
-    {
-      paid: 1,
-      bank,
-      depositor,
-      method: `${bank} ${depositor}`,
-      createdAt: timestamp,
-      updatedAt: timestamp,
+  await insertD1Row("bankTransactions", {
+    id: transactionId,
+    dedupeKey,
+    amount: input.amount,
+    depositor: input.depositor,
+    receivedAt: input.timestamp,
+    rawText: input.rawText ?? `${input.bank} ${input.depositor} ${input.amount}`,
+    source: input.source ?? "MANUAL",
+    status,
+    matchedPaymentId: autoCandidate?.paymentId ?? null,
+    createdAt: timestamp,
+  });
+
+  if (autoCandidate) {
+    await markPaymentPaidById(autoCandidate.paymentId, {
+      bank: input.bank,
+      depositor: input.depositor,
+      timestamp: input.timestamp,
+      matchedBankTransactionId: transactionId,
+      matchedBy: "AUTO_MATCHED",
+    });
+  }
+
+  return {
+    result: {
+      bankTransactionId: transactionId,
+      status,
+      matchedPaymentId: autoCandidate?.paymentId ?? null,
+      candidateCount: candidates.length,
     },
-    "id = ?",
-    [payment.id],
+    status: 200,
+  };
+}
+
+export async function getPendingBankTransactions(): Promise<MutationResult> {
+  const transactions = await queryD1<BankTransactionRow>(
+    "SELECT * FROM bankTransactions WHERE status IN (?, ?) ORDER BY receivedAt DESC, createdAt DESC",
+    [bankTransactionStatus.NEEDS_REVIEW, bankTransactionStatus.UNMATCHED],
   );
 
-  return { result: "ok", status: 200 };
+  return {
+    result: {
+      transactions: await Promise.all(transactions.map(async (transaction) => ({
+        id: transaction.id,
+        amount: transaction.amount,
+        depositor: transaction.depositor,
+        receivedAt: normalizeNumber(transaction.receivedAt) ?? 0,
+        rawText: transaction.rawText,
+        source: transaction.source,
+        status: transaction.status,
+        matchedPaymentId: transaction.matchedPaymentId ?? null,
+        createdAt: normalizeNumber(transaction.createdAt) ?? 0,
+        candidates: await findPaymentCandidates(transaction.amount),
+      }))),
+    },
+    status: 200,
+  };
+}
+
+export async function confirmBankTransaction(bankTransactionId: string, paymentId: string): Promise<MutationResult> {
+  const transaction = (await queryD1<BankTransactionRow>(
+    "SELECT * FROM bankTransactions WHERE id = ? LIMIT 1",
+    [bankTransactionId],
+  ))[0];
+
+  if (!transaction) {
+    return { error: "Bank Transaction Not Found", status: 404 };
+  }
+
+  await markPaymentPaidById(paymentId, {
+    bank: transaction.source,
+    depositor: transaction.depositor,
+    timestamp: normalizeNumber(transaction.receivedAt) ?? now(),
+    matchedBankTransactionId: bankTransactionId,
+    matchedBy: "MANUAL_REVIEW",
+  });
+  await updateD1Rows(
+    "bankTransactions",
+    {
+      status: bankTransactionStatus.AUTO_MATCHED,
+      matchedPaymentId: paymentId,
+    },
+    "id = ?",
+    [bankTransactionId],
+  );
+
+  return { result: "Payment matched", status: 200 };
+}
+
+export async function ignoreBankTransaction(bankTransactionId: string): Promise<MutationResult> {
+  await updateD1Rows(
+    "bankTransactions",
+    { status: bankTransactionStatus.IGNORED },
+    "id = ?",
+    [bankTransactionId],
+  );
+  return { result: "Bank transaction ignored", status: 200 };
 }
 
 export async function setMenuOrderStatus(menuOrderId: string, status: string): Promise<MutationResult> {
@@ -400,6 +926,27 @@ export async function setMenuOrderStatus(menuOrderId: string, status: string): P
 
   if (!menuOrder) {
     return { error: "Menu Order Not Found", status: 404 };
+  }
+
+  if (status === menuOrderStatus.READY && menuOrder.status !== menuOrderStatus.PENDING) {
+    return { error: "Menu order must be pending before ready", status: 409 };
+  }
+
+  if (status === menuOrderStatus.PICKED_UP && menuOrder.status !== menuOrderStatus.READY) {
+    return { error: "Menu order must be ready before pickup", status: 409 };
+  }
+
+  if (status === menuOrderStatus.READY) {
+    const paymentJoin = await paymentJoinSql("o", "p");
+    const paidOrders = await queryD1<{ paid: boolean | number; status?: string | null }>(
+      `SELECT p.paid, p.status FROM orders o INNER JOIN payments p ON ${paymentJoin} WHERE o.id = ? AND p.deletedAt IS NULL LIMIT 1`,
+      [menuOrder.orderId],
+    );
+    const payment = paidOrders[0];
+
+    if (!payment || !isPaymentPaid(payment as PaymentRow)) {
+      return { error: "Order is not paid yet", status: 409 };
+    }
   }
 
   await updateD1Rows("menuOrders", { status, updatedAt: now() }, "id = ?", [menuOrderId]);
@@ -413,8 +960,7 @@ export async function markOrderPaid(orderId: string): Promise<MutationResult> {
     return { error: "Payment Not Found", status: 404 };
   }
 
-  const paymentWhere = await paymentWhereForOrder(orderId);
-  await updateD1Rows("payments", { paid: 1, updatedAt: now() }, paymentWhere.sql, paymentWhere.params);
+  await markPaymentPaidById(payment.id);
   return { result: "Order marked as paid", status: 200 };
 }
 
@@ -500,8 +1046,8 @@ export async function vacateAdminTable(tableId: string): Promise<MutationResult>
   }
 
   const pendingMenuOrders = await queryD1<MenuOrderRow>(
-    `SELECT mo.* FROM menuOrders mo INNER JOIN orders o ON o.id = mo.orderId WHERE o.tableContextId = ? AND o.deletedAt IS NULL AND mo.deletedAt IS NULL AND mo.status = ? LIMIT 1`,
-    [activeContext.id, menuOrderStatus.PENDING],
+    `SELECT mo.* FROM menuOrders mo INNER JOIN orders o ON o.id = mo.orderId WHERE o.tableContextId = ? AND o.deletedAt IS NULL AND mo.deletedAt IS NULL AND mo.status IN (?, ?) LIMIT 1`,
+    [activeContext.id, menuOrderStatus.PENDING, menuOrderStatus.READY],
   );
 
   if (pendingMenuOrders.length > 0) {

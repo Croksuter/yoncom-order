@@ -5,11 +5,17 @@ import { ClipboardPasteIcon } from "lucide-react";
 
 export default function OrderPaymentModal({
   openState, setOpenState,
-  amount,
+  originalAmount,
+  paymentCode,
+  expectedTransferAmount,
+  expiresAt,
 }: {
   openState: boolean;
   setOpenState: (open: boolean) => void;
-  amount: number;
+  originalAmount: number;
+  paymentCode: number | null;
+  expectedTransferAmount: number;
+  expiresAt: number | null;
 }) {
   const copyAccount = () => {
     // TODO: 토스 이체 계좌 변경 필요
@@ -22,7 +28,7 @@ export default function OrderPaymentModal({
   }
 
   const copyAmount = () => {
-    navigator.clipboard.writeText(amount.toString());
+    navigator.clipboard.writeText(expectedTransferAmount.toString());
     toast({
       title: "입금액이 복사되었습니다.",
     });
@@ -43,6 +49,19 @@ export default function OrderPaymentModal({
           <DialogTitle className="text-2xl">직접 이체</DialogTitle>
           <DialogDescription>
             <div className="fc w-full mt-4 justify-between *:my-2">
+              <div className="grid w-full grid-cols-2 gap-2 text-left text-base">
+                <span className="font-bold">주문금액</span>
+                <span className="text-right">{originalAmount.toLocaleString()}원</span>
+                <span className="font-bold">결제코드</span>
+                <span className="text-right">{paymentCode ?? "-"}원 차감</span>
+                <span className="font-bold">입금 기한</span>
+                <span className="text-right">{expiresAt ? new Date(expiresAt).toLocaleTimeString("ko-KR", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  second: "2-digit",
+                  hour12: false,
+                }) : "-"}</span>
+              </div>
               <div className="fc items-end justify-between *:mt-1">
                 <span className="w-full leading-8 font-bold text-start text-lg">⋅ 입금 계좌</span>
                 <div
@@ -59,7 +78,7 @@ export default function OrderPaymentModal({
                   onClick={copyAmount}
                   className="fr w-full oveflow-hidden rounded-lg bg-blue-100 p-2 justify-center mb-2 items-center"
                 >
-                  <span className="truncate text-blue-500 text-3xl font-bold hover:cursor-pointer">{amount.toLocaleString()}원</span>
+                  <span className="truncate text-blue-500 text-3xl font-bold hover:cursor-pointer">{expectedTransferAmount.toLocaleString()}원</span>
                   <ClipboardPasteIcon className="text-blue-500 w-fit scale-110 ml-2 mt-[2px]" />
                 </div>
               </div>

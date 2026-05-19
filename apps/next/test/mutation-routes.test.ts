@@ -1,6 +1,40 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { d1Success, installD1FetchMock, stubCloudflareEnv } from "./helpers/d1";
 
+const paymentColumns = [
+  "id",
+  "paid",
+  "amount",
+  "bank",
+  "depositor",
+  "method",
+  "orderId",
+  "status",
+  "paymentCode",
+  "originalAmount",
+  "expectedTransferAmount",
+  "expiresAt",
+  "paidAt",
+  "matchedBankTransactionId",
+  "matchedBy",
+  "depositorHint",
+  "createdAt",
+  "updatedAt",
+  "deletedAt",
+];
+
+const orderColumns = [
+  "id",
+  "tableContextId",
+  "clientOrderId",
+  "displayNumber",
+  "status",
+  "expiresAt",
+  "createdAt",
+  "updatedAt",
+  "deletedAt",
+];
+
 function tableInfo(columns: string[]) {
   return d1Success(columns.map((name) => ({ name })));
 }
@@ -9,13 +43,37 @@ describe("implemented mutation route handlers", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    vi.doMock("~/lib/server/auth-session", () => ({
+      requireAdmin: vi.fn(async () => null),
+    }));
     stubCloudflareEnv();
   });
 
-  it("POST /api/order creates an order, decrements stock, and creates a payment in D1", async () => {
+  it("POST /api/order creates an idempotent order, decrements stock conditionally, and issues the smallest payment code", async () => {
     const { requests } = installD1FetchMock(({ sql, params }) => {
-      if (sql.includes("sqlite_master") && params[0] === "tableContexts") {
-        return d1Success([{ name: "tableContexts" }]);
+      if (sql === "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?") {
+        return d1Success(params[0] === "tableContexts" || params[0] === "paymentCodeLeases" ? [{ name: params[0] }] : []);
+      }
+      if (sql === "PRAGMA table_info(\"payments\")") {
+        return tableInfo(paymentColumns);
+      }
+      if (sql === "PRAGMA table_info(\"orders\")") {
+        return tableInfo(orderColumns);
+      }
+      if (sql === "PRAGMA table_info(\"tableContexts\")") {
+        return tableInfo(["id", "tableId", "createdAt", "updatedAt", "deletedAt"]);
+      }
+      if (sql === "PRAGMA table_info(\"menuOrders\")") {
+        return tableInfo(["id", "quantity", "status", "orderId", "menuId", "createdAt", "updatedAt", "deletedAt"]);
+      }
+      if (sql.startsWith("SELECT * FROM payments WHERE deletedAt IS NULL AND paid = 0 AND expiresAt")) {
+        return d1Success([]);
+      }
+      if (sql === "DELETE FROM paymentCodeLeases WHERE expiresAt <= ?") {
+        return d1Success([], { duration: 1, changes: 0 });
+      }
+      if (sql === "SELECT * FROM orders WHERE clientOrderId = ? AND deletedAt IS NULL LIMIT 1") {
+        return d1Success([]);
       }
       if (sql === "SELECT * FROM tables WHERE id = ? AND deletedAt IS NULL LIMIT 1") {
         return d1Success([
@@ -33,14 +91,8 @@ describe("implemented mutation route handlers", () => {
       if (sql === "SELECT * FROM \"tableContexts\" WHERE tableId = ? AND deletedAt IS NULL LIMIT 1") {
         return d1Success([]);
       }
-      if (sql === "PRAGMA table_info(\"tableContexts\")") {
-        return tableInfo(["id", "tableId", "createdAt", "updatedAt", "deletedAt"]);
-      }
       if (sql.startsWith("INSERT INTO \"tableContexts\"")) {
-        return d1Success([]);
-      }
-      if (sql === "PRAGMA table_info(\"payments\")") {
-        return tableInfo(["id", "paid", "amount", "bank", "depositor", "orderId", "createdAt", "updatedAt", "deletedAt"]);
+        return d1Success([], { duration: 1, changes: 1 });
       }
       if (sql.includes("LEFT JOIN payments")) {
         return d1Success([]);
@@ -60,23 +112,26 @@ describe("implemented mutation route handlers", () => {
           },
         ]);
       }
-      if (sql === "UPDATE menus SET quantity = quantity - ?, updatedAt = ? WHERE id = ?") {
+      if (sql === "SELECT * FROM payments WHERE deletedAt IS NULL AND paid = 0 AND COALESCE(status, ?) IN (?, ?)") {
         return d1Success([]);
       }
-      if (sql === "PRAGMA table_info(\"orders\")") {
-        return tableInfo(["id", "tableContextId", "createdAt", "updatedAt", "deletedAt"]);
+      if (sql === "INSERT OR IGNORE INTO paymentCodeLeases (code, paymentId, expiresAt, createdAt) VALUES (?, ?, ?, ?)") {
+        return d1Success([], { duration: 1, changes: 1 });
+      }
+      if (sql === "UPDATE menus SET quantity = quantity - ?, updatedAt = ? WHERE id = ? AND deletedAt IS NULL AND available = 1 AND quantity >= ?") {
+        return d1Success([], { duration: 1, changes: 1 });
+      }
+      if (sql === "SELECT COALESCE(MAX(displayNumber), 0) + 1 AS nextDisplayNumber FROM orders") {
+        return d1Success([{ nextDisplayNumber: 1 }]);
       }
       if (sql.startsWith("INSERT INTO \"orders\"")) {
-        return d1Success([]);
-      }
-      if (sql === "PRAGMA table_info(\"menuOrders\")") {
-        return tableInfo(["id", "quantity", "status", "orderId", "menuId", "createdAt", "updatedAt", "deletedAt"]);
+        return d1Success([], { duration: 1, changes: 1 });
       }
       if (sql.startsWith("INSERT INTO \"menuOrders\"")) {
-        return d1Success([]);
+        return d1Success([], { duration: 1, changes: 1 });
       }
       if (sql.startsWith("INSERT INTO \"payments\"")) {
-        return d1Success([]);
+        return d1Success([], { duration: 1, changes: 1 });
       }
       throw new Error(`Unexpected SQL: ${sql}`);
     });
@@ -86,38 +141,70 @@ describe("implemented mutation route handlers", () => {
       method: "POST",
       body: JSON.stringify({
         tableId: "table_e2e_00001",
+        clientOrderId: "client-order-001",
         menuOrders: [{ menuId: "menu_e2e_000001", quantity: 2 }],
       }),
     }));
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ result: "Order Created" });
-    expect(requests.some((request) => request.sql === "UPDATE menus SET quantity = quantity - ?, updatedAt = ? WHERE id = ?")).toBe(true);
-    expect(requests.some((request) => request.sql.startsWith("INSERT INTO \"orders\""))).toBe(true);
-    expect(requests.some((request) => request.sql.startsWith("INSERT INTO \"menuOrders\""))).toBe(true);
-    expect(requests.some((request) => request.sql.startsWith("INSERT INTO \"payments\"") && request.params.includes(23993))).toBe(true);
+    const body = await response.json();
+    expect(body.result).toEqual(expect.objectContaining({
+      displayNumber: 1,
+      payment: expect.objectContaining({
+        status: "PENDING",
+        originalAmount: 24000,
+        paymentCode: 1,
+        expectedTransferAmount: 23999,
+      }),
+    }));
+    expect(requests.some((request) => request.sql === "UPDATE menus SET quantity = quantity - ?, updatedAt = ? WHERE id = ? AND deletedAt IS NULL AND available = 1 AND quantity >= ?")).toBe(true);
+    const paymentInsert = requests.find((request) => request.sql.startsWith("INSERT INTO \"payments\""));
+    expect(paymentInsert?.params).toContain(23999);
+    expect(paymentInsert?.params).toContain(24000);
+    expect(paymentInsert?.params).toContain(1);
   });
 
-  it("POST /api/admin/deposit marks the newest matching unpaid payment as paid", async () => {
-    const { requests } = installD1FetchMock(({ sql }) => {
-      if (sql === "SELECT * FROM payments WHERE amount = ? AND paid = 0 AND deletedAt IS NULL ORDER BY createdAt DESC LIMIT 1") {
+  it("POST /api/admin/deposit stores a bank transaction and auto-matches only a single exact expected amount", async () => {
+    const { requests } = installD1FetchMock(({ sql, params }) => {
+      if (sql === "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?") {
+        return d1Success(params[0] === "tableContexts" || params[0] === "paymentCodeLeases" ? [{ name: params[0] }] : []);
+      }
+      if (sql === "PRAGMA table_info(\"payments\")") {
+        return tableInfo(paymentColumns);
+      }
+      if (sql === "PRAGMA table_info(\"bankTransactions\")") {
+        return tableInfo(["id", "dedupeKey", "amount", "depositor", "receivedAt", "rawText", "source", "status", "matchedPaymentId", "createdAt"]);
+      }
+      if (sql.startsWith("SELECT p.*, o.id AS orderId")) {
         return d1Success([
           {
             id: "pay_e2e_000001",
             paid: 0,
-            amount: 23993,
+            amount: 23999,
+            status: "PENDING",
+            paymentCode: 1,
+            originalAmount: 24000,
+            expectedTransferAmount: 23999,
             orderId: "order_e2e_0001",
+            tableName: "E2E Table",
+            displayNumber: 1,
             createdAt: 1,
             updatedAt: 1,
             deletedAt: null,
           },
         ]);
       }
-      if (sql === "PRAGMA table_info(\"payments\")") {
-        return tableInfo(["id", "paid", "amount", "bank", "depositor", "method", "orderId", "createdAt", "updatedAt", "deletedAt"]);
+      if (sql === "SELECT * FROM bankTransactions WHERE dedupeKey = ? LIMIT 1") {
+        return d1Success([]);
+      }
+      if (sql.startsWith("INSERT INTO \"bankTransactions\"")) {
+        return d1Success([], { duration: 1, changes: 1 });
       }
       if (sql.startsWith("UPDATE \"payments\"")) {
-        return d1Success([]);
+        return d1Success([], { duration: 1, changes: 1 });
+      }
+      if (sql === "DELETE FROM paymentCodeLeases WHERE paymentId = ?") {
+        return d1Success([], { duration: 1, changes: 1 });
       }
       throw new Error(`Unexpected SQL: ${sql}`);
     });
@@ -126,17 +213,26 @@ describe("implemented mutation route handlers", () => {
     const response = await POST(new Request("http://order.test/api/admin/deposit", {
       method: "POST",
       body: JSON.stringify({
-        amount: 23993,
+        amount: 23999,
         bank: "테스트은행",
         timestamp: 1710000000000,
         name: "테스터",
+        source: "MANUAL",
       }),
     }));
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ result: "ok" });
+    await expect(response.json()).resolves.toEqual({
+      result: {
+        bankTransactionId: expect.any(String),
+        status: "AUTO_MATCHED",
+        matchedPaymentId: "pay_e2e_000001",
+        candidateCount: 1,
+      },
+    });
     const update = requests.find((request) => request.sql.startsWith("UPDATE \"payments\""));
     expect(update?.params).toContain(1);
+    expect(update?.params).toContain("PAID");
     expect(update?.params).toContain("테스트은행");
     expect(update?.params).toContain("테스터");
   });
@@ -159,7 +255,7 @@ describe("implemented mutation route handlers", () => {
         return d1Success([{ id: "user_admin0000" }]);
       }
       if (sql.startsWith("INSERT INTO \"tables\"")) {
-        return d1Success([]);
+        return d1Success([], { duration: 1, changes: 1 });
       }
       throw new Error(`Unexpected SQL: ${sql}`);
     });
@@ -177,5 +273,28 @@ describe("implemented mutation route handlers", () => {
     const insert = requests.find((request) => request.sql.startsWith("INSERT INTO \"tables\""));
     expect(insert?.sql).toContain("\"userId\"");
     expect(insert?.params).toContain("user_admin0000");
+  });
+
+  it("admin mutation routes reject requests when requireAdmin fails", async () => {
+    vi.resetModules();
+    vi.doMock("~/lib/server/auth-session", () => ({
+      requireAdmin: vi.fn(async () => Response.json({ error: "Forbidden" }, { status: 403 })),
+    }));
+    stubCloudflareEnv();
+    const { POST } = await import("~/app/api/admin/deposit/route");
+
+    const response = await POST(new Request("http://order.test/api/admin/deposit", {
+      method: "POST",
+      body: JSON.stringify({
+        amount: 23999,
+        bank: "테스트은행",
+        timestamp: 1710000000000,
+        name: "테스터",
+        source: "MANUAL",
+      }),
+    }));
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({ error: "Forbidden" });
   });
 });

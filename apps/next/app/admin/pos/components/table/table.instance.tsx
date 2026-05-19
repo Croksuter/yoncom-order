@@ -35,8 +35,18 @@ export default function TableInstance({
   const isOnOrder = activeTableContext?.orders.some((order) => 
     order.deletedAt === null
     && order.payment.paid
-    && order.menuOrders.some((menuOrder) => menuOrder.status === Schema.menuOrderStatus.PENDING)
+    && order.menuOrders.some((menuOrder) => (
+      menuOrder.status === Schema.menuOrderStatus.PENDING
+      || menuOrder.status === Schema.menuOrderStatus.READY
+    ))
   ) || false;
+
+  const menuOrderIcon = (status: string) => {
+    if (status === Schema.menuOrderStatus.PENDING) return "⌛";
+    if (status === Schema.menuOrderStatus.READY) return "🔔";
+    if (status === Schema.menuOrderStatus.PICKED_UP) return "✅";
+    return "❌";
+  };
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -88,7 +98,7 @@ export default function TableInstance({
                   <TableBody>
                     {menuOrders.map((menuOrder) => (
                       <TableRow key={menuOrder.id} className="*:py-1">
-                        <TableCell>{menuOrder.status === Schema.menuOrderStatus.PENDING ? "⌛" : "✅"} {menuId2menu(menuOrder.menuId)?.name}</TableCell>
+                        <TableCell>{menuOrderIcon(menuOrder.status)} {menuId2menu(menuOrder.menuId)?.name}</TableCell>
                         <TableCell className="font-bold">{menuOrder.quantity}</TableCell>
                       </TableRow>
                     ))}

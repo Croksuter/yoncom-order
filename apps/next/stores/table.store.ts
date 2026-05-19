@@ -15,6 +15,7 @@ import * as AdminDepositResponse from "shared/types/responses/admin/deposit";
 type TableState = {
   clientTable: ClientTableResponse.Get["result"] | null;
   tables: AdminTableResponse.Get["result"];
+  bankTransactions: AdminDepositResponse.Get["result"]["transactions"];
   isLoaded: boolean;
   error: boolean;
 
@@ -33,8 +34,13 @@ type TableState = {
   adminCancelOrder: (query: AdminOrderRequest.RemoveOrderQuery) => Promise<AdminOrderResponse.Remove | null>;
   
   adminDeposit: (query: AdminDepositRequest.Create) => Promise<AdminDepositResponse.Create | null>;
+  adminPayOrder: (query: AdminOrderRequest.PaidOrder) => Promise<AdminOrderResponse.Paid | null>;
+  loadBankTransactions: () => Promise<AdminDepositResponse.Get | null>;
+  adminConfirmBankTransaction: (query: AdminDepositRequest.Confirm) => Promise<AdminDepositResponse.Confirm | null>;
+  adminIgnoreBankTransaction: (query: AdminDepositRequest.Ignore) => Promise<AdminDepositResponse.Ignore | null>;
 
   adminCompleteOrder: (query: AdminOrderRequest.CompleteOrder) => Promise<AdminOrderResponse.Complete | null>;
+  adminPickUpOrder: (query: AdminOrderRequest.PickUpOrder) => Promise<AdminOrderResponse.PickUp | null>;
 
   // 다른 store에서 사용하기 위해 노출. component에서 사용하지 않음.
   _setTables: (tables: AdminTableResponse.Get["result"]) => void;
@@ -43,6 +49,7 @@ type TableState = {
 const useTableStore = create<TableState>((set, get) => ({
   clientTable: null,
   tables: [],
+  bankTransactions: [],
   isLoaded: false,
   error: false,
 
@@ -188,8 +195,23 @@ const useTableStore = create<TableState>((set, get) => ({
     setter: set,
     onSuccess: (res) => {
       toast({
-        title: "주문 완료 완료",
-        description: "주문이 성공적으로 완료되었습니다.",
+        title: "준비 완료",
+        description: "주문이 준비 완료 상태로 변경되었습니다.",
+        duration: 3000,
+      });
+      get().load({});
+    },
+  }),
+
+  adminPickUpOrder: async (query: AdminOrderRequest.PickUpOrder) => await queryStore<AdminOrderRequest.PickUpOrder, AdminOrderResponse.PickUp>({
+    route: "admin/order/pick-up",
+    method: "put",
+    query,
+    setter: set,
+    onSuccess: () => {
+      toast({
+        title: "수령 완료",
+        description: "주문이 수령 완료 상태로 변경되었습니다.",
         duration: 3000,
       });
       get().load({});
@@ -202,12 +224,72 @@ const useTableStore = create<TableState>((set, get) => ({
     query,
     setter: set,
     onSuccess: (res) => {
+      const message = res.result.status === "AUTO_MATCHED"
+        ? "입금 내역이 주문과 자동 매칭되었습니다."
+        : res.result.status === "NEEDS_REVIEW"
+          ? "입금 확인 필요 목록에서 매칭할 주문을 선택해주세요."
+          : "일치하는 주문 후보가 없어 미확인 입금으로 보관했습니다.";
       toast({
-        title: "결제 처리 완료",
-        description: "결제가 성공적으로 처리되었습니다.",
+        title: "입금 내역 등록",
+        description: message,
         duration: 3000,
       });
       get().load({});
+      get().loadBankTransactions();
+    },
+  }),
+
+  adminPayOrder: async (query: AdminOrderRequest.PaidOrder) => await queryStore<AdminOrderRequest.PaidOrder, AdminOrderResponse.Paid>({
+    route: "admin/order",
+    method: "put",
+    query,
+    setter: set,
+    onSuccess: () => {
+      toast({
+        title: "결제 확인",
+        description: "주문이 수동 결제 완료 처리되었습니다.",
+        duration: 3000,
+      });
+      get().load({});
+      get().loadBankTransactions();
+    },
+  }),
+
+  loadBankTransactions: async () => await queryStore<{}, AdminDepositResponse.Get>({
+    route: "admin/deposit",
+    method: "get",
+    query: {},
+    onSuccess: (res) => set({ bankTransactions: res.result.transactions }),
+  }),
+
+  adminConfirmBankTransaction: async (query: AdminDepositRequest.Confirm) => await queryStore<AdminDepositRequest.Confirm, AdminDepositResponse.Confirm>({
+    route: "admin/deposit/confirm",
+    method: "put",
+    query,
+    setter: set,
+    onSuccess: () => {
+      toast({
+        title: "입금 매칭 완료",
+        description: "선택한 주문이 결제 완료 처리되었습니다.",
+        duration: 3000,
+      });
+      get().load({});
+      get().loadBankTransactions();
+    },
+  }),
+
+  adminIgnoreBankTransaction: async (query: AdminDepositRequest.Ignore) => await queryStore<AdminDepositRequest.Ignore, AdminDepositResponse.Ignore>({
+    route: "admin/deposit/ignore",
+    method: "put",
+    query,
+    setter: set,
+    onSuccess: () => {
+      toast({
+        title: "입금 내역 무시",
+        description: "해당 입금 내역을 후보 목록에서 제외했습니다.",
+        duration: 3000,
+      });
+      get().loadBankTransactions();
     },
   }),
 

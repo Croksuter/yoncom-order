@@ -231,9 +231,27 @@ function parseEnvFile(envPath: string) {
 }
 
 export async function queryD1<T = D1ApiRow>(sql: string, params: unknown[] = []) {
-  const { database } = getD1Database();
-  const result = await database.query<T>(sql, params);
+  const result = await queryD1Result<T>(sql, params);
   return result.results ?? [];
+}
+
+export async function queryD1Result<T = D1ApiRow>(sql: string, params: unknown[] = []) {
+  const { database } = getD1Database();
+  return await database.query<T>(sql, params);
+}
+
+export async function executeD1(sql: string, params: unknown[] = []) {
+  const result = await queryD1Result(sql, params);
+  const meta = result.meta ?? {};
+  const changed =
+    Number(meta.changes ?? meta.changed_db ?? meta.rows_written ?? meta.rowsWritten ?? 0) ||
+    (Array.isArray(result.results) ? result.results.length : 0);
+
+  return {
+    changed,
+    meta,
+    results: result.results ?? [],
+  };
 }
 
 export async function hasD1Table(name: string) {

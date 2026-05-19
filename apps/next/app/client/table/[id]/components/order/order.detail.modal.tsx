@@ -13,9 +13,10 @@ export default function OrderDetailModal({
   setOpenState: (open: boolean) => void;
   orderDetail: ClientTableResponse.Get["result"]["tableContexts"][number]["orders"][number] | null;
 }) {
+  const { menus } = useMenuStore();
+
   if (!orderDetail) return null;
 
-  const { menus } = useMenuStore();
   const menuOrderInfos = orderDetail.menuOrders.map((menuOrder) => {
     const menu = menus.find((menu) => menu.id === menuOrder.menuId);
     if (!menu) return null;
@@ -27,6 +28,15 @@ export default function OrderDetailModal({
       totalPrice: menu.price * menuOrder.quantity,
     }
   })
+  const originalAmount = orderDetail.payment.originalAmount ?? orderDetail.payment.amount;
+  const expectedTransferAmount = orderDetail.payment.expectedTransferAmount ?? orderDetail.payment.amount;
+  const menuOrderStatusLabel = (status: string) => {
+    if (status === "PENDING") return "조리 중";
+    if (status === "READY") return "준비 완료";
+    if (status === "PICKED_UP") return "수령 완료";
+    if (status === "CANCELLED") return "취소";
+    return status;
+  };
 
   const handleClose = () => {
     setOpenState(false);
@@ -46,6 +56,9 @@ export default function OrderDetailModal({
                 hour: "2-digit",
                 minute: "2-digit",
               })}</DialogDescription>
+              <DialogDescription className="text-center">
+                주문금액 {originalAmount.toLocaleString()}원 · 결제코드 {orderDetail.payment.paymentCode ?? "-"} · 입금액 {expectedTransferAmount.toLocaleString()}원
+              </DialogDescription>
             </DialogHeader>
             <Table>
               <TableHeader className="bg-gray-200">
@@ -54,24 +67,30 @@ export default function OrderDetailModal({
                   <TableHead className="!text-right">단가</TableHead>
                   <TableHead className="!text-right">수량</TableHead>
                   <TableHead className="!text-right">가격</TableHead>
+                  <TableHead className="!text-center">상태</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {menuOrderInfos.map((menuOrderInfo) => (
-                  <TableRow key={menuOrderInfo!.menuId} className="h-14 *:text-base"
-                  >
-                    <TableCell className="text-left font-bold">{menuOrderInfo!.menuName}</TableCell>
-                    <TableCell className="text-right">{menuOrderInfo!.menuPrice.toLocaleString()}</TableCell>
-                    <TableCell className="text-right">{menuOrderInfo!.quantity}</TableCell>
-                    <TableCell className="text-right">{menuOrderInfo!.totalPrice.toLocaleString()}</TableCell>
-                  </TableRow>
-                ))}
+                {menuOrderInfos.map((menuOrderInfo) => {
+                  const menuOrder = orderDetail.menuOrders.find((item) => item.menuId === menuOrderInfo!.menuId);
+
+                  return (
+                    <TableRow key={menuOrderInfo!.menuId} className="h-14 *:text-base"
+                    >
+                      <TableCell className="text-left font-bold">{menuOrderInfo!.menuName}</TableCell>
+                      <TableCell className="text-right">{menuOrderInfo!.menuPrice.toLocaleString()}</TableCell>
+                      <TableCell className="text-right">{menuOrderInfo!.quantity}</TableCell>
+                      <TableCell className="text-right">{menuOrderInfo!.totalPrice.toLocaleString()}</TableCell>
+                      <TableCell className="text-center">{menuOrder ? menuOrderStatusLabel(menuOrder.status) : "-"}</TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
             <div className="text-right">
               <span className="text-right text-lg mr-2">총액</span>
               <span className="text-right text-2xl font-bold">
-                {orderDetail.payment.amount.toLocaleString()} 원
+                {expectedTransferAmount.toLocaleString()} 원
               </span>
             </div>
             <DialogFooter className="h-fit fr *:flex-1 *:mx-2 *:h-14 *:rounded-2xl *:text-lg">

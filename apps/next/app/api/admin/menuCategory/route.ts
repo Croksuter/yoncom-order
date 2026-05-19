@@ -1,5 +1,6 @@
 import { createValidation, removeValidation, updateValidation } from "shared/types/requests/admin/menuCategory";
 import { fail, ok, routeError } from "~/lib/server/api";
+import { requireAdmin } from "~/lib/server/auth-session";
 import {
   createAdminMenuCategory,
   removeAdminMenuCategory,
@@ -7,6 +8,9 @@ import {
 } from "~/lib/server/d1-mutations";
 
 export async function POST(request: Request) {
+  const adminError = await requireAdmin();
+  if (adminError) return adminError;
+
   try {
     const query = createValidation.parse(await request.json());
     const result = await createAdminMenuCategory(query.menuCategoryOptions);
@@ -22,6 +26,9 @@ export async function POST(request: Request) {
 }
 
 export async function PUT(request: Request) {
+  const adminError = await requireAdmin();
+  if (adminError) return adminError;
+
   try {
     const query = updateValidation.parse(await request.json());
     const result = await updateAdminMenuCategory(query.menuCategoryId, query.menuCategoryOptions);
@@ -37,6 +44,9 @@ export async function PUT(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const adminError = await requireAdmin();
+  if (adminError) return adminError;
+
   try {
     const query = removeValidation.parse(await request.json());
     const result = await removeAdminMenuCategory(query.menuCategoryId);

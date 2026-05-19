@@ -136,6 +136,9 @@ async function upsertRows(tableName, rows) {
   }
 
   const columns = Object.keys(rows[0]).filter((column) => liveColumns[tableName]?.includes(column) ?? true);
+  if (columns.length === 0) {
+    return;
+  }
   const columnSql = columns.map(quoteIdentifier).join(", ");
   const placeholders = columns.map(() => "?").join(", ");
   const sql = `INSERT OR REPLACE INTO ${quoteIdentifier(tableName)} (${columnSql}) VALUES (${placeholders})`;
@@ -185,6 +188,10 @@ const paymentIds = {
   cooking: fixtureId("pay_cook1"),
 };
 
+const bankTransactionIds = {
+  review: fixtureId("bt_review1"),
+};
+
 const menuOrderIds = {
   liveBibimbap: fixtureId("mo_bibim1"),
   liveAde: fixtureId("mo_ade1"),
@@ -209,15 +216,19 @@ const imageUrls = {
 };
 
 const contextTableName = await resolveTableContextName();
+const paymentCodeLeasesExists = await tableExists("paymentCodeLeases");
+const bankTransactionsExists = await tableExists("bankTransactions");
 liveColumns = {
   users: await getExistingColumns("users", ["id", "role", "name", "email", "password", "createdAt", "updatedAt", "deletedAt"]),
   menuCategories: await getExistingColumns("menuCategories", ["id", "name", "description", "userId", "createdAt", "updatedAt", "deletedAt"]),
   menus: await getExistingColumns("menus", ["id", "name", "image", "description", "price", "quantity", "available", "menuCategoryId", "userId", "createdAt", "updatedAt", "deletedAt"]),
   tables: await getExistingColumns("tables", ["id", "key", "name", "seats", "userId", "createdAt", "updatedAt", "deletedAt"]),
   [contextTableName]: await getExistingColumns(contextTableName, ["id", "tableId", "userId", "createdAt", "updatedAt", "deletedAt"]),
-  orders: await getExistingColumns("orders", ["id", "tableContextId", "paymentId", "userId", "createdAt", "updatedAt", "deletedAt"]),
-  payments: await getExistingColumns("payments", ["id", "paid", "amount", "method", "bank", "depositor", "orderId", "userId", "createdAt", "updatedAt", "deletedAt"]),
+  orders: await getExistingColumns("orders", ["id", "clientOrderId", "displayNumber", "status", "expiresAt", "tableContextId", "paymentId", "userId", "createdAt", "updatedAt", "deletedAt"]),
+  payments: await getExistingColumns("payments", ["id", "paid", "amount", "method", "bank", "depositor", "orderId", "status", "paymentCode", "originalAmount", "expectedTransferAmount", "expiresAt", "paidAt", "matchedBankTransactionId", "matchedBy", "depositorHint", "userId", "createdAt", "updatedAt", "deletedAt"]),
   menuOrders: await getExistingColumns("menuOrders", ["id", "quantity", "status", "orderId", "menuId", "userId", "createdAt", "updatedAt", "deletedAt"]),
+  paymentCodeLeases: paymentCodeLeasesExists ? await getExistingColumns("paymentCodeLeases", ["code", "paymentId", "expiresAt", "createdAt"]) : [],
+  bankTransactions: bankTransactionsExists ? await getExistingColumns("bankTransactions", ["id", "dedupeKey", "amount", "depositor", "receivedAt", "rawText", "source", "status", "matchedPaymentId", "createdAt"]) : [],
 };
 const passwordHash = await new Scrypt().hash("demo-admin-1234");
 
@@ -415,6 +426,10 @@ await upsertRows(contextTableName, [
 await upsertRows("orders", [
   {
     id: orderIds.live,
+    clientOrderId: "demo-client-live",
+    displayNumber: 1,
+    status: "ACTIVE",
+    expiresAt: now + 20 * oneMinute,
     tableContextId: contextIds.window,
     createdAt: now - 31 * oneMinute,
     updatedAt: now - 7 * oneMinute,
@@ -422,6 +437,10 @@ await upsertRows("orders", [
   },
   {
     id: orderIds.paid,
+    clientOrderId: "demo-client-paid",
+    displayNumber: 2,
+    status: "ACTIVE",
+    expiresAt: now - 79 * oneMinute,
     tableContextId: contextIds.family,
     createdAt: now - 84 * oneMinute,
     updatedAt: now - 21 * oneMinute,
@@ -429,6 +448,10 @@ await upsertRows("orders", [
   },
   {
     id: orderIds.cooking,
+    clientOrderId: "demo-client-cook",
+    displayNumber: 3,
+    status: "ACTIVE",
+    expiresAt: now - 8 * oneMinute,
     tableContextId: contextIds.family,
     createdAt: now - 13 * oneMinute,
     updatedAt: now - 3 * oneMinute,
@@ -440,11 +463,20 @@ await upsertRows("payments", [
   {
     id: liveColumns.payments.includes("orderId") ? paymentIds.live : orderIds.live,
     paid: 0,
-    amount: 36500,
-    method: "국민은행 김하린",
-    bank: "국민은행",
-    depositor: "김하린",
+    amount: 36499,
+    method: "미결제",
+    bank: null,
+    depositor: null,
     orderId: orderIds.live,
+    status: "PENDING",
+    paymentCode: 1,
+    originalAmount: 36500,
+    expectedTransferAmount: 36499,
+    expiresAt: now + 20 * oneMinute,
+    paidAt: null,
+    matchedBankTransactionId: null,
+    matchedBy: null,
+    depositorHint: "김하린",
     createdAt: now - 31 * oneMinute,
     updatedAt: now - 7 * oneMinute,
     deletedAt: null,
@@ -452,11 +484,20 @@ await upsertRows("payments", [
   {
     id: liveColumns.payments.includes("orderId") ? paymentIds.paid : orderIds.paid,
     paid: 1,
-    amount: 31000,
+    amount: 30998,
     method: "신한은행 박준호",
     bank: "신한은행",
     depositor: "박준호",
     orderId: orderIds.paid,
+    status: "PAID",
+    paymentCode: 2,
+    originalAmount: 31000,
+    expectedTransferAmount: 30998,
+    expiresAt: now - 79 * oneMinute,
+    paidAt: now - 78 * oneMinute,
+    matchedBankTransactionId: null,
+    matchedBy: "MANUAL",
+    depositorHint: "박준호",
     createdAt: now - 84 * oneMinute,
     updatedAt: now - 21 * oneMinute,
     deletedAt: null,
@@ -464,11 +505,20 @@ await upsertRows("payments", [
   {
     id: liveColumns.payments.includes("orderId") ? paymentIds.cooking : orderIds.cooking,
     paid: 1,
-    amount: 27500,
+    amount: 27497,
     method: "현장 카드 결제",
     bank: "현장 카드",
     depositor: "가족 4인석",
     orderId: orderIds.cooking,
+    status: "PAID",
+    paymentCode: 3,
+    originalAmount: 27500,
+    expectedTransferAmount: 27497,
+    expiresAt: now - 8 * oneMinute,
+    paidAt: now - 7 * oneMinute,
+    matchedBankTransactionId: null,
+    matchedBy: "MANUAL",
+    depositorHint: "가족 4인석",
     createdAt: now - 13 * oneMinute,
     updatedAt: now - 3 * oneMinute,
     deletedAt: null,
@@ -499,7 +549,7 @@ await upsertRows("menuOrders", [
   {
     id: menuOrderIds.liveBrownie,
     quantity: 1,
-    status: "SERVED",
+    status: "READY",
     orderId: orderIds.live,
     menuId: menuIds.brownie,
     createdAt: now - 29 * oneMinute,
@@ -509,7 +559,7 @@ await upsertRows("menuOrders", [
   {
     id: menuOrderIds.paidJeyuk,
     quantity: 2,
-    status: "SERVED",
+    status: "PICKED_UP",
     orderId: orderIds.paid,
     menuId: menuIds.jeyuk,
     createdAt: now - 83 * oneMinute,
@@ -519,7 +569,7 @@ await upsertRows("menuOrders", [
   {
     id: menuOrderIds.paidCoffee,
     quantity: 2,
-    status: "SERVED",
+    status: "PICKED_UP",
     orderId: orderIds.paid,
     menuId: menuIds.coffee,
     createdAt: now - 82 * oneMinute,
@@ -548,10 +598,44 @@ await upsertRows("menuOrders", [
   },
 ]);
 
-const fixtureTables = ["users", "menuCategories", "menus", "tables", contextTableName, "orders", "payments", "menuOrders"];
+if (paymentCodeLeasesExists) {
+  await upsertRows("paymentCodeLeases", [
+    {
+      code: 1,
+      paymentId: liveColumns.payments.includes("orderId") ? paymentIds.live : orderIds.live,
+      expiresAt: now + 20 * oneMinute,
+      createdAt: now - 31 * oneMinute,
+    },
+  ]);
+}
+
+if (bankTransactionsExists) {
+  await upsertRows("bankTransactions", [
+    {
+      id: bankTransactionIds.review,
+      dedupeKey: "demo:manual:review:36500:김하린",
+      amount: 36500,
+      depositor: "김하린",
+      receivedAt: now - 2 * oneMinute,
+      rawText: "국민은행 김하린 36,500원",
+      source: "MANUAL",
+      status: "NEEDS_REVIEW",
+      matchedPaymentId: null,
+      createdAt: now - 2 * oneMinute,
+    },
+  ]);
+}
+
+const fixtureTables = ["users", "menuCategories", "menus", "tables", contextTableName, "orders", "payments", "menuOrders"]
+  .concat(paymentCodeLeasesExists ? ["paymentCodeLeases"] : [])
+  .concat(bankTransactionsExists ? ["bankTransactions"] : []);
 const counts = {};
 for (const tableName of fixtureTables) {
-  counts[tableName] = (await query(`SELECT COUNT(*) AS count FROM ${quoteIdentifier(tableName)} WHERE id LIKE ?`, ["demo_%"]))[0]?.count ?? 0;
+  if (liveColumns[tableName]?.includes("id")) {
+    counts[tableName] = (await query(`SELECT COUNT(*) AS count FROM ${quoteIdentifier(tableName)} WHERE id LIKE ?`, ["demo_%"]))[0]?.count ?? 0;
+  } else {
+    counts[tableName] = (await query(`SELECT COUNT(*) AS count FROM ${quoteIdentifier(tableName)}`))[0]?.count ?? 0;
+  }
 }
 
 console.log(JSON.stringify({

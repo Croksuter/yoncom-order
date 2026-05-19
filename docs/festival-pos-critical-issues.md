@@ -9,6 +9,8 @@
 - 주문 누락
 - 중복 주문
 - 같은 금액 주문의 결제 오매칭
+- 테이블 번호 기반 입금액 편법의 구조적 한계
+- 고객이 안내 금액을 무시하고 원금액으로 입금한 경우의 처리 누락
 - 품절/재고 과판매
 - 조리 완료와 고객 수령 완료의 혼동
 - 결제된 주문 취소/환불 필요 상태의 손실
@@ -60,6 +62,147 @@
 - 두 번째 주문만 결제 처리한다.
 - DB에서 두 번째 주문의 payment만 `paid = true`인지 확인한다.
 - POS 화면에서 결제 완료된 주문과 미결제 주문이 분리되어 보이는지 확인한다.
+
+## P0. 테이블 번호 기반 입금액 편법을 주문별 paymentCode로 교체
+
+### 현재 문제
+
+레거시 시스템은 테이블 생성 시 `table.key`를 붙이고, 주문 생성 시 결제 금액을 `메뉴 합계 - table.key`로 저장한다. 이후 은행 입금내역 금액을 보고 `% 100` 또는 100원 미만 차이를 이용해 테이블 번호를 역산하는 방식으로 같은 금액 주문을 구분해왔다.
+
+관련 위치:
+
+- 레거시 주문 생성: `apps/api/src/controller/order.controller.ts`의 `payment.amount = menu total - table.key`
+- Next 이식 코드: `apps/next/lib/server/d1-mutations.ts`의 `createClientOrder()`에서 `amount = menu total - table.key`
+- 레거시 입금 API: `apps/api/src/routes/admin/deposit.ts`
+- Next 입금 API: `apps/next/app/api/admin/deposit/route.ts`
+- 입금 request 타입: `packages/shared/types/requests/admin/deposit.ts`
+- 고객 입금 안내 모달: `apps/next/app/client/table/[id]/components/order/order.payment.modal.tsx`
+
+이 방식은 결제 식별자가 테이블 구조에 묶여 있다. 같은 테이블에서 여러 주문이 생기거나, 테이블 이름/id/key가 바뀌거나, 픽업형 주문번호를 도입하면 결제 식별 규칙이 깨진다. 또한 사용자가 안내 금액을 확인하지 않고 원금액 그대로 입금하면 자동 매칭이 실패하거나 잘못된 주문에 붙을 수 있다.
+
+### 원하는 흐름
+
+1. 주문 생성 시 `originalAmount`를 메뉴 합계로 계산한다.
+2. 현재 활성 미결제 payment 사이에서 `1..99` 중 가장 작은 사용 가능 `paymentCode`를 발급한다.
+3. `expectedTransferAmount = originalAmount - paymentCode`로 저장한다.
+4. 고객에게는 원금액, 식별코드, 실제 입금액을 함께 보여준다.
+5. 은행 입금내역은 먼저 `bankTransactions`에 저장한다.
+6. matcher가 자동 확정 가능한 입금만 결제 완료 처리한다.
+7. 애매한 입금은 POS의 후보 리스트에서 직원이 수동 확정한다.
+
+### 코드 발급 정책
+
+- `paymentCode`는 `1..99` 범위에서만 발급한다.
+- 항상 가장 작은 빈 코드를 선택한다.
+- 빈 코드 판단 기준은 `PENDING` 또는 미결제 상태의 활성 payment다.
+- 결제 완료, 주문 취소, 결제 만료 시 코드를 즉시 반환한다.
+- 코드 고갈 시 새 주문을 `409 Payment Code Exhausted`로 막거나 현장 수동 결제로 유도한다.
+- 가능하면 `paymentCodeLeases` 같은 별도 테이블을 두고 `code`를 primary key로 잡아 동시 주문 경쟁을 막는다.
+
+권장 lease 테이블:
+
+```txt
+paymentCodeLeases
+- code
+- paymentId
+- expiresAt
+- createdAt
+```
+
+권장 payment 필드:
+
+```txt
+payments
+- orderId
+- paymentCode
+- originalAmount
+- expectedTransferAmount
+- depositorHint
+- status: PENDING | PAID | MANUAL_REVIEW | EXPIRED | CANCELLED
+- expiresAt
+- paidAt
+- matchedBankTransactionId
+- matchedBy
+```
+
+권장 입금내역 테이블:
+
+```txt
+bankTransactions
+- id
+- amount
+- depositor
+- receivedAt
+- rawText
+- source: KB_PUSH | KB_SMS | SELENIUM | MANUAL
+- matchedPaymentId
+- status: UNMATCHED | AUTO_MATCHED | NEEDS_REVIEW | IGNORED
+- createdAt
+```
+
+### 입금 매칭 규칙
+
+자동 확정 가능한 경우:
+
+- `amount == expectedTransferAmount`인 활성 미결제 후보가 정확히 1건이다.
+- 또는 `amount == originalAmount`인 활성 미결제 후보가 정확히 1건이고, 같은 입금액에 대한 `expectedTransferAmount` exact 후보가 없다.
+
+POS 확인이 필요한 경우:
+
+- `abs(amount - expectedTransferAmount) < 100`인 후보가 1건 이상이다.
+- 고객이 원금액 그대로 입금했고 `originalAmount` 후보가 여러 건이다.
+- 입금자명에 주문번호나 코드가 포함되어 있지만 금액 후보가 복수다.
+- 입금액은 비슷하지만 원금액/요청금액 차이가 운영자가 확인해야 할 수준이다.
+
+자동 매칭하면 안 되는 경우:
+
+- 후보가 2건 이상인데 우선순위를 결정할 근거가 없다.
+- 이미 결제 완료된 payment와만 매칭된다.
+- 만료/취소된 주문과만 매칭된다.
+- 입금액이 모든 후보와 100원 이상 차이 난다.
+
+### POS 후보 리스트
+
+POS에는 `입금 확인 필요` 패널을 둔다.
+
+각 입금내역 행에는 다음 정보를 보여준다.
+
+- 실제 입금액
+- 입금자명
+- 입금 시각
+- 후보 주문번호 또는 테이블명
+- 주문 원금액
+- 요청 입금액
+- 실제 입금액과 요청 입금액의 차이
+- 매칭 사유: exact amount, original amount, within 100, depositor hint
+
+직원이 선택할 수 있는 액션:
+
+- 이 주문으로 매칭
+- 보류
+- 무시
+- 수동 결제 완료 처리
+
+### 구현 포인트
+
+- `createClientOrder()`에서 `table.key` 차감을 제거한다.
+- `allocatePaymentCode(originalAmount)` 유틸을 만든다.
+- 만료된 미결제 payment와 lease를 먼저 정리한 뒤 1부터 99까지 순회한다.
+- `expectedTransferAmount`도 활성 미결제 payment 사이에서 중복되지 않도록 가능한 코드를 고른다.
+- `INSERT OR IGNORE` 또는 equivalent 방식으로 lease 획득 경쟁을 처리한다.
+- `/api/admin/deposit`는 바로 payment를 paid로 바꾸지 말고, 먼저 `bankTransactions`에 저장한 뒤 matcher 결과에 따라 처리한다.
+- 기존 `amount` 컬럼은 migration 중 `expectedTransferAmount`와 같은 값으로 유지해 UI/테스트 호환을 확보한다.
+- 고객 입금 안내 모달은 `amount` 하나만 받지 말고 `originalAmount`, `paymentCode`, `expectedTransferAmount`를 표시한다.
+
+### 검증
+
+- 미결제 주문이 없을 때 첫 주문은 `paymentCode = 1`을 받는다.
+- 1, 2, 3번 코드가 사용 중이면 다음 주문은 4번을 받는다.
+- 1번 주문이 결제 완료되면 다음 신규 주문은 다시 1번을 받을 수 있다.
+- 같은 원금액 주문 2건이 있을 때 원금액 그대로 입금되면 자동 매칭되지 않고 POS 확인으로 간다.
+- `expectedTransferAmount`와 정확히 일치하는 입금 후보가 단건이면 자동 결제 완료된다.
+- 100원 미만 오차 후보는 POS 후보 리스트에 뜨고 자동 확정되지 않는다.
+- 테이블 key를 바꿔도 결제 식별이 깨지지 않는다.
 
 ## P0. 재고 차감 race condition 막기
 
@@ -377,18 +520,21 @@ WHERE id = ?
 ## 권장 구현 순서
 
 1. `displayNumber`와 `clientOrderId` 추가
-2. 주문 생성 idempotency 적용
-3. 재고 조건부 차감 적용
-4. 미결제 주문 TTL 또는 결제 확인 후 확정 정책 적용
-5. 결제 처리 API를 `orderId/paymentId` 기준으로 변경
-6. `PENDING -> READY -> PICKED_UP` 상태 전이 추가
-7. 고객 주문 조회 route 마이그레이션
-8. 관리자 API guard 추가
-9. paid 주문 취소/환불 필요 상태 기록
+2. 주문별 `paymentCode`, `originalAmount`, `expectedTransferAmount` 추가
+3. `paymentCodeLeases`와 `bankTransactions` 추가
+4. 주문 생성 idempotency 적용
+5. 재고 조건부 차감 적용
+6. 미결제 주문 TTL 또는 결제 확인 후 확정 정책 적용
+7. 결제 처리 API를 `orderId/paymentId` 기준으로 변경하고 `/api/admin/deposit`를 입금내역 ingestion + matcher로 변경
+8. POS 입금 후보 확인 UI 추가
+9. `PENDING -> READY -> PICKED_UP` 상태 전이 추가
+10. 고객 주문 조회 route 마이그레이션
+11. 관리자 API guard 추가
+12. paid 주문 취소/환불 필요 상태 기록
 
 ## 다음 작업 시작 시 체크리스트
 
 - 현재 DB schema와 live D1 schema가 다를 수 있으므로 migration 전에 실제 컬럼을 확인한다.
 - 기존 `d1-mutations.ts`는 live schema 호환을 위해 분기 로직이 많다. 새 컬럼 추가 시 legacy/live 양쪽 호환을 고려한다.
 - 테스트는 API unit test만으로 부족하다. Browser로 실제 UI 클릭, API 호출, DB 반영, 새로고침 후 UI 반영까지 확인한다.
-- 같은 금액 주문, 동시 주문, 더블 클릭, 미결제 방치, 조리 완료 후 수령 미완료 케이스를 반드시 시뮬레이션한다.
+- 같은 금액 주문, paymentCode 고갈, 원금액 그대로 입금, 100원 미만 오차 입금, 동시 주문, 더블 클릭, 미결제 방치, 조리 완료 후 수령 미완료 케이스를 반드시 시뮬레이션한다.

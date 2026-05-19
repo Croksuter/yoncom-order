@@ -24,6 +24,7 @@ export type RemoveOrderQuery = z.infer<typeof removeValidation>;
 
 export const paidValidation = z.object({
   orderId: z.string().length(15),
+  paymentId: z.string().length(15).optional(),
 });
 export type PaidOrder = z.infer<typeof paidValidation>;
 
@@ -32,3 +33,9 @@ export const completeValidation = z.object({
 });
 
 export type CompleteOrder = z.infer<typeof completeValidation>;
+
+export const pickUpValidation = z.object({
+  menuOrderId: z.string().length(15),
+});
+
+export type PickUpOrder = z.infer<typeof pickUpValidation>;

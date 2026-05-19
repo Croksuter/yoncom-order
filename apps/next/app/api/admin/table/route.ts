@@ -1,9 +1,13 @@
 import { createValidation, getValidation, removeValidation, updateValidation } from "shared/types/requests/admin/table";
 import { fail, ok, parseSearchParams, routeError } from "~/lib/server/api";
+import { requireAdmin } from "~/lib/server/auth-session";
 import { createAdminTable, removeAdminTable, updateAdminTable } from "~/lib/server/d1-mutations";
 import { getTablesWithRelations } from "~/lib/server/table-queries";
 
 export async function GET(request: Request) {
+  const adminError = await requireAdmin();
+  if (adminError) return adminError;
+
   try {
     parseSearchParams(request, getValidation);
 
@@ -14,6 +18,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const adminError = await requireAdmin();
+  if (adminError) return adminError;
+
   try {
     const query = createValidation.parse(await request.json());
     const result = await createAdminTable(query.tableOptions.name, query.tableOptions.seats);
@@ -29,6 +36,9 @@ export async function POST(request: Request) {
 }
 
 export async function PUT(request: Request) {
+  const adminError = await requireAdmin();
+  if (adminError) return adminError;
+
   try {
     const query = updateValidation.parse(await request.json());
     const result = await updateAdminTable(query.tableId, query.tableOptions);
@@ -44,6 +54,9 @@ export async function PUT(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const adminError = await requireAdmin();
+  if (adminError) return adminError;
+
   try {
     const query = removeValidation.parse(await request.json());
     const result = await removeAdminTable(query.tableId);

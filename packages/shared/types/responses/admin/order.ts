@@ -22,3 +22,7 @@ export type Paid = {
 export type Complete = {
   result: string;
 };
+
+export type PickUp = {
+  result: string;
+};

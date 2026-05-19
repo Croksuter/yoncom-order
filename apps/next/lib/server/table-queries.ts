@@ -19,11 +19,24 @@ type TableContextRow = BaseRow & {
 
 type OrderRow = BaseRow & {
   tableContextId: string;
+  clientOrderId?: string | null;
+  displayNumber?: number | null;
+  status?: string | null;
+  expiresAt?: number | string | null;
 };
 
 type PaymentRow = BaseRow & {
   paid: boolean | number;
   amount: number;
+  status?: string | null;
+  paymentCode?: number | null;
+  originalAmount?: number | null;
+  expectedTransferAmount?: number | null;
+  expiresAt?: number | string | null;
+  paidAt?: number | string | null;
+  matchedBankTransactionId?: string | null;
+  matchedBy?: string | null;
+  depositorHint?: string | null;
   bank?: string | null;
   depositor?: string | null;
   method?: string | null;
@@ -113,11 +126,19 @@ function normalizePayment(row: PaymentRow) {
   return {
     ...normalizeBase(row),
     paid: row.paid === true || row.paid === 1,
+    status: row.status ?? (row.paid === true || row.paid === 1 ? "PAID" : "PENDING"),
+    originalAmount: row.originalAmount ?? row.amount,
+    expectedTransferAmount: row.expectedTransferAmount ?? row.amount,
+    expiresAt: normalizeTime(row.expiresAt ?? null),
+    paidAt: normalizeTime(row.paidAt ?? null),
   };
 }
 
 function normalizeMenuOrder(row: MenuOrderRow) {
-  return normalizeBase(row);
+  return {
+    ...normalizeBase(row),
+    status: row.status === "SERVED" ? "PICKED_UP" : row.status,
+  };
 }
 
 export async function getTablesWithRelations(tableId?: string) {
