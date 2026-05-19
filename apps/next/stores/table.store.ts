@@ -166,7 +166,7 @@ const useTableStore = create<TableState>((set, get) => ({
     onSuccess: (res) => {
       toast({
         title: "주문 취소 완료",
-        description: "주문이 성공적으로 취소되었습니다.",
+        description: "입금 전 주문을 취소하고 재고와 결제코드를 복구했습니다.",
         duration: 3000,
       });
       get().clientGetTable({ tableId: get().clientTable?.id ?? "" });
@@ -181,7 +181,7 @@ const useTableStore = create<TableState>((set, get) => ({
     onSuccess: (res) => {
       toast({
       title: "주문 취소 완료",
-      description: "주문이 성공적으로 취소되었습니다.",
+      description: "주문을 취소했습니다. 결제 완료 건은 환불 내역을 별도로 확인해주세요.",
       duration: 3000,
       });
       get().load({});
@@ -196,7 +196,7 @@ const useTableStore = create<TableState>((set, get) => ({
     onSuccess: (res) => {
       toast({
         title: "준비 완료",
-        description: "주문이 준비 완료 상태로 변경되었습니다.",
+        description: "해당 메뉴를 수령 대기 상태로 변경했습니다.",
         duration: 3000,
       });
       get().load({});
@@ -211,7 +211,7 @@ const useTableStore = create<TableState>((set, get) => ({
     onSuccess: () => {
       toast({
         title: "수령 완료",
-        description: "주문이 수령 완료 상태로 변경되었습니다.",
+        description: "해당 메뉴를 고객 수령 완료로 변경했습니다.",
         duration: 3000,
       });
       get().load({});
@@ -225,12 +225,12 @@ const useTableStore = create<TableState>((set, get) => ({
     setter: set,
     onSuccess: (res) => {
       const message = res.result.status === "AUTO_MATCHED"
-        ? "입금 내역이 주문과 자동 매칭되었습니다."
+        ? "입금금액이 정확히 일치해 주문과 자동 매칭되었습니다."
         : res.result.status === "NEEDS_REVIEW"
-          ? "입금 확인 필요 목록에서 매칭할 주문을 선택해주세요."
-          : "일치하는 주문 후보가 없어 미확인 입금으로 보관했습니다.";
+          ? "금액이 애매합니다. 입금 확인 필요 목록에서 주문을 직접 확정해주세요."
+          : "일치하는 주문 후보가 없습니다. 은행 내역 확인 후 처리해주세요.";
       toast({
-        title: "입금 내역 등록",
+        title: "입금 내역 확인",
         description: message,
         duration: 3000,
       });
@@ -246,8 +246,8 @@ const useTableStore = create<TableState>((set, get) => ({
     setter: set,
     onSuccess: () => {
       toast({
-        title: "결제 확인",
-        description: "주문이 수동 결제 완료 처리되었습니다.",
+        title: "관리자 결제 완료",
+        description: "선택한 주문을 결제 완료로 처리했습니다.",
         duration: 3000,
       });
       get().load({});
@@ -270,7 +270,7 @@ const useTableStore = create<TableState>((set, get) => ({
     onSuccess: () => {
       toast({
         title: "입금 매칭 완료",
-        description: "선택한 주문이 결제 완료 처리되었습니다.",
+        description: "입금 내역을 선택한 주문에 연결하고 결제 완료 처리했습니다.",
         duration: 3000,
       });
       get().load({});
@@ -285,8 +285,8 @@ const useTableStore = create<TableState>((set, get) => ({
     setter: set,
     onSuccess: () => {
       toast({
-        title: "입금 내역 무시",
-        description: "해당 입금 내역을 후보 목록에서 제외했습니다.",
+        title: "입금 내역 제외",
+        description: "해당 입금 내역을 확인 필요 목록에서 제외했습니다.",
         duration: 3000,
       });
       get().loadBankTransactions();

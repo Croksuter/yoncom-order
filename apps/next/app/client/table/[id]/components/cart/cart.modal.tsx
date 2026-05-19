@@ -131,7 +131,7 @@ export default function CartModal({
               </div>
               <DialogFooter className="h-fit fr *:flex-1 *:mx-2 *:h-14 *:rounded-2xl *:text-lg">
                 <Button variant="outline" onClick={handleClose}>취소</Button>
-                <Button className="bg-blue-500 hover:bg-blue-600 text-white" onClick={handleConfirm}>주문하기</Button>
+                <Button className="bg-blue-500 hover:bg-blue-600 text-white" onClick={handleConfirm}>주문하고 입금안내 보기</Button>
               </DialogFooter>
             </>
           )}

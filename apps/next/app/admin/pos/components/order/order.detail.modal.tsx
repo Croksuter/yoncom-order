@@ -33,8 +33,8 @@ export default function OrderDetailModal({
   const originalAmount = order.payment.originalAmount ?? menuOrderInfos.reduce((acc, menuOrderInfo) => acc + menuOrderInfo!.totalPrice, 0);
   const expectedTransferAmount = order.payment.expectedTransferAmount ?? order.payment.amount;
   const paymentStatus = order.payment.paid ? "결제 완료" :
-    order.payment.status === "MANUAL_REVIEW" ? "확인 필요" :
-    order.payment.status === "EXPIRED" ? "만료" :
+    order.payment.status === "MANUAL_REVIEW" ? "입금 확인 필요" :
+    order.payment.status === "EXPIRED" ? "입금 기한 만료" :
     order.payment.status === "CANCELLED" ? "취소" :
     "입금 대기";
 
@@ -83,7 +83,8 @@ export default function OrderDetailModal({
               <span><span className="font-bold">일시</span>: {new Date(order.createdAt).toLocaleString()}</span>
               <span><span className="font-bold">결제 상태</span>: {paymentStatus}</span>
               <span><span className="font-bold">주문금액</span>: {originalAmount.toLocaleString()}원</span>
-              <span><span className="font-bold">결제코드</span>: {order.payment.paymentCode ?? "-"} / <span className="font-bold">입금요청액</span>: {expectedTransferAmount.toLocaleString()}원</span>
+              <span><span className="font-bold">결제코드</span>: {order.payment.paymentCode ?? "-"} / <span className="font-bold">입금금액</span>: {expectedTransferAmount.toLocaleString()}원</span>
+              {order.payment.paid && <span className="text-xs text-neutral-500">결제 완료 주문을 취소하면 환불은 별도 확인이 필요합니다.</span>}
             </DialogDescription>
           </DialogHeader>
           <Table className="w-full">
@@ -124,7 +125,7 @@ export default function OrderDetailModal({
             </TableBody>
           </Table>
           <div className="text-left mr-4 w-full h-fit fr justify-end items-end">
-            <span className="text-left text-lg mr-2">총액</span>
+            <span className="text-left text-lg mr-2">주문금액</span>
             <span className="text-left text-2xl font-bold">
               {menuOrderInfos.reduce((acc, menuOrderInfo) => acc + menuOrderInfo!.totalPrice, 0).toLocaleString()} 원
             </span>
@@ -133,7 +134,7 @@ export default function OrderDetailModal({
             <div className="w-fit *:mx-1">
               <Button className="dangerBG dangerB" onClick={handelOrderCancel}>주문 취소</Button>
               {!order.payment.paid && (
-                <Button className="dangerBG dangerB" onClick={handlePay}>수동 결제 확인</Button>
+                <Button className="dangerBG dangerB" onClick={handlePay}>관리자 결제 완료 처리</Button>
               )}
               <Button onClick={handleClose}>닫기</Button>
             </div>

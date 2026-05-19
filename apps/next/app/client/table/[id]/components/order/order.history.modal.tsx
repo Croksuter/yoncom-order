@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "~/components/ui/dialog";
 import { DialogContent } from "~/components/ui/dialog";
-import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "~/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
 import useMenuStore from "~/stores/menu.store";
 import useTableStore from "~/stores/table.store";
 import OrderDetailModal from "./order.detail.modal";
@@ -46,9 +46,9 @@ export default function OrderHistoryModal({
   })
 
   const orderStatusLabel = (order: ClientTableResponse.Get["result"]["tableContexts"][number]["orders"][number]) => {
-    if (order.status === "EXPIRED" || order.payment.status === "EXPIRED") return "만료";
+    if (order.status === "EXPIRED" || order.payment.status === "EXPIRED") return "입금 기한 만료";
     if (order.deletedAt !== null || order.status === "CANCELLED" || order.payment.status === "CANCELLED") return "주문취소";
-    if (order.payment.status === "MANUAL_REVIEW") return "확인 필요";
+    if (order.payment.status === "MANUAL_REVIEW") return "입금 확인 필요";
     if (!order.payment.paid) return "입금 대기";
 
     const activeMenuOrders = order.menuOrders.filter((menuOrder) => menuOrder.deletedAt === null);
@@ -85,7 +85,7 @@ export default function OrderHistoryModal({
                     {/* <TableHead></TableHead> */}
                     <TableHead className="!text-left font-bold">주문 일시</TableHead>
                     <TableHead className="!text-center">상태</TableHead>
-                    <TableHead className="!text-right">금액</TableHead>
+                    <TableHead className="!text-right">주문금액</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -115,7 +115,7 @@ export default function OrderHistoryModal({
                 </TableBody>
               </Table>
               <div className="text-right">
-                <span className="text-right text-lg mr-2">총액</span>
+                <span className="text-right text-lg mr-2">주문금액 합계</span>
                 <span className="text-right text-2xl font-bold">
                   {orderHistories.filter((orderHistory) => orderHistory.order.deletedAt === null).reduce((acc, orderHistory) => acc + orderHistory.totalPrice, 0).toLocaleString()} 원
                 </span>

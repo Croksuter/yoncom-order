@@ -29,8 +29,8 @@ export default function OrderCancelModal({
         <DialogContent className="fc min-w-fit min-h-[25rem] max-h-[40rem] justify-between rounded-xl">
           <DialogHeader className="fc items-start w-fit">
             <DialogTitle className="text-2xl">주문 취소</DialogTitle>
-            <DialogDescription>정말 주문을 취소하시겠습니까?</DialogDescription>
-            <DialogDescription>환불은 자동으로 진행되지 않습니다.</DialogDescription>
+            <DialogDescription>이 주문을 운영자 취소 처리하시겠습니까?</DialogDescription>
+            <DialogDescription>결제 완료 주문의 환불은 자동 처리되지 않습니다. 입금 내역을 별도로 확인해주세요.</DialogDescription>
           </DialogHeader>
           <DialogFooter className="w-full h-fit fr justify-end items-end">
             <div className="w-fit *:h-12 *:rounded-2xl *:text-lg">

@@ -1,7 +1,7 @@
 
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "~/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "~/components/ui/dialog";
 import OrderPaymentModal from "./order.payment.modal";
 import useMenuStore from "~/stores/menu.store";
 import useTableStore from "~/stores/table.store";
@@ -45,7 +45,8 @@ export default function OrderModal({
     const latestOrder = success.result.tableContexts[0]?.orders[0];
     if (!latestOrder || latestOrder.payment.paid) {
       toast({
-        title: "주문이 이미 완료되었습니다.",
+        title: "결제 안내가 종료되었습니다.",
+        description: latestOrder?.payment.paid ? "이미 결제 완료된 주문입니다." : "확인할 주문이 없습니다.",
       });
       handleClose();
       return;
@@ -71,7 +72,8 @@ export default function OrderModal({
     const latestOrder = success.result.tableContexts[0]?.orders[0];
     if (!latestOrder || latestOrder.payment.paid) {
       toast({
-        title: "주문이 이미 완료되었습니다.",
+        title: "결제 안내가 종료되었습니다.",
+        description: latestOrder?.payment.paid ? "이미 결제 완료된 주문입니다." : "확인할 주문이 없습니다.",
       });
       handleClose();
       return;
@@ -95,7 +97,8 @@ export default function OrderModal({
     const latestOrder = success.result.tableContexts[0]?.orders[0];
     if (!latestOrder || latestOrder.payment.paid) {
       toast({
-        title: "주문이 이미 완료되었습니다.",
+        title: "주문을 취소할 수 없습니다.",
+        description: latestOrder?.payment.paid ? "이미 결제 완료된 주문은 운영자에게 문의해주세요." : "취소할 주문이 없습니다.",
       });
       handleClose();
       return;
@@ -125,11 +128,12 @@ export default function OrderModal({
                 onClick={handleCancelOrder}
               >주문 취소</Button>
             </div>
-            <span className="text-blue-500 text-2xl font-extrabold text-center z-10 bg-white px-2 w-fit">꼭! 지켜주세요</span>
+            <span className="text-blue-500 text-2xl font-extrabold text-center z-10 bg-white px-2 w-fit">입금 안내</span>
             <DialogDescription className="fc !-mt-4 rounded-xl p-4 border-2 border-blue-500 *:text-base *:my-2 *:text-black">
-              <span className="text-start">⋅ 송금액의 끝자리가 0이 아닐 수 있습니다. 정상적인 현상이니 <b className="dangerTXT">금액을 절대 변경하지 말고</b> 입금해주세요.</span>
-              <span className="text-start">⋅ 주문이 완료되면, <b className="dangerTXT">입금 전까지 추가 주문이 불가합니다.</b></span>
-              <span className="text-start">⋅ 입금이 인식되기까지 약 10초 정도 소요됩니다.</span>
+              <span className="text-start">⋅ 주문마다 다른 <b className="dangerTXT">결제코드</b>가 붙어 입금금액이 정해집니다.</span>
+              <span className="text-start">⋅ <b className="dangerTXT">안내된 입금금액 그대로</b> 보내야 자동으로 결제 확인됩니다.</span>
+              <span className="text-start">⋅ 금액을 바꾸거나 원금액으로 보내면 운영자가 확인한 뒤 처리될 수 있습니다.</span>
+              <span className="text-start">⋅ 입금 확인 전까지 같은 테이블에서 추가 주문은 잠시 제한됩니다.</span>
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="fr *:flex-1 *:mx-2 *:h-14 *:rounded-2xl *:text-lg *:my-2">

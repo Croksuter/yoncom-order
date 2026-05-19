@@ -59,7 +59,7 @@ export default function Footer() {
                 }
               }}
               className="fc flex-1 h-full rounded-3xl bg-gray-500 text-white text-2xl hover:cursor-pointer hover:bg-gray-600"
-            >결제하기<br /><span className="-mt-2 text-sm text-gray-300">결제 대기중인 항목이 있습니다.</span>
+            >입금 안내<br /><span className="-mt-2 text-sm text-gray-300">입금 확인 전 주문이 있습니다.</span>
             </Button>
           ) : (
             <Button

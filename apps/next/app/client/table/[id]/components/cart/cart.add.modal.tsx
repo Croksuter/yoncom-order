@@ -38,8 +38,8 @@ export default function CartAddModal({
     const inProgressOrder = clientTable?.tableContexts.some((tableContext) => tableContext.orders.some((order) => !order.payment.paid && order.deletedAt === null));
     if (inProgressOrder) {
       toast({
-        title: "결제되지 않은 주문이 있습니다.",
-        description: "결제를 완료하고 주문해주세요.",
+        title: "입금 확인 전 주문이 있습니다.",
+        description: "입금 안내를 확인하고 결제 완료 후 추가 주문해주세요.",
         variant: "destructive",
       });
       handleClose();

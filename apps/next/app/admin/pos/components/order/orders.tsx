@@ -23,6 +23,12 @@ export default function Orders() {
     )))
   ).sort((a, b) => a.createdAt - b.createdAt);
   const reviewTransactions = bankTransactions.filter((transaction) => transaction.status !== "IGNORED");
+  const candidateReasonLabel = (reason: string) => {
+    if (reason === "EXPECTED_AMOUNT") return "입금금액 일치";
+    if (reason === "ORIGINAL_AMOUNT") return "주문금액 입금";
+    if (reason === "WITHIN_100") return "100원 미만 오차";
+    return reason;
+  };
 
   return (
     <div className="full p-2">
@@ -41,18 +47,18 @@ export default function Orders() {
                 {reviewTransactions.map((transaction) => (
                   <div key={transaction.id} className="rounded bg-white p-2 text-sm">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="font-semibold">{transaction.amount.toLocaleString()}원 · {transaction.depositor}</span>
+                      <span className="font-semibold">입금 {transaction.amount.toLocaleString()}원 · {transaction.depositor}</span>
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={() => useTableStore.getState().adminIgnoreBankTransaction({ bankTransactionId: transaction.id })}
                       >
-                        무시
+                        처리 제외
                       </Button>
                     </div>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {transaction.candidates.length === 0 ? (
-                        <span className="text-neutral-500">매칭 후보 없음</span>
+                        <span className="text-neutral-500">매칭 후보 없음: 입금자명과 은행 내역을 직접 확인하세요.</span>
                       ) : transaction.candidates.map((candidate) => (
                         <Button
                           key={candidate.paymentId}
@@ -63,7 +69,7 @@ export default function Orders() {
                             paymentId: candidate.paymentId,
                           })}
                         >
-                          {candidate.tableName} #{candidate.displayNumber ?? "-"} · {candidate.reason} · 차이 {candidate.diff.toLocaleString()}원
+                          {candidate.tableName} #{candidate.displayNumber ?? "-"} 확정 · {candidateReasonLabel(candidate.reason)} · 차이 {candidate.diff.toLocaleString()}원
                         </Button>
                       ))}
                     </div>

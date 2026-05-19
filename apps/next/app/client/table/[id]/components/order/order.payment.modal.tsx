@@ -1,5 +1,5 @@
 import { Button } from "~/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "~/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "~/components/ui/dialog";
 import { toast } from "~/hooks/use-toast";
 import { ClipboardPasteIcon } from "lucide-react";
 
@@ -46,44 +46,45 @@ export default function OrderPaymentModal({
     <Dialog open={openState} onOpenChange={handleClose}>
       <DialogContent className="w-[96%] border-blue-500 border-2 rounded-xl">
         <DialogHeader>
-          <DialogTitle className="text-2xl">직접 이체</DialogTitle>
-          <DialogDescription>
-            <div className="fc w-full mt-4 justify-between *:my-2">
-              <div className="grid w-full grid-cols-2 gap-2 text-left text-base">
-                <span className="font-bold">주문금액</span>
-                <span className="text-right">{originalAmount.toLocaleString()}원</span>
-                <span className="font-bold">결제코드</span>
-                <span className="text-right">{paymentCode ?? "-"}원 차감</span>
-                <span className="font-bold">입금 기한</span>
-                <span className="text-right">{expiresAt ? new Date(expiresAt).toLocaleTimeString("ko-KR", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  second: "2-digit",
-                  hour12: false,
-                }) : "-"}</span>
-              </div>
-              <div className="fc items-end justify-between *:mt-1">
-                <span className="w-full leading-8 font-bold text-start text-lg">⋅ 입금 계좌</span>
-                <div
-                  onClick={copyAccount}
-                  className="fr w-full oveflow-hidden rounded-lg bg-gray-200 p-2 justify-center mb-2 items-center"
-                >
-                  <span className="truncate text-gray-600 text-xl font-semibold hover:cursor-pointer">국민은행 94580201548620</span>
-                  <ClipboardPasteIcon className="text-gray-600 scale-75 w-fit mt-[2px]" />
-                </div>
-              </div>
-              <div className="fc items-end justify-between *:mt-1">
-                <span className="w-full leading-8 font-bold text-start text-lg">⋅ 입금 금액</span>
-                <div
-                  onClick={copyAmount}
-                  className="fr w-full oveflow-hidden rounded-lg bg-blue-100 p-2 justify-center mb-2 items-center"
-                >
-                  <span className="truncate text-blue-500 text-3xl font-bold hover:cursor-pointer">{expectedTransferAmount.toLocaleString()}원</span>
-                  <ClipboardPasteIcon className="text-blue-500 w-fit scale-110 ml-2 mt-[2px]" />
-                </div>
+          <DialogTitle className="text-2xl">입금 정보</DialogTitle>
+          <div className="fc w-full mt-4 justify-between *:my-2 text-sm text-muted-foreground">
+            <div className="grid w-full grid-cols-2 gap-2 text-left text-base text-black">
+              <span className="font-bold">주문금액</span>
+              <span className="text-right">{originalAmount.toLocaleString()}원</span>
+              <span className="font-bold">결제코드</span>
+              <span className="text-right">{paymentCode !== null ? `${paymentCode}원 차감` : "-"}</span>
+              <span className="font-bold text-blue-600">입금금액</span>
+              <span className="text-right font-bold text-blue-600">{expectedTransferAmount.toLocaleString()}원</span>
+              <span className="font-bold">입금 기한</span>
+              <span className="text-right">{expiresAt ? new Date(expiresAt).toLocaleTimeString("ko-KR", {
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+                hour12: false,
+              }) : "-"}</span>
+            </div>
+            <div className="fc items-end justify-between *:mt-1">
+              <span className="w-full leading-8 font-bold text-start text-lg text-black">⋅ 입금 계좌</span>
+              <div
+                onClick={copyAccount}
+                className="fr w-full oveflow-hidden rounded-lg bg-gray-200 p-2 justify-center mb-2 items-center"
+              >
+                <span className="truncate text-gray-600 text-xl font-semibold hover:cursor-pointer">국민은행 94580201548620</span>
+                <ClipboardPasteIcon className="text-gray-600 scale-75 w-fit mt-[2px]" />
               </div>
             </div>
-          </DialogDescription>
+            <div className="fc items-end justify-between *:mt-1">
+              <span className="w-full leading-8 font-bold text-start text-lg text-black">⋅ 정확히 보낼 금액</span>
+              <div
+                onClick={copyAmount}
+                className="fr w-full oveflow-hidden rounded-lg bg-blue-100 p-2 justify-center mb-2 items-center"
+              >
+                <span className="truncate text-blue-500 text-3xl font-bold hover:cursor-pointer">{expectedTransferAmount.toLocaleString()}원</span>
+                <ClipboardPasteIcon className="text-blue-500 w-fit scale-110 ml-2 mt-[2px]" />
+              </div>
+            </div>
+            <span className="text-sm text-start text-slate-600">주문금액이 아니라 결제코드가 차감된 입금금액을 그대로 보내주세요.</span>
+          </div>
         </DialogHeader>
 
         <DialogFooter className="fr *:flex-1 *:mx-2 *:h-14 *:rounded-2xl *:text-lg">
