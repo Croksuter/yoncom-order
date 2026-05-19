@@ -24,6 +24,7 @@ function getUserFacingErrorMessage(error?: string) {
     "Payment Cannot Be Marked Paid": "취소, 만료, 환불 상태의 결제는 결제 완료로 되돌릴 수 없습니다.",
     "There are unfinished orders": "아직 조리 중이거나 수령 대기 중인 메뉴가 있어 테이블을 비울 수 없습니다.",
     "Refund Pending Orders Exist": "환불 대기 중인 주문이 있어 테이블을 비울 수 없습니다.",
+    FEATURE_UNAVAILABLE: "현재 운영 화면에서 사용하지 않는 기능입니다.",
     Unauthorized: "로그인이 필요합니다.",
     Forbidden: "관리자 권한이 필요합니다.",
     "DB Query Error": "데이터 처리 중 오류가 발생했습니다. 운영자에게 문의해주세요.",
@@ -39,11 +40,6 @@ function getUserFacingErrorMessage(error?: string) {
 export default async function kyErrorHandler(error: unknown) {
   if (error instanceof HTTPError) {
     const res = await error.response.json<ClientErrorResponse.Error>().catch(() => null);
-
-    if (res?.error === "NEXT_MIGRATION_NOT_IMPLEMENTED") {
-      console.info(new Date().toLocaleString(), "Migration placeholder:", res.error);
-      return;
-    }
 
     console.error(new Date().toLocaleString(), "HTTP Error:", res?.error ?? error.response.status);
     toast({

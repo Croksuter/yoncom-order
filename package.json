@@ -5,36 +5,20 @@
   "main": "index.js",
   "scripts": {
     "dev": "pnpm --filter web-next dev",
-    "dev:legacy": "concurrently -n api,web -c cyan,magenta \"pnpm --filter api dev\" \"pnpm --filter web dev\"",
-    "dev:legacy:local": "concurrently -n api,web -c cyan,magenta \"pnpm --filter api dev:local\" \"pnpm --filter web dev\"",
     "dev:local": "pnpm --filter web-next dev",
-    "dev:next": "pnpm --filter web-next dev",
     "build": "pnpm --filter web-next build",
-    "build:legacy": "concurrently -n api,web -c cyan,magenta \"pnpm --filter api build\" \"pnpm --filter web build\"",
-    "build:next": "pnpm --filter web-next build",
+    "start": "pnpm --filter web-next start",
     "seed:dummy": "pnpm --filter web-next seed:dummy",
+    "typecheck": "pnpm --filter web-next typecheck",
     "typecheck:next": "pnpm --filter web-next typecheck",
     "test": "pnpm --filter web-next test",
     "test:next": "pnpm --filter web-next test",
     "db:generate": "cd packages/db && pnpm db:generate",
-    "db:migrate": "cd packages/db && pnpm db:migrate",
-    "db:apply": "cd apps/api && pnpm db:apply",
-    "db:apply:local": "cd apps/api && pnpm db:apply:local"
+    "db:migrate": "cd packages/db && pnpm db:migrate"
   },
   "keywords": [],
   "author": "",
   "packageManager": "pnpm@10.8.0",
-  "dependencies": {
-    "better-sqlite3": "^11.10.0",
-    "drizzle-orm": "^0.43.1",
-    "hono": "^4.7.9"
-  },
-  "devDependencies": {
-    "@cloudflare/workers-types": "^4.20250509.0",
-    "@types/node": "^22.15.17",
-    "concurrently": "^9.1.2",
-    "dotenv": "^16.5.0",
-    "prettier": "^3.5.3",
-    "typescript": "^5.8.3"
-  }
+  "dependencies": {},
+  "devDependencies": {}
 }

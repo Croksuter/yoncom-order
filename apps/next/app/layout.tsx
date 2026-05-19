@@ -4,7 +4,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Yoncom Order",
-  description: "Yoncom Order Next.js migration workspace",
+  description: "Yoncom Order festival booth POS",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

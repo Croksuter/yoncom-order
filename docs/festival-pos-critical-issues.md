@@ -31,7 +31,7 @@
 
 ## 2026-05-20 P0 구현 현황
 
-P0 계획은 `apps/next`를 source of truth로 두고 구현했다. 레거시 `apps/api`, `apps/web`는 새 결제/주문 정책에 연결하지 않는다.
+P0 계획은 `apps/next`를 source of truth로 두고 구현했다. 이전 Worker/Remix 구현은 Next 코드로 재해석되었고 현재 실행 경로에서 제거했다.
 
 | 영역 | 상태 | 해결 내용 | 남은 주의점 |
 | --- | --- | --- | --- |
@@ -123,10 +123,8 @@ P0 계획은 `apps/next`를 source of truth로 두고 구현했다. 레거시 `a
 
 관련 위치:
 
-- 레거시 주문 생성: `apps/api/src/controller/order.controller.ts`의 `payment.amount = menu total - table.key`
-- Next 이식 코드: `apps/next/lib/server/d1-mutations.ts`의 `createClientOrder()`에서 `amount = menu total - table.key`
-- 레거시 입금 API: `apps/api/src/routes/admin/deposit.ts`
-- Next 입금 API: `apps/next/app/api/admin/deposit/route.ts`
+- 주문 생성: `apps/next/lib/server/d1-mutations.ts`의 `createClientOrder()`
+- 입금 API: `apps/next/app/api/admin/deposit/route.ts`
 - 입금 request 타입: `packages/shared/types/requests/admin/deposit.ts`
 - 고객 입금 안내 모달: `apps/next/app/client/table/[id]/components/order/order.payment.modal.tsx`
 
@@ -518,7 +516,7 @@ WHERE id = ?
 
 ### 현재 문제
 
-고객 주문 목록/상세 조회 route가 아직 notMigrated 상태다.
+고객 주문 목록/상세 조회 route는 Next API로 구현되었고, 현재 table context 기준으로 list/detail 응답을 반환한다.
 
 관련 위치:
 
@@ -587,10 +585,9 @@ WHERE id = ?
 ## 다음 작업 시작 시 체크리스트
 
 - live D1 schema와 migration SQL이 동일한지 운영 전 한 번 더 확인한다. 특히 수동 D1 HTTP 적용과 migration CLI 적용이 섞이지 않게 한다.
-- `drizzle-kit`, `wrangler` 기반 migration 명령을 복구해 같은 schema를 재현 가능하게 만든다.
+- `drizzle-kit` 기반 migration 명령으로 같은 schema를 재현 가능하게 유지한다.
 - 실제 KB 국민은행 ingestion 또는 수동 입금 입력 흐름이 `/api/admin/deposit` 새 계약만 호출하는지 확인한다.
 - 현장 고객 안내 문구, 계좌 안내 이미지, 운영자 구두 안내를 모두 `주문금액 - 결제코드 = 입금금액`으로 통일한다.
 - Browser로 실제 UI 클릭, API 호출, DB 반영, 새로고침 후 UI 반영까지 다시 확인한다.
 - 같은 금액 주문, paymentCode 고갈, 원금액 그대로 입금, 100원 미만 오차 입금, 동시 주문, 더블 클릭, 미결제 방치, 조리 완료 후 수령 미완료 케이스를 반드시 시뮬레이션한다.
 - 환불 대기 주문은 `환불 필요` 패널에서 반드시 `환불 완료 처리`까지 닫은 뒤 테이블을 비운다.
-- 레거시 `apps/api`, `apps/web`가 같은 DB를 건드릴 가능성이 있으면 배포/실행에서 비활성화하거나 동일 정책으로 별도 이식한다.

@@ -1,13 +1,10 @@
 {
   "compilerOptions": {
     "strict": true,
-    "types": ["@cloudflare/workers-types"],
     "baseUrl": ".",
     "paths": {
-      "api/*": ["apps/api/src/*"],
-      "web/*": ["apps/web/src/*"],
       "shared/*": ["packages/shared/*"],
-      "db/*": ["packages/db/*"],
+      "db/*": ["packages/db/*"]
     }
-  },
+  }
 }

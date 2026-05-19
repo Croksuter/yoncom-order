@@ -1,4 +1,4 @@
-import { notMigrated } from "~/lib/server/responses";
+import { featureUnavailable } from "~/lib/server/responses";
 import { requireAdmin } from "~/lib/server/auth-session";
 
 type AdminMenuDetailRouteContext = {
@@ -14,7 +14,7 @@ export async function GET(
 
   const { menuId } = await params;
 
-  return notMigrated("GET /api/admin/menu/:menuId", {
+  return featureUnavailable("admin-menu-detail", {
     menuId,
     requiresAdmin: true,
   });

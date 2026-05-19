@@ -1,5 +1,5 @@
-import { migrationHealth } from "~/lib/server/responses";
+import { apiHealth } from "~/lib/server/responses";
 
 export function GET() {
-  return migrationHealth();
+  return apiHealth();
 }

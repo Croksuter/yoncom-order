@@ -7,7 +7,7 @@ type ContractCase = {
   args?: unknown[];
 };
 
-const placeholderContracts: ContractCase[] = [
+const unavailableFeatureContracts: ContractCase[] = [
   { label: "GET /api/admin/payout", importPath: "~/app/api/admin/payout/route", method: "GET" },
   { label: "PUT /api/admin/image", importPath: "~/app/api/admin/image/route", method: "PUT" },
   {
@@ -21,7 +21,7 @@ const placeholderContracts: ContractCase[] = [
   },
 ];
 
-describe("not-yet-migrated API contracts", () => {
+describe("disabled optional API contracts", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
@@ -30,7 +30,7 @@ describe("not-yet-migrated API contracts", () => {
     }));
   });
 
-  it.each(placeholderContracts)("$label advertises an explicit 501 migration placeholder", async (contract) => {
+  it.each(unavailableFeatureContracts)("$label returns an explicit feature-unavailable response", async (contract) => {
     const routeModule = (await import(contract.importPath)) as Record<
       string,
       (...args: unknown[]) => Promise<Response> | Response
@@ -39,7 +39,7 @@ describe("not-yet-migrated API contracts", () => {
     const body = await response.json();
 
     expect(response.status).toBe(501);
-    expect(body.error).toBe("NEXT_MIGRATION_NOT_IMPLEMENTED");
-    expect(body.contract).toContain(contract.label.split(" ")[0]);
+    expect(body.error).toBe("FEATURE_UNAVAILABLE");
+    expect(typeof body.feature).toBe("string");
   });
 });

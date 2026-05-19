@@ -1,11 +1,11 @@
-import { notMigrated } from "~/lib/server/responses";
+import { featureUnavailable } from "~/lib/server/responses";
 import { requireAdmin } from "~/lib/server/auth-session";
 
 export async function GET() {
   const adminError = await requireAdmin();
   if (adminError) return adminError;
 
-  return notMigrated("GET /api/admin/payout", {
+  return featureUnavailable("admin-payout-report", {
     requiresAdmin: true,
   });
 }
