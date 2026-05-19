@@ -1,109 +1,48 @@
 # Yoncom Order Rebuild Context
 
-Generated on 2026-05-18 before new rebuild work.
+## Current Source Of Truth
 
-## Baseline
+- `apps/next`: Next.js App Router application, API routes, UI, tests, and dummy seed script.
+- `packages/db`: Drizzle schema and migration SQL.
+- `packages/shared`: request/response contracts shared by the Next app.
 
-- Repository: `/Users/choehoyeong/Documents/development/yoncom-order`
-- Current git commit: `b0d5aba fix multiple ordering-problem`
-- Current worktree was clean before this document was added.
-- Dependency lockfile exists, but `node_modules` is not installed.
-- Existing ctx memory from 2026-05-16 references a different/stale app shape. Current filesystem and the fresh code graph below are the active baseline.
+The previous Worker API and Remix UI implementations have been removed from the active workspace. New work should be implemented in `apps/next` unless it is a shared schema/type change.
 
-## Context Index
+## Runtime
 
-context-mode has indexed fresh summaries for:
+- App: `pnpm dev`
+- Production build: `pnpm build`
+- Tests: `pnpm test`
+- Typecheck: `pnpm typecheck`
+- Dummy data: `pnpm seed:dummy`
+- DB schema generation/migration: `pnpm db:generate`, `pnpm db:migrate`
 
-- workspace/package scripts and dependency surfaces
-- API route files, controller exports, web route files, and database schema markers
-- environment variable references and `.env.example`
-- TODO/deprecated/legacy markers
-- test file inventory
+DB-backed routes and seed scripts require:
 
-Important indexed facts:
+- `CLOUDFLARE_ACCOUNT_ID`
+- `CLOUDFLARE_DATABASE_ID`
+- `CLOUDFLARE_D1_TOKEN`
 
-- Monorepo managed by `pnpm-workspace.yaml`
-- Apps: `apps/api`, `apps/web`
-- Packages: `packages/db`, `packages/shared`
-- Web app: Remix + Vite + React
-- API app: Hono on Cloudflare Workers/Wrangler
-- Persistence: Drizzle ORM with Cloudflare D1 migrations
-- Test files currently detected: `0`
+## Implemented Operating Model
 
-## Code Graph
+- Customer ordering uses `clientOrderId` idempotency.
+- Payment requests use `expectedTransferAmount = originalAmount - paymentCode`.
+- `paymentCode` leases use the smallest available code in `1..99` and are released on paid/cancelled/expired/refunded terminal flows where applicable.
+- Bank deposits are ingested through `bankTransactions`; exact single matches can auto-pay, ambiguous matches require POS review.
+- Menu order lifecycle is `PENDING -> READY -> PICKED_UP`.
+- Unpaid `PENDING` menu rows are displayed as `입금 대기`, not kitchen work.
+- Kitchen views only show active orders with `payment.status === "PAID"` and `menuOrder.status === "PENDING"`.
+- Paid cancellation creates `REFUND_PENDING`; refund completion changes the payment to `REFUNDED`.
+- `REFUND_PENDING` blocks table vacate until refund completion.
+- Admin API routes and `/admin/*` pages require an admin session.
 
-Fresh full code graph rebuild completed:
+## Current Known Non-Core Features
 
-- Files parsed: `125`
-- Nodes: `329`
-- Edges: `3123`
-- Execution flows: `61`
-- Communities: `14`
-- Risk score: `medium (0.55)`
-- Generated wiki: `.code-review-graph/wiki`
+These routes intentionally return `FEATURE_UNAVAILABLE` until a dedicated Next runtime storage/reporting design is added:
 
-Largest graph communities:
+- `GET /image/:filename`
+- `PUT /api/admin/image`
+- `GET /api/admin/payout`
+- `GET /api/admin/menu/:menuId`
 
-- `table-handle`: admin POS table/inventory/order UI
-- `order-handle`: client table ordering UI
-- `lib-query`: API DB/query helpers
-- `components-menu`: admin cooker UI
-- `lib-filter`: web auth/query/filter utilities
-- `admin-admin`: admin API controllers
-
-Critical execution flows:
-
-- `POS`
-- `Auth`
-- `CartAddModal`
-- `CartModal`
-- `OrderUpdateModal`
-- `queryOrders`
-- `handleRequest`
-- `Client`
-- `MenuAddModal`
-
-## Architecture Shape
-
-The project is a small ordering platform split into:
-
-- Client ordering route: `apps/web/app/routes/client.table.$id/route.tsx`
-- Admin POS route: `apps/web/app/routes/admin.pos/route.tsx`
-- Admin cooker route: `apps/web/app/routes/admin.cooker/route.tsx`
-- Auth route: `apps/web/app/routes/auth/route.tsx`
-- API routes under `apps/api/src/routes`
-- API controllers under `apps/api/src/controller`
-- DB schema and migrations under `packages/db`
-- Shared request/response validation types under `packages/shared`
-
-Database schema markers include:
-
-- `sessions`
-- `users`
-- `menuCategories`
-- `menus`
-- `tables`
-- `tableContexts`
-- `orders`
-- `payments`
-- `menuOrders`
-
-## Rebuild Risks
-
-- No tests were detected. Rebuild work needs at least smoke/type/build coverage before behavior changes.
-- `createOrder` is both large and highly connected. Treat order creation as a critical domain path.
-- Client cart/order modal components are large, stateful, and graph hotspots.
-- Admin POS inventory/table/order modal components are large and tightly coupled to shared UI primitives.
-- `queryStore`, `toast`, `useToast`, `kyErrorHandler`, `cn`, and `useValidateOrder` are bridge nodes. Small changes there can affect many screens.
-- Cloudflare D1/Wrangler and local SQLite/better-sqlite3 behavior need explicit environment setup before runtime verification.
-- TODO markers remain for Toss transfer account configuration and an API production cleanup note.
-
-## Suggested Rebuild Order
-
-1. Restore install/build baseline: `pnpm install`, then typecheck/build per workspace.
-2. Verify API local runtime and D1 migration path before UI changes.
-3. Add minimal smoke tests around order creation, table lookup, auth/session, and client cart validation.
-4. Refactor or stabilize `createOrder` only after coverage exists.
-5. Rebuild UI flows by vertical slice: auth, client table ordering, admin POS, cooker.
-6. Re-run `build_or_update_graph` and context-mode indexing after each major slice.
-
+They are no longer migration placeholders; they are disabled optional features outside the current festival POS core flow.

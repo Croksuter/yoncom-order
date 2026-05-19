@@ -1,4 +1,7 @@
 node_modules
+.next
+apps/*/.next
+.playwright-mcp
 .DS_Store
 .vscode
 packages/db/.env
@@ -9,3 +12,4 @@ wrangler.toml
 
 .idea
 .env
+.env.local

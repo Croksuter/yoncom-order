@@ -1,43 +1,37 @@
-# YONCOM-ORDER 
-Mono Repository project for integrated POS System for non-registered Sellers
+# YONCOM-ORDER
+
+Next.js 기반 대학 축제 부스 운영용 주문/POS 시스템입니다.
 
 ## Start Project
-0. Login to Wrangler
-    ```bash
-    npx wrangler login
-    ```
-1. Create D1 DB
-    ```bash
-    npx wrangler d1 create DB_NAME
-    ```
-2. Copy and Edit .env file
-    ```bash
-    cp .env.example .env
-    ```
-3. Copy and Edit wrangler.jsonc file
-    ```bash
-    cp apps/api/wrangler.example.jsonc apps/api/wrangler.jsonc
-4. Install Dependencies
-    ```bash
-    pnpm install
-    ```
-5. Generate & Migration
-    1. on Local DB
-        ```bash
-        pnpm db:generate
-        pnpm db:apply:local
-        ```
-    2. on Cloud DB
-        ```bash
-        pnpm db:generate
-        pnpm db:apply
-        ```
-6. Run
-   1. with Cloud DB
-        ```bash
-        pnpm dev
-        ```
-   2. with Local DB
-       ```bash
-       pnpm dev:local
-       ```
+
+1. Install dependencies
+   ```bash
+   pnpm install
+   ```
+
+2. Copy and edit environment variables
+   ```bash
+   cp .env.example .env.local
+   ```
+
+3. Generate or apply DB migrations when schema changes
+   ```bash
+   pnpm db:generate
+   pnpm db:migrate
+   ```
+
+4. Seed realistic demo data when needed
+   ```bash
+   pnpm seed:dummy
+   ```
+
+5. Run the app
+   ```bash
+   pnpm dev
+   ```
+
+## Active Workspace
+
+- `apps/next`: Next.js App Router app, API routes, UI, tests, and dummy seed script.
+- `packages/db`: Drizzle schema and migrations.
+- `packages/shared`: shared request/response contracts used by the Next app.
