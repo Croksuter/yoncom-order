@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const createValidation = z.object({
   tableId: z.string().length(15),
+  clientOrderId: z.string().min(8).max(64),
   menuOrders: z.array(
     z.object({
       menuId: z.string().length(15),
