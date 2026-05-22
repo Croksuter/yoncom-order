@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "~/components/ui/dialog";
 import OrderPaymentModal from "./order.payment.modal";
@@ -16,19 +16,47 @@ export default function OrderModal({
 }) {
   const [orderPaymentModalOpen, setOrderPaymentModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const paymentModalTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { clientTable } = useTableStore();
   const { clientMenuCategories } = useMenuStore();
 
   useEffect(() => {
-    if (openState && clientTable?.id) {
-      setLoading(true);
-      useTableStore.getState().clientGetTable({
-        tableId: clientTable.id,
-      }).finally(() => {
-        setLoading(false);
-      });
+    let cancelled = false;
+
+    if (!openState || !clientTable?.id) {
+      setLoading(false);
+      return () => {
+        cancelled = true;
+      };
     }
+
+    const refreshTable = async () => {
+      setLoading(true);
+      try {
+        await useTableStore.getState().clientGetTable({
+          tableId: clientTable.id,
+        });
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void refreshTable();
+
+    return () => {
+      cancelled = true;
+    };
   }, [openState, clientTable?.id]);
+
+  useEffect(() => {
+    return () => {
+      if (paymentModalTimerRef.current) {
+        clearTimeout(paymentModalTimerRef.current);
+      }
+    };
+  }, []);
 
   const menus = clientMenuCategories ? clientMenuCategories.flatMap((menuCategory) => menuCategory.menus) : [];
   const order = clientTable?.tableContexts[0]?.orders.find(isPaymentInstructionOrder);
@@ -102,8 +130,12 @@ export default function OrderModal({
         return;
       }
       handleClose();
-      setTimeout(() => {
+      if (paymentModalTimerRef.current) {
+        clearTimeout(paymentModalTimerRef.current);
+      }
+      paymentModalTimerRef.current = setTimeout(() => {
         setOrderPaymentModalOpen(true);
+        paymentModalTimerRef.current = null;
       }, 250);
     } finally {
       setLoading(false);

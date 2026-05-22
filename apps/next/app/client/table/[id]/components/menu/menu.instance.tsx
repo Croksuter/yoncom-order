@@ -9,6 +9,37 @@ import { API_BASE_URL } from "shared/constants";
 
 export default function MenuInstance({ menu }: { menu: ClientMenuResponse.Get["result"][number]["menus"][number] }) {
   const [modalOpen, setModalOpen] = useState(false);
+  const [isOpening, setIsOpening] = useState(false);
+
+  const handleOpenMenu = async () => {
+    if (isOpening) return;
+
+    setIsOpening(true);
+    try {
+      const res = await useMenuStore.getState().clientLoad({});
+      if (!res) {
+        toast({
+          title: "메뉴 정보를 불러오는데 실패했습니다.",
+          description: "다시 시도해주세요.",
+          variant: "destructive",
+        });
+        return;
+      }
+      const updatedMenuCategories = useMenuStore.getState().clientMenuCategories;
+      const updatedMenuState = updatedMenuCategories?.flatMap((m) => m.menus).find((m) => m.id === menu.id);
+      if (!updatedMenuState?.available || updatedMenuState.quantity <= 0) {
+        toast({
+          title: "메뉴가 품절 또는 비활성화 되었습니다.",
+          description: "다른 메뉴를 주문해주세요.",
+          variant: "destructive",
+        });
+        return;
+      }
+      setModalOpen(true);
+    } finally {
+      setIsOpening(false);
+    }
+  }
 
   return (
     <>
@@ -28,30 +59,9 @@ export default function MenuInstance({ menu }: { menu: ClientMenuResponse.Get["r
           </Card>
         ) : (
           <Card
-            className="fc mb-3 p-4 hover:cursor-pointer hover:bg-gray-100"
-            onClick={async () => {
-              const res = await useMenuStore.getState().clientLoad({});
-              if (!res) {
-                toast({
-                  title: "메뉴 정보를 불러오는데 실패했습니다.",
-                  description: "다시 시도해주세요.",
-                  variant: "destructive",
-                });
-                return;
-              }
-              const updatedMenuCategories = useMenuStore.getState().clientMenuCategories;
-              const updatedMenuState = updatedMenuCategories?.flatMap((m) => m.menus).find((m) => m.id === menu.id);
-              console.debug("updatedMenuState", updatedMenuState);
-              if (!updatedMenuState?.available || updatedMenuState.quantity <= 0) {
-                toast({
-                  title: "메뉴가 품절 또는 비활성화 되었습니다.",
-                  description: "다른 메뉴를 주문해주세요.",
-                  variant: "destructive",
-                });
-                return;
-              }
-              setModalOpen(true);
-            }}
+            className={`fc mb-3 p-4 hover:cursor-pointer hover:bg-gray-100 ${isOpening ? "pointer-events-none opacity-80" : ""}`}
+            aria-disabled={isOpening}
+            onClick={handleOpenMenu}
           >
             <div className="fr justify-between items-center bg-none h-full">
               <div className="fr items-center">

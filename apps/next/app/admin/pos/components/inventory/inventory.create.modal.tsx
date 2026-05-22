@@ -23,21 +23,29 @@ export default function InventoryCreateModal({
   const [menuQuantity, setMenuQuantity] = useState(0);
   const [menuAvailable, setMenuAvailable] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
+  const [duringConfirm, setDuringConfirm] = useState(false);
+  const isBusy = isUploading || duringConfirm;
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isUploading) return;
+
     const file = e.target.files?.[0];
-    console.debug("file", file);
     if (!file) return;
 
-    // setIsUploading(true);
-    const response = await useMenuStore.getState().uploadImage(file);
-    console.debug("response", response);
-    if (response) {
-      setMenuImage(response.filename);
+    setIsUploading(true);
+    try {
+      const response = await useMenuStore.getState().uploadImage(file);
+      if (response) {
+        setMenuImage(response.filename);
+      }
+    } finally {
+      setIsUploading(false);
     }
   };
 
   const handleConfirm = async () => {
+    if (isBusy) return;
+
     if (
       menuName.length === 0
       || !menuCategories.some(category => category.id === menuCategory)
@@ -46,22 +54,37 @@ export default function InventoryCreateModal({
       return;
     }
 
-    await createMenu({
-      menuOptions: {
-        name: menuName,
-        description: menuDescription,
-        image: menuImage,
-        price: menuPrice,
-        quantity: menuQuantity,
-        available: menuAvailable,
-        menuCategoryId: menuCategory,
-      },
-    });
+    setDuringConfirm(true);
+    try {
+      await createMenu({
+        menuOptions: {
+          name: menuName,
+          description: menuDescription,
+          image: menuImage,
+          price: menuPrice,
+          quantity: menuQuantity,
+          available: menuAvailable,
+          menuCategoryId: menuCategory,
+        },
+      });
 
-    handleClose();
+      setInvalid(false);
+      setMenuName("");
+      setMenuCategory("");
+      setMenuDescription("");
+      setMenuImage("");
+      setMenuPrice(0);
+      setMenuQuantity(0);
+      setMenuAvailable(true);
+      setOpenState(false);
+    } finally {
+      setDuringConfirm(false);
+    }
   }
 
   const handleClose = () => {
+    if (isBusy) return;
+
     setInvalid(false);
     setMenuName("");
     setMenuCategory("");
@@ -69,6 +92,7 @@ export default function InventoryCreateModal({
     setMenuImage("");
     setMenuPrice(0);
     setMenuQuantity(0);
+    setMenuAvailable(true);
     setOpenState(false);
   }
 
@@ -134,7 +158,7 @@ export default function InventoryCreateModal({
                 onChange={handleImageUpload}
                 type="file"
                 accept="image/*"
-                disabled={isUploading}
+                disabled={isBusy}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
               />
               <div className={`
@@ -215,8 +239,10 @@ export default function InventoryCreateModal({
 
         <DialogDescription className={`-mt-2 text-right ${invalid ? "dangerTXT" : "hidden"}`}>⚠︎ 올바른 이름과 카테고리를 입력하세요.</DialogDescription>
         <DialogFooter className="">
-          <Button onClick={handleConfirm} className="dangerBG dangerB">추가</Button>
-          <Button onClick={handleClose}>닫기</Button>
+          <Button onClick={handleConfirm} className="dangerBG dangerB" disabled={isBusy}>
+            {duringConfirm ? "처리 중..." : "추가"}
+          </Button>
+          <Button onClick={handleClose} disabled={isBusy}>닫기</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

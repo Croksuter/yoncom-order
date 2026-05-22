@@ -23,6 +23,8 @@ export default function OrderPaymentModal({
   const [timeLeft, setTimeLeft] = useState<number>(0);
   
   const totalDurationRef = useRef<number>(0);
+  const copiedAccountTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const copiedAmountTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!expiresAt) return;
@@ -47,6 +49,17 @@ export default function OrderPaymentModal({
     return () => clearInterval(timer);
   }, [expiresAt]);
 
+  useEffect(() => {
+    return () => {
+      if (copiedAccountTimerRef.current) {
+        clearTimeout(copiedAccountTimerRef.current);
+      }
+      if (copiedAmountTimerRef.current) {
+        clearTimeout(copiedAmountTimerRef.current);
+      }
+    };
+  }, []);
+
   const formatTime = (ms: number) => {
     const totalSeconds = Math.ceil(ms / 1000);
     const minutes = Math.floor(totalSeconds / 60);
@@ -58,27 +71,59 @@ export default function OrderPaymentModal({
     ? Math.min(100, Math.max(0, (timeLeft / totalDurationRef.current) * 100))
     : 0;
 
-  const copyAccount = () => {
-    navigator.clipboard.writeText("국민은행 94580201548620");
+  const copyAccount = async () => {
+    try {
+      await navigator.clipboard.writeText("국민은행 94580201548620");
+    } catch {
+      toast({
+        title: "계좌정보를 복사하지 못했습니다.",
+        description: "브라우저 권한을 확인한 뒤 다시 시도해주세요.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setCopiedAccount(true);
     toast({
       title: "계좌정보가 복사되었습니다.",
       description: "국민은행 94580201548620",
     });
-    setTimeout(() => setCopiedAccount(false), 2000);
+    if (copiedAccountTimerRef.current) {
+      clearTimeout(copiedAccountTimerRef.current);
+    }
+    copiedAccountTimerRef.current = setTimeout(() => {
+      setCopiedAccount(false);
+      copiedAccountTimerRef.current = null;
+    }, 2000);
   };
 
-  const copyAmount = () => {
-    navigator.clipboard.writeText(expectedTransferAmount.toString());
+  const copyAmount = async () => {
+    try {
+      await navigator.clipboard.writeText(expectedTransferAmount.toString());
+    } catch {
+      toast({
+        title: "입금액을 복사하지 못했습니다.",
+        description: "브라우저 권한을 확인한 뒤 다시 시도해주세요.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setCopiedAmount(true);
     toast({
       title: "입금액이 복사되었습니다.",
       description: `${expectedTransferAmount.toLocaleString()}원`,
     });
-    setTimeout(() => setCopiedAmount(false), 2000);
+    if (copiedAmountTimerRef.current) {
+      clearTimeout(copiedAmountTimerRef.current);
+    }
+    copiedAmountTimerRef.current = setTimeout(() => {
+      setCopiedAmount(false);
+      copiedAmountTimerRef.current = null;
+    }, 2000);
   };
 
-  const handleConfirm = async () => {
+  const handleConfirm = () => {
     handleClose();
   };
 
@@ -226,4 +271,3 @@ export default function OrderPaymentModal({
     </Dialog>
   );
 }
-

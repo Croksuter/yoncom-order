@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "~/components/ui/dialog";
 import useTableStore from "~/stores/table.store";
@@ -18,13 +19,22 @@ export default function TableSetModal({
   const prompt = inUse ? "미사용" : "사용 중";
   const { occupyTable, vacateTable } = useTableStore();
   const confirmFunction = inUse ? vacateTable : occupyTable;
+  const [duringConfirm, setDuringConfirm] = useState(false);
 
   const handleConfirm = async () => {
-    await confirmFunction({ tableId: table.id });
-    handleCancel();
+    if (duringConfirm) return;
+
+    setDuringConfirm(true);
+    try {
+      await confirmFunction({ tableId: table.id });
+      setOpenState(false);
+    } finally {
+      setDuringConfirm(false);
+    }
   }
 
   const handleCancel = () => {
+    if (duringConfirm) return;
     setOpenState(false);
   }
 
@@ -42,8 +52,10 @@ export default function TableSetModal({
           ⚠︎ 테이블이 미사용 상태로 변경되면, 해당 테이블의 주문 내역이 모두 초기화되고 진행 중인 주문은 모두 취소됩니다.
         </p>
         <DialogFooter>
-          <Button onClick={handleCancel} variant="outline">취소</Button>
-          <Button onClick={handleConfirm}>확인</Button>
+          <Button onClick={handleCancel} variant="outline" disabled={duringConfirm}>취소</Button>
+          <Button onClick={handleConfirm} disabled={duringConfirm}>
+            {duringConfirm ? "처리 중..." : "확인"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

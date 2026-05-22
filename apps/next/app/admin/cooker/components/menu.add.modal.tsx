@@ -19,7 +19,7 @@ export default function MenuAddModal({
   const [monitoringMenu, setMonitoringMenu] = useState<string>("");
   const [invalid, setInvalid] = useState(false);
 
-  const handleConfirm = async () => {
+  const handleConfirm = () => {
     if (monitoringMenu.length === 0) {
       setInvalid(true);
       return;

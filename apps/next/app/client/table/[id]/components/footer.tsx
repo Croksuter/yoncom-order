@@ -6,11 +6,13 @@ import useTableStore from "~/stores/table.store";
 import OrderModal from "./order/order.modal";
 import OrderHistoryModal from "./order/order.history.modal";
 import { isPaymentInstructionOrder, isUnresolvedPaymentOrder } from "~/lib/order-status";
+import { Loader2 } from "lucide-react";
 
 export default function Footer() {
   const [purchaseModalOpen, setPurchaseModalOpen] = useState(false);
   const [orderModalOpen, setOrderModalOpen] = useState(false);
   const [orderHistoryModalOpen, setOrderHistoryModalOpen] = useState(false);
+  const [isRefreshingTable, setIsRefreshingTable] = useState(false);
   const { menuOrders } = useCartStore();
   const { clientTable, clientGetTable } = useTableStore();
 
@@ -35,6 +37,42 @@ export default function Footer() {
     }
   }, [clientTable]);
 
+  const refreshClientTable = async () => {
+    if (!clientTable?.id) return clientTable;
+
+    const response = await clientGetTable({ tableId: clientTable.id });
+    return response?.result ?? useTableStore.getState().clientTable ?? clientTable;
+  }
+
+  const handleOpenOrderHistory = async () => {
+    if (isRefreshingTable) return;
+
+    setIsRefreshingTable(true);
+    try {
+      await refreshClientTable();
+      setOrderHistoryModalOpen(true);
+    } finally {
+      setIsRefreshingTable(false);
+    }
+  }
+
+  const handleOpenUnresolvedOrder = async () => {
+    if (isRefreshingTable) return;
+
+    setIsRefreshingTable(true);
+    try {
+      const latestClientTable = await refreshClientTable();
+      const latestUnresolvedPaymentOrder = findUnresolvedPaymentOrder(latestClientTable);
+      if (latestUnresolvedPaymentOrder && isPaymentInstructionOrder(latestUnresolvedPaymentOrder)) {
+        setPurchaseModalOpen(true);
+      } else {
+        setOrderHistoryModalOpen(true);
+      }
+    } finally {
+      setIsRefreshingTable(false);
+    }
+  }
+
   return (
     <>
       <div className="w-full h-20 fr p-1 mb-3">
@@ -42,26 +80,19 @@ export default function Footer() {
           <Button 
             variant="outline" 
             className="w-full h-full text-center text-lg bg-gray-100 hover:bg-gray-200 rounded-3xl"
-            onClick={() => {
-              setOrderHistoryModalOpen(true);
-            }}
+            onClick={handleOpenOrderHistory}
+            disabled={isRefreshingTable}
           >
-            <span className="leading-6 text-gray-500">이전<br />주문내역</span>
+            <span className="leading-6 text-gray-500">{isRefreshingTable ? "확인 중" : <>이전<br />주문내역</>}</span>
           </Button>
         </div>
         {inProgressOrderRemain
           ? (
             <Button
-              onClick={() => {
-                const latestUnresolvedPaymentOrder = findUnresolvedPaymentOrder(clientTable);
-                if (latestUnresolvedPaymentOrder && isPaymentInstructionOrder(latestUnresolvedPaymentOrder)) {
-                  setPurchaseModalOpen(true);
-                } else {
-                  setOrderHistoryModalOpen(true);
-                }
-              }}
+              onClick={handleOpenUnresolvedOrder}
+              disabled={isRefreshingTable}
               className="fc flex-1 h-full rounded-3xl bg-gray-500 text-white text-2xl hover:cursor-pointer hover:bg-gray-600"
-            >{needsManualReview ? "입금 확인 중" : "입금 안내"}<br /><span className="-mt-2 text-sm text-gray-300">
+            >{isRefreshingTable && <Loader2 className="mb-1 h-5 w-5 animate-spin" />}{needsManualReview ? "입금 확인 중" : "입금 안내"}<br /><span className="-mt-2 text-sm text-gray-300">
               {needsManualReview ? "운영자 확인이 필요한 주문이 있습니다." : "입금 확인 전 주문이 있습니다."}
             </span>
             </Button>

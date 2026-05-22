@@ -24,14 +24,33 @@ export default function OrderHistoryModal({
   const { clientTable } = useTableStore();
 
   useEffect(() => {
-    if (openState && clientTable?.id) {
-      setLoading(true);
-      useTableStore.getState().clientGetTable({
-        tableId: clientTable.id,
-      }).finally(() => {
-        setLoading(false);
-      });
+    let cancelled = false;
+
+    if (!openState || !clientTable?.id) {
+      setLoading(false);
+      return () => {
+        cancelled = true;
+      };
     }
+
+    const refreshTable = async () => {
+      setLoading(true);
+      try {
+        await useTableStore.getState().clientGetTable({
+          tableId: clientTable.id,
+        });
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void refreshTable();
+
+    return () => {
+      cancelled = true;
+    };
   }, [openState, clientTable?.id]);
 
   const orders = clientTable?.tableContexts[0]?.orders ?? [];
