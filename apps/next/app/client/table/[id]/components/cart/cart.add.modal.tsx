@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "~/components/ui/input";
 import useCartStore from "~/stores/cart.store";
 import * as ClientMenuResponse from "shared/types/responses/client/menu";
-import { MinusIcon, PlusIcon } from "lucide-react";
+import { MinusIcon, PlusIcon, Loader2 } from "lucide-react";
 import useTableStore from "~/stores/table.store";
 import { toast } from "~/hooks/use-toast";
 import { useValidateOrder } from "~/hooks/validate-order";
@@ -22,6 +22,7 @@ export default function CartAddModal({
 }) {
   const [quantity, setQuantity] = useState<number>(1);
   const [invalid, setInvalid] = useState(false);
+  const [duringConfirm, setDuringConfirm] = useState(false);
 
   const { addMenuOrder, menuOrders } = useCartStore();
   const { clientTable } = useTableStore();
@@ -31,6 +32,7 @@ export default function CartAddModal({
   const maxQuantity = menu.quantity - recentOrderedQuantity;
 
   const handleConfirm = async () => {
+    if (duringConfirm) return;
     if (quantity <= 0 || quantity > maxQuantity) {
       setInvalid(true);
       return;
@@ -49,11 +51,16 @@ export default function CartAddModal({
       return;
     }
 
-    const isValid = await validateOrder([{ menuId: menu.id, quantity: quantity + recentOrderedQuantity }]);
-    if (!isValid) return;
+    setDuringConfirm(true);
+    try {
+      const isValid = await validateOrder([{ menuId: menu.id, quantity: quantity + recentOrderedQuantity }]);
+      if (!isValid) return;
 
-    addMenuOrder({ menuId: menu.id, quantity });
-    handleClose();
+      addMenuOrder({ menuId: menu.id, quantity });
+      handleClose();
+    } finally {
+      setDuringConfirm(false);
+    }
   }
 
   const handleClose = () => {
@@ -110,13 +117,20 @@ export default function CartAddModal({
         <DialogDescription className={`text-center text-xs ${invalid ? "dangerTXT" : "hidden"}`}>⚠︎ 올바른 수량을 입력하세요.</DialogDescription>
         
         <DialogFooter className="fr gap-3 *:flex-1 *:h-12 *:rounded-xl *:text-base mt-2">
-          <Button variant="outline" onClick={handleClose} className="border-slate-200 hover:bg-slate-50 transition-colors">취소</Button>
-          <Button className="bg-brand-500 hover:bg-brand-600 text-white shadow-md shadow-brand-500/10 hover-lift active:scale-98 transition-all" onClick={handleConfirm}>
-            <div className="fc items-center justify-center leading-none">
-              <span className="text-lg font-bold">{(quantity * menu.price).toLocaleString()}원</span>
-              <span className="text-[10px] opacity-80 mt-0.5">장바구니 담기</span>
-            </div>
-          </Button>
+          <Button variant="outline" onClick={handleClose} disabled={duringConfirm} className="border-slate-200 hover:bg-slate-50 transition-colors">취소</Button>
+          {duringConfirm ? (
+            <Button disabled className="bg-brand-400 text-white cursor-not-allowed">
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              담는 중...
+            </Button>
+          ) : (
+            <Button className="bg-brand-500 hover:bg-brand-600 text-white shadow-md shadow-brand-500/10 hover-lift active:scale-98 transition-all" onClick={handleConfirm}>
+              <div className="fc items-center justify-center leading-none">
+                <span className="text-lg font-bold">{(quantity * menu.price).toLocaleString()}원</span>
+                <span className="text-[10px] opacity-80 mt-0.5">장바구니 담기</span>
+              </div>
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog >

@@ -10,6 +10,7 @@ import * as AdminImageRequest from "types/requests/admin/image";
 import * as AdminImageResponse from "types/responses/admin/image";
 import queryStore, { api } from '~/lib/query';
 import { toast } from '~/hooks/use-toast';
+import { useLoadingStore } from '~/stores/loading.store';
 
 export type MenuState = {
   clientMenuCategories: ClientMenuResponse.Get["result"] | null;
@@ -109,18 +110,24 @@ const useMenuStore = create<MenuState>((set, get) => ({
   }),
 
   uploadImage: async (file: File): Promise<{ filename: string } | null> => {
-    const formData = new FormData();
-    formData.append('file', file);
+    const { startMutation, endMutation } = useLoadingStore.getState();
+    startMutation();
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
 
-    const response = await api.put('admin/image', {
-      body: formData,
-    }).json<{ result: { filename: string } }>();
+      const response = await api.put('admin/image', {
+        body: formData,
+      }).json<{ result: { filename: string } }>();
 
-    if (response.result?.filename) {
-      return response.result;
+      if (response.result?.filename) {
+        return response.result;
+      }
+
+      return null;
+    } finally {
+      endMutation();
     }
-
-    return null;
   },
 
   createMenuCategory: async (query: AdminMenuCategoryRequest.Create) => queryStore<AdminMenuCategoryRequest.Create, AdminMenuCategoryResponse.Create>({

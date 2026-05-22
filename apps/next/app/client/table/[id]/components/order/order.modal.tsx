@@ -45,86 +45,104 @@ export default function OrderModal({
   const expiresAt = typeof order?.payment.expiresAt === "number" ? order.payment.expiresAt : null;
 
   const handleTossPayment = async () => {
-    const success = await useTableStore.getState().clientGetTable({
-      tableId: clientTable!.id,
-    });
-    if (!success) {
-      toast({
-        title: "테이블 정보를 불러오는데 실패했습니다.",
-        description: "다시 시도해주세요.",
-        variant: "destructive",
+    if (loading) return;
+    setLoading(true);
+    try {
+      const success = await useTableStore.getState().clientGetTable({
+        tableId: clientTable!.id,
       });
-      return;
-    }
-    const latestOrder = success.result.tableContexts[0]?.orders.find(isPaymentInstructionOrder);
-    if (!latestOrder || isPaymentPaid(latestOrder.payment)) {
-      toast({
-        title: "결제 안내가 종료되었습니다.",
-        description: isPaymentPaid(latestOrder?.payment) ? "이미 결제 완료된 주문입니다." : "확인할 주문이 없습니다.",
-      });
-      handleClose();
-      return;
-    }
+      if (!success) {
+        toast({
+          title: "테이블 정보를 불러오는데 실패했습니다.",
+          description: "다시 시도해주세요.",
+          variant: "destructive",
+        });
+        return;
+      }
+      const latestOrder = success.result.tableContexts[0]?.orders.find(isPaymentInstructionOrder);
+      if (!latestOrder || isPaymentPaid(latestOrder.payment)) {
+        toast({
+          title: "결제 안내가 종료되었습니다.",
+          description: isPaymentPaid(latestOrder?.payment) ? "이미 결제 완료된 주문입니다." : "확인할 주문이 없습니다.",
+        });
+        handleClose();
+        return;
+      }
 
-    const transferAmount = latestOrder.payment.expectedTransferAmount ?? latestOrder.payment.amount;
-    window.open(`supertoss://send?amount=${transferAmount}&bank=국민은행&accountNo=94580201548620`, "_blank");
-    handleClose();
+      const transferAmount = latestOrder.payment.expectedTransferAmount ?? latestOrder.payment.amount;
+      window.open(`supertoss://send?amount=${transferAmount}&bank=국민은행&accountNo=94580201548620`, "_blank");
+      handleClose();
+    } finally {
+      setLoading(false);
+    }
   }
 
   const handleDirectTransfer = async () => {
-    const success = await useTableStore.getState().clientGetTable({
-      tableId: clientTable!.id,
-    });
-    if (!success) {
-      toast({
-        title: "테이블 정보를 불러오는데 실패했습니다.",
-        description: "다시 시도해주세요.",
-        variant: "destructive",
+    if (loading) return;
+    setLoading(true);
+    try {
+      const success = await useTableStore.getState().clientGetTable({
+        tableId: clientTable!.id,
       });
-      return;
-    }
-    const latestOrder = success.result.tableContexts[0]?.orders.find(isPaymentInstructionOrder);
-    if (!latestOrder || isPaymentPaid(latestOrder.payment)) {
-      toast({
-        title: "결제 안내가 종료되었습니다.",
-        description: isPaymentPaid(latestOrder?.payment) ? "이미 결제 완료된 주문입니다." : "확인할 주문이 없습니다.",
-      });
+      if (!success) {
+        toast({
+          title: "테이블 정보를 불러오는데 실패했습니다.",
+          description: "다시 시도해주세요.",
+          variant: "destructive",
+        });
+        return;
+      }
+      const latestOrder = success.result.tableContexts[0]?.orders.find(isPaymentInstructionOrder);
+      if (!latestOrder || isPaymentPaid(latestOrder.payment)) {
+        toast({
+          title: "결제 안내가 종료되었습니다.",
+          description: isPaymentPaid(latestOrder?.payment) ? "이미 결제 완료된 주문입니다." : "확인할 주문이 없습니다.",
+        });
+        handleClose();
+        return;
+      }
       handleClose();
-      return;
+      setTimeout(() => {
+        setOrderPaymentModalOpen(true);
+      }, 250);
+    } finally {
+      setLoading(false);
     }
-    handleClose();
-    setTimeout(() => {
-      setOrderPaymentModalOpen(true);
-    }, 250);
   }
 
   const handleCancelOrder = async () => {
-    const success = await useTableStore.getState().clientGetTable({
-      tableId: clientTable!.id,
-    });
-    if (!success) {
-      toast({
-        title: "테이블 정보를 불러오는데 실패했습니다.",
-        description: "다시 시도해주세요.",
-        variant: "destructive",
+    if (loading) return;
+    setLoading(true);
+    try {
+      const success = await useTableStore.getState().clientGetTable({
+        tableId: clientTable!.id,
       });
-      return;
-    }
-    const latestOrder = success.result.tableContexts[0]?.orders.find(isPaymentInstructionOrder);
-    if (!latestOrder || isPaymentPaid(latestOrder.payment)) {
-      toast({
-        title: "주문을 취소할 수 없습니다.",
-        description: isPaymentPaid(latestOrder?.payment) ? "이미 결제 완료된 주문은 운영자에게 문의해주세요." : "취소할 주문이 없습니다.",
+      if (!success) {
+        toast({
+          title: "테이블 정보를 불러오는데 실패했습니다.",
+          description: "다시 시도해주세요.",
+          variant: "destructive",
+        });
+        return;
+      }
+      const latestOrder = success.result.tableContexts[0]?.orders.find(isPaymentInstructionOrder);
+      if (!latestOrder || isPaymentPaid(latestOrder.payment)) {
+        toast({
+          title: "주문을 취소할 수 없습니다.",
+          description: isPaymentPaid(latestOrder?.payment) ? "이미 결제 완료된 주문은 운영자에게 문의해주세요." : "취소할 주문이 없습니다.",
+        });
+        handleClose();
+        return;
+      }
+
+      await useTableStore.getState().clientCancelOrder({
+        orderId: latestOrder.id,
       });
-      handleClose();
-      return;
+
+      setOpenState(false);
+    } finally {
+      setLoading(false);
     }
-
-    await useTableStore.getState().clientCancelOrder({
-      orderId: latestOrder.id,
-    });
-
-    setOpenState(false);
   }
 
   const handleClose = () => {
@@ -149,6 +167,7 @@ export default function OrderModal({
                     variant="destructive"
                     className="w-fit h-10 rounded-xl"
                     onClick={handleCancelOrder}
+                    disabled={loading}
                   >주문 취소</Button>
                 </div>
                 <span className="text-blue-500 text-2xl font-extrabold text-center z-10 bg-white px-2 w-fit">입금 안내</span>
@@ -160,8 +179,8 @@ export default function OrderModal({
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter className="fr *:flex-1 *:mx-2 *:h-14 *:rounded-2xl *:text-lg *:my-2">
-                <Button variant="outline" onClick={handleDirectTransfer}>직접 이체</Button>
-                <Button className="bg-blue-500 hover:bg-blue-600 text-white" onClick={handleTossPayment}>토스 이체</Button>
+                <Button variant="outline" onClick={handleDirectTransfer} disabled={loading}>직접 이체</Button>
+                <Button className="bg-blue-500 hover:bg-blue-600 text-white" onClick={handleTossPayment} disabled={loading}>토스 이체</Button>
               </DialogFooter>
             </>
           )}

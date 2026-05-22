@@ -4,7 +4,7 @@ import { Button } from "~/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
 import useCartStore, { CartState } from "~/stores/cart.store";
-import { MinusIcon, PlusIcon } from "lucide-react";
+import { MinusIcon, PlusIcon, Loader2 } from "lucide-react";
 import useMenuStore from "~/stores/menu.store";
 import { toast } from "~/hooks/use-toast";
 import useTableStore from "~/stores/table.store";
@@ -21,6 +21,7 @@ export default function OrderUpdateModal({
   const { clientTable } = useTableStore();
   const [quantity, setQuantity] = useState<number>(0);
   const [invalid, setInvalid] = useState(false);
+  const [duringConfirm, setDuringConfirm] = useState(false);
   const validateOrder = useValidateOrder();
 
   const { updateMenuOrder } = useCartStore();
@@ -33,16 +34,22 @@ export default function OrderUpdateModal({
   const menu = menus.find((m) => m.id === menuOrder.menuId)!;
 
   const handleConfirm = async () => {
+    if (duringConfirm) return;
     if (quantity < 0 || quantity > menu.quantity) {
       setInvalid(true);
       return;
     }
 
-    const isValid = await validateOrder([{ menuId: menu.id, quantity }]);
-    if (!isValid) return;
+    setDuringConfirm(true);
+    try {
+      const isValid = await validateOrder([{ menuId: menu.id, quantity }]);
+      if (!isValid) return;
 
-    updateMenuOrder(menuOrder.menuId, { menuId: menuOrder.menuId, quantity });
-    handleClose();
+      updateMenuOrder(menuOrder.menuId, { menuId: menuOrder.menuId, quantity });
+      handleClose();
+    } finally {
+      setDuringConfirm(false);
+    }
   }
 
   const handleClose = () => {
@@ -79,8 +86,15 @@ export default function OrderUpdateModal({
         <span className="text-sm text-center">주문 가능 수량: {menu.quantity}</span>
         <DialogDescription className={`-mt-2 text-right ${invalid ? "dangerTXT" : "hidden"}`}>⚠︎ 올바른 수량을 입력하세요.</DialogDescription>
         <DialogFooter className="fr *:flex-1 *:mx-2 *:h-14 *:rounded-2xl *:text-lg">
-          <Button variant="outline" onClick={handleClose}>취소</Button>
-          <Button className="bg-blue-500 hover:bg-blue-600 text-white" onClick={handleConfirm}>수정하기</Button>
+          <Button variant="outline" onClick={handleClose} disabled={duringConfirm}>취소</Button>
+          {duringConfirm ? (
+            <Button disabled className="bg-blue-400 text-white cursor-not-allowed">
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              수정 중...
+            </Button>
+          ) : (
+            <Button className="bg-blue-500 hover:bg-blue-600 text-white" onClick={handleConfirm}>수정하기</Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog >

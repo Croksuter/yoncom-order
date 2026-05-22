@@ -42,10 +42,7 @@ export default function Footer() {
           <Button 
             variant="outline" 
             className="w-full h-full text-center text-lg bg-gray-100 hover:bg-gray-200 rounded-3xl"
-            onClick={async () => {
-              await useTableStore.getState().clientGetTable({
-                tableId: clientTable!.id,
-              });
+            onClick={() => {
               setOrderHistoryModalOpen(true);
             }}
           >
@@ -55,15 +52,11 @@ export default function Footer() {
         {inProgressOrderRemain
           ? (
             <Button
-              onClick={async () => {
-                await useTableStore.getState().clientGetTable({
-                  tableId: clientTable!.id,
-                });
-                const newClientTable = useTableStore.getState().clientTable;
-                const latestUnresolvedPaymentOrder = findUnresolvedPaymentOrder(newClientTable);
+              onClick={() => {
+                const latestUnresolvedPaymentOrder = findUnresolvedPaymentOrder(clientTable);
                 if (latestUnresolvedPaymentOrder && isPaymentInstructionOrder(latestUnresolvedPaymentOrder)) {
                   setPurchaseModalOpen(true);
-                } else if (latestUnresolvedPaymentOrder) {
+                } else {
                   setOrderHistoryModalOpen(true);
                 }
               }}
