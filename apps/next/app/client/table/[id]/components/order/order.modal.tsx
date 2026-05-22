@@ -79,8 +79,10 @@ export default function OrderModal({
       handleClose();
       return;
     }
-    setOrderPaymentModalOpen(true);
     handleClose();
+    setTimeout(() => {
+      setOrderPaymentModalOpen(true);
+    }, 250);
   }
 
   const handleCancelOrder = async () => {

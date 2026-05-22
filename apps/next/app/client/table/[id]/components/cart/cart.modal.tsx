@@ -25,6 +25,7 @@ export default function CartModal({
   const [modalOpenState, setModalOpenState] = useState(false);
   const [modalMenuOrder, setModalMenuOrder] = useState<CartState["menuOrders"][number] | null>(null);
   const [duringPurchase, setDuringPurchase] = useState(false);
+  const [isOrderCompleted, setIsOrderCompleted] = useState(false);
 
   const { clientMenuCategories } = useMenuStore();
   const { menuOrders, purchaseMenuOrders } = useCartStore();
@@ -44,8 +45,8 @@ export default function CartModal({
     }
   })
 
-  const noMenuOrder = menuOrderInfos.length === 0;
-  const invalidMenuOrder = menuOrderInfos.length === 0
+  const noMenuOrder = menuOrderInfos.length === 0 && !isOrderCompleted;
+  const invalidMenuOrder = (menuOrderInfos.length === 0 && !isOrderCompleted)
     || menuOrderInfos.some((menuOrderInfo) => menuOrderInfo === null)
 
   const handleConfirm = async () => {
@@ -63,14 +64,23 @@ export default function CartModal({
       return;
     }
 
+    setIsOrderCompleted(true);
     useCartStore.getState().clearMenuOrders();
 
     await useTableStore.getState().clientGetTable({
       tableId: clientTable!.id,
     });
-    setConfirmModalOpenState(true);
+    
     setOpenState(false);
-    setDuringPurchase(false);
+    
+    setTimeout(() => {
+      setConfirmModalOpenState(true);
+    }, 250);
+
+    setTimeout(() => {
+      setIsOrderCompleted(false);
+      setDuringPurchase(false);
+    }, 300);
   }
   const handleClose = () => {
     setOpenState(false);
