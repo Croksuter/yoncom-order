@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "~/components/ui/dialog";
 import OrderPaymentModal from "./order.payment.modal";
@@ -15,21 +15,34 @@ export default function OrderModal({
   setOpenState: (open: boolean) => void;
 }) {
   const [orderPaymentModalOpen, setOrderPaymentModalOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
   const { clientTable } = useTableStore();
   const { clientMenuCategories } = useMenuStore();
 
-  const menus = clientMenuCategories!.flatMap((menuCategory) => menuCategory.menus);
+  useEffect(() => {
+    if (openState && clientTable?.id) {
+      setLoading(true);
+      useTableStore.getState().clientGetTable({
+        tableId: clientTable.id,
+      }).finally(() => {
+        setLoading(false);
+      });
+    }
+  }, [openState, clientTable?.id]);
+
+  const menus = clientMenuCategories ? clientMenuCategories.flatMap((menuCategory) => menuCategory.menus) : [];
   const order = clientTable?.tableContexts[0]?.orders.find(isPaymentInstructionOrder);
-  const menuOrders = order?.menuOrders;
-  if (!menuOrders || !order) return;
+  const menuOrders = order?.menuOrders ?? [];
+  const hasOrder = !!order && menuOrders.length > 0;
 
   const calculatedAmount = menuOrders.reduce((acc, menuOrder) => {
-    return acc + menus.find((menu) => menu.id === menuOrder.menuId)!.price * menuOrder.quantity;
+    const targetMenu = menus.find((menu) => menu.id === menuOrder.menuId);
+    return acc + (targetMenu ? targetMenu.price : 0) * menuOrder.quantity;
   }, 0);
-  const originalAmount = order.payment.originalAmount ?? calculatedAmount;
-  const expectedTransferAmount = order.payment.expectedTransferAmount ?? order.payment.amount;
-  const paymentCode = order.payment.paymentCode ?? null;
-  const expiresAt = typeof order.payment.expiresAt === "number" ? order.payment.expiresAt : null;
+  const originalAmount = order?.payment.originalAmount ?? calculatedAmount;
+  const expectedTransferAmount = order?.payment.expectedTransferAmount ?? order?.payment.amount ?? 0;
+  const paymentCode = order?.payment.paymentCode ?? null;
+  const expiresAt = typeof order?.payment.expiresAt === "number" ? order.payment.expiresAt : null;
 
   const handleTossPayment = async () => {
     const success = await useTableStore.getState().clientGetTable({
@@ -121,28 +134,37 @@ export default function OrderModal({
   return (
     <>
       <Dialog open={openState} onOpenChange={handleClose}>
-        <DialogContent className="w-[96%] border-blue-500 border-2 rounded-xl">
-          <DialogHeader className="fc items-center my-4">
-            <DialogTitle />
-            <div className="fr w-full justify-start !-mt-4">
-              <Button
-                variant="destructive"
-                className="w-fit h-10 rounded-xl"
-                onClick={handleCancelOrder}
-              >주문 취소</Button>
+        <DialogContent className="w-[96%] border-blue-500 border-2 rounded-xl min-h-[200px] flex flex-col justify-center">
+          {loading || !hasOrder ? (
+            <div className="flex flex-col items-center justify-center py-12 space-y-4">
+              <div className="w-12 h-12 border-4 border-blue-100 border-t-blue-500 rounded-full animate-spin"></div>
+              <p className="text-blue-500 font-semibold text-lg animate-pulse">입금 정보를 불러오고 있습니다...</p>
             </div>
-            <span className="text-blue-500 text-2xl font-extrabold text-center z-10 bg-white px-2 w-fit">입금 안내</span>
-            <DialogDescription className="fc !-mt-4 rounded-xl p-4 border-2 border-blue-500 *:text-base *:my-2 *:text-black">
-              <span className="text-start">⋅ 주문마다 다른 <b className="dangerTXT">결제코드</b>가 붙어 입금금액이 정해집니다.</span>
-              <span className="text-start">⋅ <b className="dangerTXT">안내된 입금금액 그대로</b> 보내야 자동으로 결제 확인됩니다.</span>
-              <span className="text-start">⋅ 금액을 바꾸거나 원금액으로 보내면 운영자가 확인한 뒤 처리될 수 있습니다.</span>
-              <span className="text-start">⋅ 입금 확인 전까지 같은 테이블에서 추가 주문은 잠시 제한됩니다.</span>
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="fr *:flex-1 *:mx-2 *:h-14 *:rounded-2xl *:text-lg *:my-2">
-            <Button variant="outline" onClick={handleDirectTransfer}>직접 이체</Button>
-            <Button className="bg-blue-500 hover:bg-blue-600 text-white" onClick={handleTossPayment}>토스 이체</Button>
-          </DialogFooter>
+          ) : (
+            <>
+              <DialogHeader className="fc items-center my-4">
+                <DialogTitle />
+                <div className="fr w-full justify-start !-mt-4">
+                  <Button
+                    variant="destructive"
+                    className="w-fit h-10 rounded-xl"
+                    onClick={handleCancelOrder}
+                  >주문 취소</Button>
+                </div>
+                <span className="text-blue-500 text-2xl font-extrabold text-center z-10 bg-white px-2 w-fit">입금 안내</span>
+                <DialogDescription className="fc !-mt-4 rounded-xl p-4 border-2 border-blue-500 *:text-base *:my-2 *:text-black">
+                  <span className="text-start">⋅ 주문마다 다른 <b className="dangerTXT">결제코드</b>가 붙어 입금금액이 정해집니다.</span>
+                  <span className="text-start">⋅ <b className="dangerTXT">안내된 입금금액 그대로</b> 보내야 자동으로 결제 확인됩니다.</span>
+                  <span className="text-start">⋅ 금액을 바꾸거나 원금액으로 보내면 운영자가 확인한 뒤 처리될 수 있습니다.</span>
+                  <span className="text-start">⋅ 입금 확인 전까지 같은 테이블에서 추가 주문은 잠시 제한됩니다.</span>
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter className="fr *:flex-1 *:mx-2 *:h-14 *:rounded-2xl *:text-lg *:my-2">
+                <Button variant="outline" onClick={handleDirectTransfer}>직접 이체</Button>
+                <Button className="bg-blue-500 hover:bg-blue-600 text-white" onClick={handleTossPayment}>토스 이체</Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog >
       <OrderPaymentModal

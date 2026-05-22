@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "~/components/ui/dialog";
 import { DialogContent } from "~/components/ui/dialog";
@@ -18,9 +18,21 @@ export default function OrderHistoryModal({
 }) {
   const [orderDetailModalOpenState, setOrderDetailModalOpenState] = useState(false);
   const [orderDetail, setOrderDetail] = useState<ClientTableResponse.Get["result"]["tableContexts"][number]["orders"][number] | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const { menus } = useMenuStore();
   const { clientTable } = useTableStore();
+
+  useEffect(() => {
+    if (openState && clientTable?.id) {
+      setLoading(true);
+      useTableStore.getState().clientGetTable({
+        tableId: clientTable.id,
+      }).finally(() => {
+        setLoading(false);
+      });
+    }
+  }, [openState, clientTable?.id]);
 
   const orders = clientTable?.tableContexts[0]?.orders ?? [];
   const orderHistories = orders.map((order) => {
@@ -57,7 +69,12 @@ export default function OrderHistoryModal({
     <>
       <Dialog open={openState} onOpenChange={setOpenState}>
         <DialogContent className="fc w-[96%] min-h-[25rem] max-h-[40rem] justify-between border-blue-500 border-2 rounded-xl">
-          {orderHistories.length === 0 ? (
+          {loading ? (
+            <div className="flex flex-col items-center justify-center flex-1 py-12 space-y-4">
+              <div className="w-12 h-12 border-4 border-blue-100 border-t-blue-500 rounded-full animate-spin"></div>
+              <p className="text-blue-500 font-semibold text-lg animate-pulse">주문 내역을 불러오고 있습니다...</p>
+            </div>
+          ) : orderHistories.length === 0 ? (
             <DialogHeader >
               <DialogTitle>주문 내역이 없습니다</DialogTitle>
               <DialogDescription />
