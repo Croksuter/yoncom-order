@@ -1,8 +1,8 @@
+"use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "~/components/ui/button";
-import { Dialog, BottomSheetContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "~/components/ui/dialog";
-import { Input } from "~/components/ui/input";
+import { Dialog, BottomSheetContent, DialogDescription, DialogTitle } from "~/components/ui/dialog";
 import useCartStore from "~/stores/cart.store";
 import * as ClientMenuResponse from "shared/types/responses/client/menu";
 import { MinusIcon, PlusIcon } from "lucide-react";
@@ -24,16 +24,24 @@ export default function CartAddModal({
   const [invalid, setInvalid] = useState(false);
   const [duringConfirm, setDuringConfirm] = useState(false);
 
-  const { addMenuOrder, menuOrders } = useCartStore();
+  const { addMenuOrder, removeMenuOrder, updateMenuOrder, menuOrders } = useCartStore();
   const { clientTable } = useTableStore();
   const validateOrder = useValidateOrder();
 
   const recentOrderedQuantity = menuOrders.find((m) => m.menuId === menu.id)?.quantity ?? 0;
-  const maxQuantity = menu.quantity - recentOrderedQuantity;
+  const maxQuantity = menu.quantity;
+
+  // Recover quantity from cart when modal opens
+  useEffect(() => {
+    if (openState) {
+      setQuantity(recentOrderedQuantity > 0 ? recentOrderedQuantity : 1);
+      setInvalid(false);
+    }
+  }, [openState, recentOrderedQuantity]);
 
   const handleConfirm = async () => {
     if (duringConfirm) return;
-    if (quantity <= 0 || quantity > maxQuantity) {
+    if (quantity < 0 || quantity > maxQuantity || (quantity === 0 && recentOrderedQuantity === 0)) {
       setInvalid(true);
       return;
     }
@@ -56,14 +64,28 @@ export default function CartAddModal({
     setOpenState(false);
     try {
       await runWithBlockingLoading(async () => {
-        const isValid = await validateOrder([{ menuId: menu.id, quantity: quantity + recentOrderedQuantity }]);
+        // Validate with the absolute target quantity
+        const isValid = await validateOrder([{ menuId: menu.id, quantity }]);
         if (!isValid) {
           setOpenState(true);
           return;
         }
 
-        addMenuOrder({ menuId: menu.id, quantity });
-        setTimeout(() => setQuantity(1), 100);
+        // Apply cart updates
+        if (recentOrderedQuantity > 0) {
+          if (quantity === 0) {
+            removeMenuOrder(menu.id);
+            toast({
+              title: "장바구니에서 메뉴를 제외했습니다.",
+            });
+          } else {
+            updateMenuOrder(menu.id, { menuId: menu.id, quantity });
+          }
+        } else {
+          if (quantity > 0) {
+            addMenuOrder({ menuId: menu.id, quantity });
+          }
+        }
       });
     } finally {
       setDuringConfirm(false);
@@ -72,7 +94,6 @@ export default function CartAddModal({
 
   const handleClose = () => {
     if (duringConfirm) return;
-    setTimeout(() => setQuantity(1), 100);
     setInvalid(false);
     setOpenState(false);
   }
@@ -116,10 +137,10 @@ export default function CartAddModal({
           </div>
           <div className="flex items-center justify-between bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-full p-1.5 shadow-sm min-w-[150px]">
             <Button
-              onClick={() => quantity > 1 && setQuantity(quantity - 1)}
+              onClick={() => quantity > 0 && setQuantity(quantity - 1)}
               className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 p-0 flex items-center justify-center"
               variant="ghost"
-              disabled={duringConfirm}
+              disabled={quantity <= 0 || duringConfirm}
             >
               <MinusIcon className="h-4 w-4 stroke-[3px]" />
             </Button>
@@ -138,11 +159,6 @@ export default function CartAddModal({
 
           <div className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
             주문 가능 수량: <span className="font-bold text-slate-700 dark:text-slate-300">{maxQuantity}개</span>
-            {recentOrderedQuantity > 0 && (
-              <span className="block text-destructive dark:text-rose-500 font-semibold mt-1">
-                (이미 장바구니에 {recentOrderedQuantity}개 담겨있습니다)
-              </span>
-            )}
           </div>
         </div>
 
@@ -167,7 +183,11 @@ export default function CartAddModal({
             disabled={duringConfirm}
             className="flex-[2] py-4 h-auto rounded-xl bg-primary hover:bg-brand-600 text-white font-extrabold text-sm shadow-[0_8px_20px_rgba(0,61,155,0.2)] hover:shadow-[0_12px_28px_rgba(0,61,155,0.3)] transition-all duration-300 active:scale-[0.98] cursor-pointer flex justify-center items-center gap-2"
           >
-            <span>장바구니 담기</span>
+            <span>
+              {recentOrderedQuantity > 0
+                ? (quantity === 0 ? "장바구니에서 빼기" : "수정 완료")
+                : "장바구니 담기"}
+            </span>
             <span className="font-medium opacity-85 border-l border-white/20 pl-2 ml-1">
               ₩ {(quantity * menu.price).toLocaleString()}
             </span>
@@ -177,4 +197,3 @@ export default function CartAddModal({
     </Dialog>
   );
 }
-
