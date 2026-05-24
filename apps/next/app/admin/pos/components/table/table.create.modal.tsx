@@ -15,10 +15,13 @@ export default function CreateTableModal({
   const [tableName, setTableName] = useState<string>("");
   const [tableSeats, setTableSeats] = useState<number>(0);
   const [invalid, setInvalid] = useState(false);
+  const [duringConfirm, setDuringConfirm] = useState(false);
 
   const { createTable } = useTableStore();
 
   const handleConfirm = async () => {
+    if (duringConfirm) return;
+
     if (tableName.length === 0) {
       setInvalid(true);
       return;
@@ -29,11 +32,20 @@ export default function CreateTableModal({
       return;
     }
 
-    await createTable({ tableOptions: { name: tableName, seats: tableSeats } });
-    handleClose();
+    setDuringConfirm(true);
+    try {
+      await createTable({ tableOptions: { name: tableName, seats: tableSeats } });
+      setTableName("");
+      setTableSeats(0);
+      setInvalid(false);
+      setOpenState(false);
+    } finally {
+      setDuringConfirm(false);
+    }
   }
 
   const handleClose = () => {
+    if (duringConfirm) return;
     setTableName("");
     setTableSeats(0);
     setInvalid(false);
@@ -67,8 +79,10 @@ export default function CreateTableModal({
         </div>
         <DialogDescription className={`-mt-2 text-right ${invalid ? "dangerTXT" : "hidden"}`}>⚠︎ 올바른 이름과 좌석 수를 입력하세요.</DialogDescription>
         <DialogFooter className="">
-          <Button variant="outline" onClick={handleClose}>취소</Button>
-          <Button onClick={handleConfirm}>확인</Button>
+          <Button variant="outline" onClick={handleClose} disabled={duringConfirm}>취소</Button>
+          <Button onClick={handleConfirm} disabled={duringConfirm}>
+            {duringConfirm ? "처리 중..." : "확인"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

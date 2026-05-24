@@ -1,12 +1,13 @@
 "use client";
 
-import { use, useEffect } from "react";
+import { use, useEffect, useState } from "react";
 import useMenuStore from "~/stores/menu.store";
 import useTableStore from "~/stores/table.store";
 import Footer from "./components/footer";
 import Header from "./components/header";
 import Menus from "./components/menu/menus";
 import ShopIntro from "./components/shop.intro";
+import { Skeleton } from "~/components/ui/skeleton";
 
 type ClientTablePageProps = {
   params: Promise<{ id: string }>;
@@ -16,16 +17,29 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
   const { id } = use(params);
   const { clientTable } = useTableStore();
   const { clientMenuCategories } = useMenuStore();
+  const [loading, setLoading] = useState(true);
   const isValidTableId = id.length === 15;
 
   useEffect(() => {
-    useTableStore.setState({ clientTable: null });
+    const fetchTableData = async () => {
+      setLoading(true);
+      useTableStore.setState({ clientTable: null });
 
-    if (!isValidTableId) {
-      return;
-    }
+      if (!isValidTableId) {
+        setLoading(false);
+        return;
+      }
 
-    void useTableStore.getState().clientGetTable({ tableId: id });
+      try {
+        await useTableStore.getState().clientGetTable({ tableId: id });
+      } catch (error) {
+        console.error("Failed to load table:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void fetchTableData();
   }, [id, isValidTableId]);
 
   useEffect(() => {
@@ -35,6 +49,49 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
 
     void useMenuStore.getState().clientLoad({});
   }, [clientTable]);
+
+  if (loading) {
+    return (
+      <main className="h-screen w-screen items-center justify-center overflow-hidden fc p-4">
+        <div className="w-full max-w-[600px] flex-1 overflow-hidden px-2 fc gap-4">
+          {/* Header Skeleton */}
+          <div className="fr justify-between items-center py-4 border-b border-gray-100">
+            <Skeleton className="h-8 w-24 rounded-lg" />
+            <Skeleton className="h-8 w-16 rounded-lg" />
+          </div>
+          {/* ShopIntro Skeleton */}
+          <div className="space-y-2 py-4">
+            <Skeleton className="h-6 w-32 rounded" />
+            <Skeleton className="h-4 w-48 rounded" />
+          </div>
+          {/* Tabs/Categories Skeleton */}
+          <div className="fr gap-2 pb-2">
+            <Skeleton className="h-10 w-20 rounded-full" />
+            <Skeleton className="h-10 w-20 rounded-full" />
+            <Skeleton className="h-10 w-20 rounded-full" />
+          </div>
+          {/* Menu Items Skeleton */}
+          <div className="flex-1 space-y-4 overflow-hidden pt-2">
+            {[1, 2, 3].map((n) => (
+              <div key={n} className="fr gap-4 p-3 border border-gray-100 rounded-xl items-center bg-card">
+                <Skeleton className="h-20 w-20 rounded-lg shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-5 w-1/3 rounded" />
+                  <Skeleton className="h-4 w-2/3 rounded" />
+                  <Skeleton className="h-5 w-1/4 rounded" />
+                </div>
+              </div>
+            ))}
+          </div>
+          {/* Footer Skeleton */}
+          <div className="fr justify-between items-center py-4 border-t border-gray-100 gap-2">
+            <Skeleton className="h-12 flex-1 rounded-xl" />
+            <Skeleton className="h-12 flex-1 rounded-xl" />
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="h-screen w-screen items-center justify-center overflow-hidden fc">

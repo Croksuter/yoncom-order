@@ -46,9 +46,6 @@ export default function OrderHistoryModal({
     }
   })
 
-  const handleConfirm = () => {
-    setOpenState(false);
-  }
   const handleClose = () => {
     setOpenState(false);
   }

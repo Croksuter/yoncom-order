@@ -23,10 +23,19 @@ export default function TableDetailModal({
   const prompt = inUse ? "미사용" : "사용 중";
   const { updateTable, occupyTable, vacateTable } = useTableStore();
   const confirmFunction = inUse ? vacateTable : occupyTable;
+  const [pendingAction, setPendingAction] = useState<"toggle" | "update" | null>(null);
+  const isPending = pendingAction !== null;
 
   const handleConfirm = async () => {
-    await confirmFunction({ tableId: table.id });
-    handleCancel();
+    if (isPending) return;
+
+    setPendingAction("toggle");
+    try {
+      await confirmFunction({ tableId: table.id });
+      setOpenState(false);
+    } finally {
+      setPendingAction(null);
+    }
   }
 
   const handleTablePage = async () => {
@@ -34,6 +43,8 @@ export default function TableDetailModal({
   }
 
   const handleUpdate = async () => {
+    if (isPending) return;
+
     if (
       tableName.length === 0
       || tableSeats <= 0
@@ -41,11 +52,18 @@ export default function TableDetailModal({
       setInvalid(true);
       return;
     }
-    await updateTable({ tableId: table.id, tableOptions: { name: tableName, seats: tableSeats } });
-    handleCancel();
+
+    setPendingAction("update");
+    try {
+      await updateTable({ tableId: table.id, tableOptions: { name: tableName, seats: tableSeats } });
+      setOpenState(false);
+    } finally {
+      setPendingAction(null);
+    }
   }
 
   const handleCancel = () => {
+    if (isPending) return;
     setOpenState(false);
   }
 
@@ -79,10 +97,14 @@ export default function TableDetailModal({
         </div>
         <DialogDescription className={`-mt-2 text-right ${invalid ? "dangerTXT" : "hidden"}`}>⚠︎ 올바른 이름과 좌석 수를 입력하세요.</DialogDescription>
         <DialogFooter>
-          <Button className="bg-slate-600 text-white" onClick={handleTablePage}>테이블 페이지</Button>
-          <Button className="dangerBG dangerB text-white" onClick={handleConfirm}>{inUse ? "비활성화" : "활성화"}</Button>
-          <Button className="dangerBG dangerB text-white" onClick={handleUpdate}>수정</Button>
-          <Button onClick={handleCancel}>닫기</Button>
+          <Button className="bg-slate-600 text-white" onClick={handleTablePage} disabled={isPending}>테이블 페이지</Button>
+          <Button className="dangerBG dangerB text-white" onClick={handleConfirm} disabled={isPending}>
+            {pendingAction === "toggle" ? "처리 중..." : inUse ? "비활성화" : "활성화"}
+          </Button>
+          <Button className="dangerBG dangerB text-white" onClick={handleUpdate} disabled={isPending}>
+            {pendingAction === "update" ? "처리 중..." : "수정"}
+          </Button>
+          <Button onClick={handleCancel} disabled={isPending}>닫기</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

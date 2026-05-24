@@ -1,5 +1,6 @@
 import ky, { type SearchParamsOption } from "ky";
 import kyErrorHandler from "~/lib/ky-error-handler";
+import { useLoadingStore } from "~/stores/loading.store";
 
 const API_BASE_PATH = "api";
 
@@ -36,6 +37,15 @@ export default async function queryStore<Query, Result>({
 }): Promise<Result | null> {
   setter?.({ isLoaded: false, error: false });
 
+  const isQuery = method === "get" || method === "head";
+  const { startQuery, endQuery, startMutation, endMutation } = useLoadingStore.getState();
+
+  if (isQuery) {
+    startQuery();
+  } else {
+    startMutation();
+  }
+
   try {
     const res =
       method === "get" || method === "head"
@@ -53,5 +63,11 @@ export default async function queryStore<Query, Result>({
     onError?.(error);
     setter?.({ isLoaded: false, error: true });
     return null;
+  } finally {
+    if (isQuery) {
+      endQuery();
+    } else {
+      endMutation();
+    }
   }
 }

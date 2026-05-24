@@ -25,37 +25,62 @@ export default function InventoryDetailModal({
   const [menuQuantity, setMenuQuantity] = useState(menu.quantity || 0);
   const [menuAvailable, setMenuAvailable] = useState(menu.available || false);
   const [isUploading, setIsUploading] = useState(false);
+  const [duringConfirm, setDuringConfirm] = useState(false);
+  const [invalid, setInvalid] = useState(false);
+  const isBusy = isUploading || duringConfirm;
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isUploading) return;
+
     const file = e.target.files?.[0];
-    console.debug("file", file);
     if (!file) return;
 
-    // setIsUploading(true);
-    const response = await useMenuStore.getState().uploadImage(file);
-    console.debug("response", response);
-    if (response) {
-      setMenuImage(response.filename);
+    setIsUploading(true);
+    try {
+      const response = await useMenuStore.getState().uploadImage(file);
+      if (response) {
+        setMenuImage(response.filename);
+      }
+    } finally {
+      setIsUploading(false);
     }
   };
 
   const handleConfirm = async () => {
-    await useMenuStore.getState().updateMenu({
-      menuOptions: {
-        name: menuName,
-        menuCategoryId: menuCategory,
-        description: menuDescription,
-        image: menuImage,
-        price: menuPrice,
-        quantity: menuQuantity,
-        available: menuAvailable,
-      },
-      menuId: menu.id,
-    });
-    handleClose();
+    if (isBusy) return;
+
+    if (
+      menuName.length === 0
+      || !menuCategories.some(category => category.id === menuCategory)
+    ) {
+      setInvalid(true);
+      return;
+    }
+
+    setDuringConfirm(true);
+    try {
+      await useMenuStore.getState().updateMenu({
+        menuOptions: {
+          name: menuName,
+          menuCategoryId: menuCategory,
+          description: menuDescription,
+          image: menuImage,
+          price: menuPrice,
+          quantity: menuQuantity,
+          available: menuAvailable,
+        },
+        menuId: menu.id,
+      });
+      setInvalid(false);
+      setOpenState(false);
+    } finally {
+      setDuringConfirm(false);
+    }
   }
 
   const handleClose = () => {
+    if (isBusy) return;
+    setInvalid(false);
     setOpenState(false);
   }
 
@@ -67,6 +92,7 @@ export default function InventoryDetailModal({
     setMenuPrice(menu.price || 0);
     setMenuQuantity(menu.quantity || 0);
     setMenuAvailable(menu.available || false);
+    setInvalid(false);
   }, [menu]);
 
   return (
@@ -131,7 +157,7 @@ export default function InventoryDetailModal({
                 onChange={handleImageUpload}
                 type="file"
                 accept="image/*"
-                disabled={isUploading}
+                disabled={isBusy}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
               />
               <div className={`
@@ -226,10 +252,12 @@ export default function InventoryDetailModal({
         </div>
 
 
-        {/* <DialogDescription className={`-mt-2 text-right`}>⚠︎ 올바른 이름과 좌석 수를 입력하세요.</DialogDescription> */}
+        <DialogDescription className={`-mt-2 text-right ${invalid ? "dangerTXT" : "hidden"}`}>⚠︎ 올바른 이름과 카테고리를 입력하세요.</DialogDescription>
         <DialogFooter className="">
-          <Button onClick={handleConfirm} className="dangerBG dangerB">저장</Button>
-          <Button onClick={handleClose}>닫기</Button>
+          <Button onClick={handleConfirm} className="dangerBG dangerB" disabled={isBusy}>
+            {duringConfirm ? "처리 중..." : "저장"}
+          </Button>
+          <Button onClick={handleClose} disabled={isBusy}>닫기</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

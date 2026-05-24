@@ -9,8 +9,8 @@ import { MinusIcon, PlusIcon } from "lucide-react";
 import useTableStore from "~/stores/table.store";
 import { toast } from "~/hooks/use-toast";
 import { useValidateOrder } from "~/hooks/validate-order";
-import { API_BASE_URL } from "shared/constants";
 import { isUnresolvedPaymentOrder } from "~/lib/order-status";
+import { runWithBlockingLoading } from "~/lib/blocking-loading";
 
 export default function CartAddModal({
   menu,
@@ -22,6 +22,7 @@ export default function CartAddModal({
 }) {
   const [quantity, setQuantity] = useState<number>(1);
   const [invalid, setInvalid] = useState(false);
+  const [duringConfirm, setDuringConfirm] = useState(false);
 
   const { addMenuOrder, menuOrders } = useCartStore();
   const { clientTable } = useTableStore();
@@ -31,6 +32,7 @@ export default function CartAddModal({
   const maxQuantity = menu.quantity - recentOrderedQuantity;
 
   const handleConfirm = async () => {
+    if (duringConfirm) return;
     if (quantity <= 0 || quantity > maxQuantity) {
       setInvalid(true);
       return;
@@ -49,14 +51,27 @@ export default function CartAddModal({
       return;
     }
 
-    const isValid = await validateOrder([{ menuId: menu.id, quantity: quantity + recentOrderedQuantity }]);
-    if (!isValid) return;
+    setDuringConfirm(true);
+    setInvalid(false);
+    setOpenState(false);
+    try {
+      await runWithBlockingLoading(async () => {
+        const isValid = await validateOrder([{ menuId: menu.id, quantity: quantity + recentOrderedQuantity }]);
+        if (!isValid) {
+          setOpenState(true);
+          return;
+        }
 
-    addMenuOrder({ menuId: menu.id, quantity });
-    handleClose();
+        addMenuOrder({ menuId: menu.id, quantity });
+        setTimeout(() => setQuantity(1), 100);
+      });
+    } finally {
+      setDuringConfirm(false);
+    }
   }
 
   const handleClose = () => {
+    if (duringConfirm) return;
     setTimeout(() => setQuantity(1), 100);
     setInvalid(false);
     setOpenState(false);
@@ -64,42 +79,58 @@ export default function CartAddModal({
 
   return (
     <Dialog open={openState} onOpenChange={handleClose}>
-      <DialogContent className="w-[96%] border-blue-500 border-2 rounded-xl">
-        <DialogHeader className="fc justify-between items-center">
+      <DialogContent className="fixed bottom-0 top-auto left-0 translate-x-0 translate-y-0 w-full max-w-full rounded-t-[2rem] rounded-b-none border-t border-x border-b-0 border-brand-100 bg-background/95 backdrop-blur-lg p-6 pb-8 shadow-[0_-8px_30px_rgb(0,0,0,0.08)] data-[state=open]:animate-in data-[state=open]:slide-in-from-bottom sm:bottom-auto sm:top-[50%] sm:left-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:max-w-md sm:rounded-2xl sm:border sm:shadow-lg sm:p-6 smooth-transition">
+        <DialogHeader className="fc justify-between items-center space-y-3">
           {menu.image.length !== 0 ? (
-            <img src={menu.image} alt="" width={120} height={120} className="rounded-md m-2 w-[120px] h-[120px]" />
+            <img src={menu.image} alt="" width={140} height={140} className="rounded-2xl m-2 w-[140px] h-[140px] object-cover shadow-sm" />
           ) : (
-            <img src={"/favicon.ico"} alt="" width={120} height={120} className="rounded-md m-2" />
+            <img src={"/favicon.ico"} alt="" width={120} height={120} className="rounded-2xl m-2 opacity-30" />
           )}
-          <DialogTitle className="text-2xl font-bold">{menu.name}</DialogTitle>
-          <DialogDescription className="text-md !-mt-0">{menu.description}</DialogDescription>
+          <div className="text-center space-y-1">
+            <DialogTitle className="text-2xl font-bold tracking-tight text-foreground">{menu.name}</DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground max-w-[280px] mx-auto !-mt-0 leading-relaxed">{menu.description}</DialogDescription>
+          </div>
         </DialogHeader>
-        <div className="fr justify-center items-center">
-          <Button 
-            onClick={() => quantity > 1 && setQuantity(quantity - 1)}
-            className="w-12 h-12 bg-blue-500 hover:bg-blue-600 text-white"
-          ><MinusIcon className="scale-150"/></Button>
-          <Input
-            type="number"
-            min={1}
-            max={maxQuantity}
-            value={quantity}
-            onChange={(e) => setQuantity(Number(e.target.value))}
-            className="text-center w-16 !text-2xl font-bold h-16 mx-4 input-no-spinner"
-          />
-          <Button 
-            onClick={() => quantity < maxQuantity && setQuantity(quantity + 1)}
-            className="w-12 h-12 bg-blue-500 hover:bg-blue-600 text-white"
-          ><PlusIcon className="scale-150"/></Button>
+        
+        <div className="fc items-center justify-center space-y-4 my-4">
+          <div className="fr justify-center items-center bg-secondary/80 p-1.5 rounded-2xl w-fit">
+            <Button 
+              onClick={() => quantity > 1 && setQuantity(quantity - 1)}
+              className="w-11 h-11 bg-background hover:bg-slate-100 text-foreground shadow-sm rounded-xl hover-lift active:scale-95 transition-all"
+              variant="ghost"
+            ><MinusIcon className="h-5 w-5"/></Button>
+            <Input
+              type="number"
+              min={1}
+              max={maxQuantity}
+              value={quantity}
+              onChange={(e) => setQuantity(Number(e.target.value))}
+              className="text-center w-16 !text-2xl font-bold h-11 bg-transparent border-0 ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 input-no-spinner"
+            />
+            <Button 
+              onClick={() => quantity < maxQuantity && setQuantity(quantity + 1)}
+              className="w-11 h-11 bg-background hover:bg-slate-100 text-foreground shadow-sm rounded-xl hover-lift active:scale-95 transition-all"
+              variant="ghost"
+            ><PlusIcon className="h-5 w-5"/></Button>
+          </div>
+          
+          <div className="fc items-center text-xs text-muted-foreground space-y-1">
+            <span>추가 주문 가능 수량: <span className="font-semibold text-foreground">{maxQuantity}개</span></span>
+            {recentOrderedQuantity > 0 && (
+              <span className="font-semibold text-destructive animate-pulse">이미 카트에 {recentOrderedQuantity}개 담겨있습니다.</span>
+            )}
+          </div>
         </div>
-        <span className="text-sm text-center">추가 주문 가능 수량: {maxQuantity}</span>
-        {recentOrderedQuantity > 0 && <span className="text-sm text-center -mt-4 dangerTXT">이미 카트에 {recentOrderedQuantity}개 담았어요!</span>}
-        <DialogDescription className={`-mt-2 text-right ${invalid ? "dangerTXT" : "hidden"}`}>⚠︎ 올바른 수량을 입력하세요.</DialogDescription>
-        <DialogFooter className="fr *:flex-1 *:mx-2 *:h-14 *:rounded-2xl *:text-lg">
-          <Button variant="outline" onClick={handleClose}>취소</Button>
-          <Button className="fc bg-blue-500 hover:bg-blue-600 text-white" onClick={handleConfirm}>
-            <span className="text-2xl font-bold -mt-1">{quantity * menu.price}원</span>
-            <span className="text-sm -mt-2">장바구니 담기</span>
+
+        <DialogDescription className={`text-center text-xs ${invalid ? "dangerTXT" : "hidden"}`}>⚠︎ 올바른 수량을 입력하세요.</DialogDescription>
+        
+        <DialogFooter className="fr gap-3 *:flex-1 *:h-12 *:rounded-xl *:text-base mt-2">
+          <Button variant="outline" onClick={handleClose} disabled={duringConfirm} className="border-slate-200 hover:bg-slate-50 transition-colors">취소</Button>
+          <Button className="bg-brand-500 hover:bg-brand-600 text-white shadow-md shadow-brand-500/10 hover-lift active:scale-98 transition-all" onClick={handleConfirm} disabled={duringConfirm}>
+            <div className="fc items-center justify-center leading-none">
+              <span className="text-lg font-bold">{(quantity * menu.price).toLocaleString()}원</span>
+              <span className="text-[10px] opacity-80 mt-0.5">장바구니 담기</span>
+            </div>
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -14,20 +14,31 @@ export default function RemoveTableModal({
 }) {
   const [tableId, setTableId] = useState<string>("");
   const [invalid, setInvalid] = useState(false);
+  const [duringConfirm, setDuringConfirm] = useState(false);
 
   const { tables, removeTable } = useTableStore();
 
   const handleConfirm = async () => {
+    if (duringConfirm) return;
+
     if (tableId.length === 0) {
       setInvalid(true);
       return;
     }
 
-    await removeTable({ tableId });
-    handleClose();
+    setDuringConfirm(true);
+    try {
+      await removeTable({ tableId });
+      setTableId("");
+      setInvalid(false);
+      setOpenState(false);
+    } finally {
+      setDuringConfirm(false);
+    }
   }
 
   const handleClose = () => {
+    if (duringConfirm) return;
     setTableId("");
     setInvalid(false);
     setOpenState(false);
@@ -55,8 +66,10 @@ export default function RemoveTableModal({
         </Select>
         <DialogDescription className={`-mt-2 text-right ${invalid ? "dangerTXT" : "hidden"}`}>⚠︎ 올바른 테이블을 선택하세요.</DialogDescription>
         <DialogFooter className="">
-          <Button onClick={handleClose} variant="outline">취소</Button>
-          <Button onClick={handleConfirm}>확인</Button>
+          <Button onClick={handleClose} variant="outline" disabled={duringConfirm}>취소</Button>
+          <Button onClick={handleConfirm} disabled={duringConfirm}>
+            {duringConfirm ? "처리 중..." : "확인"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -170,7 +170,6 @@ const useTableStore = create<TableState>((set, get) => ({
         description: "입금 전 주문을 취소하고 재고와 결제코드를 복구했습니다.",
         duration: 3000,
       });
-      get().clientGetTable({ tableId: get().clientTable?.id ?? "" });
     },
   }),
 
