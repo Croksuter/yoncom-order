@@ -8,10 +8,23 @@ export type RealtimeHint = {
   eventId: string;
 };
 
-function websocketUrl(scope: string) {
-  const url = new URL("/api/realtime/socket", window.location.origin);
+export function realtimeWebSocketUrl(
+  scope: string,
+  origin: string,
+  endpoint = process.env.NEXT_PUBLIC_REALTIME_SOCKET_URL,
+) {
+  const configuredEndpoint = endpoint?.trim();
+  if (!configuredEndpoint) {
+    return null;
+  }
+
+  const url = new URL(configuredEndpoint, origin);
   url.searchParams.set("scope", scope);
-  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  if (url.protocol === "https:") {
+    url.protocol = "wss:";
+  } else if (url.protocol === "http:") {
+    url.protocol = "ws:";
+  }
   return url.toString();
 }
 
@@ -20,10 +33,16 @@ export function useRealtimeSync(scope: string | null, onHint: (hint: RealtimeHin
     if (!scope || typeof window === "undefined") return;
 
     let closed = false;
+    const socketUrl = realtimeWebSocketUrl(scope, window.location.origin);
     let socket: WebSocket | null = null;
 
     const connect = () => {
-      socket = new WebSocket(websocketUrl(scope));
+      if (!socketUrl) {
+        traceEvent("client", "realtime.socket.disabled", { scope });
+        return;
+      }
+
+      socket = new WebSocket(socketUrl);
       traceEvent("client", "realtime.socket.opening", { scope });
       socket.onopen = () => {
         traceEvent("client", "realtime.socket.open", { scope });
@@ -45,6 +64,9 @@ export function useRealtimeSync(scope: string | null, onHint: (hint: RealtimeHin
         if (!closed) {
           window.setTimeout(connect, 1000);
         }
+      };
+      socket.onerror = () => {
+        traceEvent("client", "realtime.socket.error", { scope });
       };
     };
 
