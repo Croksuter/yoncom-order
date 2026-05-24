@@ -317,7 +317,29 @@ export async function createTableContext(tableId: string) {
   };
 
   await insertD1Row(contextTable, context);
+  await mirrorLegacyTableContext(contextTable, context);
   return context;
+}
+
+async function mirrorLegacyTableContext(contextTable: string, context: TableContextRow) {
+  if (contextTable !== "tableContexts" || !(await hasD1Table("tableContext"))) {
+    return;
+  }
+
+  await insertD1Row("tableContext", context);
+}
+
+async function updateLegacyTableContextMirror(
+  contextTable: string,
+  values: Record<string, unknown>,
+  whereSql: string,
+  params: unknown[],
+) {
+  if (contextTable !== "tableContexts" || !(await hasD1Table("tableContext"))) {
+    return;
+  }
+
+  await updateD1Rows("tableContext", values, whereSql, params);
 }
 
 async function paymentUsesOrderIdColumn() {
@@ -1082,6 +1104,15 @@ export async function confirmBankTransaction(bankTransactionId: string, paymentI
     return { error: "Bank Transaction Not Found", status: 404 };
   }
 
+  const payment = (await queryD1<PaymentRow>(
+    "SELECT * FROM payments WHERE id = ? AND deletedAt IS NULL LIMIT 1",
+    [paymentId],
+  ))[0];
+
+  if (!payment) {
+    return { error: "Payment Not Found", status: 404 };
+  }
+
   await markPaymentPaidById(paymentId, {
     bank: transaction.source,
     depositor: transaction.depositor,
@@ -1400,7 +1431,10 @@ export async function vacateAdminTable(tableId: string): Promise<MutationResult>
   }
 
   const contextTable = await getTableContextTableName();
-  await updateD1Rows(contextTable, { deletedAt: now(), updatedAt: now() }, "id = ?", [activeContext.id]);
+  const timestamp = now();
+  const values = { deletedAt: timestamp, updatedAt: timestamp };
+  await updateD1Rows(contextTable, values, "id = ?", [activeContext.id]);
+  await updateLegacyTableContextMirror(contextTable, values, "id = ?", [activeContext.id]);
   await revokeTableSessions(tableId, activeContext.id);
   return await withDomainEvent(
     { result: "Table vacated", status: 200 },

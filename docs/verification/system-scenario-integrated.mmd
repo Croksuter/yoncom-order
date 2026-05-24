@@ -1,0 +1,171 @@
+%% Yoncom Order integrated system scenario map
+%% Source run: artifacts/system-scenario-verification/2026-05-24T09-12-56-328Z.json
+%% Status: S1-S5 passed; browser:browser checked auth, POS, cooker, customer table, menu modal, and cart.
+
+flowchart TD
+  Start["전체 검증 시작<br/>browser:browser + API + D1"]
+  Result["전체 결과: PASSED<br/>S1-S5, 19 gates"]
+  Report["증거 파일<br/>system-scenario-verification/2026-05-24T09-12-56-328Z.json"]
+  Ledger["진행 기록<br/>system-scenario-verification/2026-05-24T09-12-56-328Z.md"]
+
+  Start --> BrowserSurface
+  Start --> ApiDbSurface
+  BrowserSurface --> BrowserEvidence
+  ApiDbSurface --> S1Start
+  S5End --> Result
+  BrowserEvidence --> Result
+  Result --> Report
+  Result --> Ledger
+
+  subgraph BrowserFlow["실제 화면 조작 경로"]
+    BrowserSurface["Codex in-app Browser"]
+    AuthScreen["/auth<br/>Email, Password, Sign In"]
+    PosScreen["/admin/pos<br/>주문 현황, 테이블 현황, 입금 확인 필요"]
+    CookerScreen["/admin/cooker<br/>메뉴 모니터링, 준비 완료 버튼"]
+    ClientScreen["/client/table/vjk7oco010xxxxx<br/>S5 Live jk7oco 고객 화면"]
+    MenuModal["메뉴 추가 모달<br/>참기름 비빔밥, 수량 선택"]
+    CartModal["장바구니 모달<br/>최종 결제 금액, 주문 완료하기"]
+    BrowserEvidence["브라우저 증거<br/>화면 렌더 OK<br/>realtime.socket.disabled OK<br/>/api/realtime/socket 404 없음"]
+
+    BrowserSurface --> AuthScreen --> PosScreen
+    PosScreen --> CookerScreen
+    CookerScreen --> ClientScreen
+    ClientScreen --> MenuModal --> CartModal --> BrowserEvidence
+  end
+
+  subgraph AccessMap["접근 경로 및 런타임 표면"]
+    CustomerQr["고객 QR<br/>/client/table/:tableId"]
+    TableSessionApi["POST /api/table/session<br/>yoncom_table_session + yoncom_csrf"]
+    TableSyncApi["GET /api/sync/table<br/>table scope revision sync"]
+    MenuApi["GET /api/menu<br/>메뉴 조회"]
+    OrderApi["POST/DELETE /api/order<br/>주문 생성/자가 취소"]
+    AdminAuth["관리자 로그인<br/>/auth"]
+    AdminPos["POS<br/>/admin/pos"]
+    AdminCooker["주방<br/>/admin/cooker"]
+    AdminSync["GET /api/sync/admin<br/>venue scope sync"]
+    DepositApi["/api/admin/deposit<br/>입금 인제스트/조회"]
+    KitchenApi["/api/admin/order/complete<br/>/api/admin/order/pick-up"]
+    VacateApi["/api/admin/table/vacate<br/>테이블 퇴장"]
+
+    CustomerQr --> TableSessionApi --> TableSyncApi
+    TableSessionApi --> MenuApi --> OrderApi
+    AdminAuth --> AdminPos --> AdminSync
+    AdminPos --> DepositApi
+    AdminPos --> VacateApi
+    AdminPos --> AdminCooker --> KitchenApi
+  end
+
+  subgraph Scenario1["S1 Happy Path: 주문, 자동 입금 매칭, 조리, 수령, 퇴장"]
+    S1Start["테이블 세션 발급<br/>expiresAt 12시간 검증"]
+    S1Order["고객 주문 생성<br/>재고 차감, 결제 생성"]
+    S1Lease["paymentCodeLeases 점유<br/>1-99원 감액 코드 중복 방지"]
+    S1Deposit["정확 입금액 인제스트<br/>AUTO_MATCHED"]
+    S1Paid["payments.status PAID<br/>matchedBy AUTO_MATCHED<br/>lease release"]
+    S1Ready["주방 준비 완료<br/>menuOrder.ready event"]
+    S1Pickup["수령 처리<br/>PICKED_UP"]
+    S1Vacate["테이블 비우기<br/>context soft delete + session revoke"]
+    S1RejectOld["기존 table session sync<br/>403 Invalid table session"]
+
+    S1Start --> S1Order --> S1Lease --> S1Deposit --> S1Paid --> S1Ready --> S1Pickup --> S1Vacate --> S1RejectOld
+  end
+
+  subgraph Scenario2["S2 Concurrency and Idempotency"]
+    S2Stock["메뉴 재고 1개 fixture"]
+    S2Race["테이블 A/B 동시 주문"]
+    S2OneSuccess["정확히 1건 성공"]
+    S2OneConflict["정확히 1건 409 Menu Not Enough"]
+    S2NoNegative["menus.quantity 0<br/>음수 재고 없음"]
+    S2Retry["동일 clientOrderId 재시도"]
+    S2SameOrder["기존 orderId 반환<br/>중복 주문/재고 차감 없음"]
+
+    S2Stock --> S2Race
+    S2Race --> S2OneSuccess --> S2NoNegative
+    S2Race --> S2OneConflict --> S2NoNegative
+    S2NoNegative --> S2Retry --> S2SameOrder
+  end
+
+  subgraph Scenario3["S3 Bank Exception and Manual Matching"]
+    S3Duplicate["동명이인/동일 금액<br/>14995원 후보 2건"]
+    S3NeedsReview["NEEDS_REVIEW 격리<br/>오자동 PAID 없음"]
+    S3Original["원금 입금<br/>10000원 ORIGINAL_AMOUNT"]
+    S3Within["근접 입금<br/>9995원 WITHIN_100"]
+    S3Candidates["GET /api/admin/deposit<br/>추천 후보 노출"]
+    S3Confirm["PUT /api/admin/deposit/confirm"]
+    S3ManualPaid["payment PAID<br/>matchedBy MANUAL_REVIEW<br/>bankTransaction matchedPaymentId 연결"]
+
+    S3Duplicate --> S3NeedsReview
+    S3Original --> S3Candidates
+    S3Within --> S3Candidates
+    S3NeedsReview --> S3Confirm
+    S3Candidates --> S3Confirm --> S3ManualPaid
+  end
+
+  subgraph Scenario4["S4 Security and Attack Prevention"]
+    S4NoSession["쿠키 없이 주문 생성 시도"]
+    S4NoSessionBlocked["401 Table session required"]
+    S4CrossTable["A 세션으로 B 주문 취소"]
+    S4CrossBlocked["403 Invalid table session"]
+    S4NoCsrf["CSRF header 누락"]
+    S4CsrfBlocked["403 CSRF token required"]
+    S4LargeBody["32KB 초과 JSON"]
+    S4LargeBlocked["413 Request body too large"]
+    S4AdminByTable["table session only admin API"]
+    S4AdminUnauth["401 Unauthorized"]
+    S4NonAdmin["non-admin yoncom_session admin API"]
+    S4AdminForbidden["403 Forbidden"]
+
+    S4NoSession --> S4NoSessionBlocked
+    S4CrossTable --> S4CrossBlocked
+    S4NoCsrf --> S4CsrfBlocked
+    S4LargeBody --> S4LargeBlocked
+    S4AdminByTable --> S4AdminUnauth
+    S4NonAdmin --> S4AdminForbidden
+  end
+
+  subgraph Scenario5["S5 Sync and Resiliency"]
+    S5Initial["afterRevision=0"]
+    S5Snapshot["snapshot.table 반환"]
+    S5Baseline["known revision baseline 생성"]
+    S5Ready["오프라인 중 menuOrder.ready 발생"]
+    S5Incremental["afterRevision=baseline"]
+    S5Ordered["events revision 오름차순<br/>snapshot 없음"]
+    S5GapEvent["인위적 revision gap<br/>afterRevision=1, current=6"]
+    S5GapSnapshot["gap=true + hard snapshot"]
+    S5OtherSession["타 테이블 세션 sync"]
+    S5LeakBlocked["403 Invalid table session<br/>타 테이블 데이터 유출 없음"]
+    S5End["S5 완료"]
+
+    S5Initial --> S5Snapshot --> S5Baseline --> S5Ready --> S5Incremental --> S5Ordered
+    S5Ordered --> S5GapEvent --> S5GapSnapshot
+    S5GapSnapshot --> S5OtherSession --> S5LeakBlocked --> S5End
+  end
+
+  subgraph Fixes["진행 중 발견 및 해결"]
+    FixEmfile["plain pnpm dev<br/>Watchpack EMFILE로 route 404"]
+    FixPolling["WATCHPACK_POLLING=true<br/>dev script 반영"]
+    FixContextFk["live D1: orders FK는 legacy tableContext<br/>tableContexts/tableContext mirror 추가"]
+    FixPayment404["수동 매칭 paymentId 없음<br/>500 대신 404 Payment Not Found"]
+    NoteAdminAuth["계약 차이<br/>table-session-only admin은 401<br/>authenticated non-admin은 403"]
+
+    FixEmfile --> FixPolling
+    FixContextFk --> S1Start
+    FixPayment404 --> S3Confirm
+    NoteAdminAuth --> S4AdminUnauth
+  end
+
+  S1RejectOld --> S2Stock
+  S2SameOrder --> S3Duplicate
+  S3ManualPaid --> S4NoSession
+  S4AdminForbidden --> S5Initial
+
+  ApiDbSurface["API + D1 검증 러너<br/>scripts/verify-system-scenarios.mjs"]
+
+  classDef passed fill:#e8f5e9,stroke:#2e7d32,color:#102a12;
+  classDef blocked fill:#fff8e1,stroke:#f9a825,color:#3d2d00;
+  classDef fixed fill:#e3f2fd,stroke:#1565c0,color:#08233f;
+  classDef surface fill:#f5f5f5,stroke:#616161,color:#111111;
+
+  class Result,S1RejectOld,S2SameOrder,S3ManualPaid,S4NoSessionBlocked,S4CrossBlocked,S4CsrfBlocked,S4LargeBlocked,S4AdminUnauth,S4AdminForbidden,S5End,BrowserEvidence passed;
+  class FixEmfile,NoteAdminAuth blocked;
+  class FixPolling,FixContextFk,FixPayment404 fixed;
+  class Start,BrowserSurface,ApiDbSurface,Report,Ledger surface;
