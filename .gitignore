@@ -1,6 +1,7 @@
 node_modules
 .next
 apps/*/.next
+apps/*/.data
 .playwright-mcp
 artifacts
 .DS_Store
