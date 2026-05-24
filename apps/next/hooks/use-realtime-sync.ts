@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { traceEvent } from "~/lib/verification-trace";
 
 export type RealtimeHint = {
   type: string;
@@ -23,20 +24,34 @@ export function useRealtimeSync(scope: string | null, onHint: (hint: RealtimeHin
 
     const connect = () => {
       socket = new WebSocket(websocketUrl(scope));
+      traceEvent("client", "realtime.socket.opening", { scope });
+      socket.onopen = () => {
+        traceEvent("client", "realtime.socket.open", { scope });
+      };
       socket.onmessage = (event) => {
         const hint = JSON.parse(String(event.data)) as RealtimeHint;
+        traceEvent("client", "realtime.socket.message", {
+          scope: hint.scope,
+          revision: hint.revision,
+          eventId: hint.eventId,
+          type: hint.type,
+        });
         if (hint.scope === scope) {
           onHint(hint);
         }
       };
       socket.onclose = () => {
+        traceEvent("client", "realtime.socket.close", { scope, reconnect: !closed });
         if (!closed) {
           window.setTimeout(connect, 1000);
         }
       };
     };
 
-    const onFocus = () => onHint(null);
+    const onFocus = () => {
+      traceEvent("client", "realtime.focus.resync", { scope });
+      onHint(null);
+    };
     window.addEventListener("focus", onFocus);
     connect();
 

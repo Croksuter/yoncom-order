@@ -1,10 +1,39 @@
+"use client"
+
 import * as React from "react"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { X } from "lucide-react"
 
 import { cn } from "~/lib/utils"
+import { traceEvent } from "~/lib/verification-trace"
 
-const Dialog = DialogPrimitive.Root
+type DialogProps = React.ComponentPropsWithoutRef<typeof DialogPrimitive.Root> & {
+  debugName?: string;
+}
+
+const Dialog = ({ debugName = "dialog", open, onOpenChange, ...props }: DialogProps) => {
+  const previousOpen = React.useRef(open);
+
+  React.useEffect(() => {
+    if (open === undefined || previousOpen.current === open) return;
+    traceEvent("client", "ui.dialog.state", {
+      debugName,
+      from: previousOpen.current ?? null,
+      to: open,
+    });
+    previousOpen.current = open;
+  }, [debugName, open]);
+
+  const handleOpenChange = React.useCallback((nextOpen: boolean) => {
+    traceEvent("client", "ui.dialog.request", {
+      debugName,
+      to: nextOpen,
+    });
+    onOpenChange?.(nextOpen);
+  }, [debugName, onOpenChange]);
+
+  return <DialogPrimitive.Root open={open} onOpenChange={handleOpenChange} {...props} />;
+}
 
 const DialogTrigger = DialogPrimitive.Trigger
 
@@ -145,4 +174,3 @@ export {
   DialogTitle,
   DialogDescription,
 }
-

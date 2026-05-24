@@ -61,10 +61,13 @@ Replace polling-based POS, kitchen, and customer-table synchronization with a ha
 - Passed: `rtk pnpm typecheck`.
 - Passed: `rtk pnpm test` with 32 tests.
 - Passed: `rtk pnpm build`.
+- Passed: `rtk pnpm verify:realtime`; wrote a gitignored structured artifact under `artifacts/realtime-verification/`.
 - Passed: `git diff --check`.
 - Browser smoke:
-  - `/auth` rendered.
-  - `/admin` redirected to `/auth` when unauthenticated, but direct admin layout paths can fail in this local DB because `sessions` migration is not applied.
+  - Codex in-app Browser (`browser:browser`) connected and opened `http://localhost:3000/auth`.
+  - `next dev` browser smoke was blocked by local Watchpack `EMFILE` and returned `/auth` 404.
+  - `next start` browser smoke produced `[yoncom-trace]` server logs, but `/auth` stayed in loading because local D1 lacks `sessions`.
+  - `/admin` can fail in this local DB because `sessions` migration is not applied.
   - `/client/table/table_e2e_00001` rendered shell, then `/api/table/session` failed because local D1 lacks `tableContexts`.
 
 ## Next Owner

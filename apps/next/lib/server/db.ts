@@ -3,6 +3,7 @@ import { drizzle } from "drizzle-orm/d1";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import * as schema from "db/schema";
+import { summarizeSql, traceDurationMs, traceEvent } from "~/lib/verification-trace";
 
 type D1ApiRow = Record<string, unknown>;
 
@@ -99,6 +100,17 @@ class D1HttpDatabase {
   async queryBatch<T = D1ApiRow>(
     statements: Array<{ sql: string; params: unknown[] }>,
   ): Promise<Array<D1ApiQueryResult<T>>> {
+    const startedAt = Date.now();
+    const batchId = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+    traceEvent("server", "d1.query.start", {
+      batchId,
+      statementCount: statements.length,
+      statements: statements.map((statement) => ({
+        sql: summarizeSql(statement.sql),
+        paramCount: statement.params.length,
+      })),
+    });
+
     const response = await fetch(this.endpoint, {
       method: "POST",
       headers: {
@@ -118,9 +130,23 @@ class D1HttpDatabase {
         failed?.error ??
         payload?.errors?.map((error) => error.message).join(", ") ??
         `D1 query failed with ${response.status}`;
+      traceEvent("server", "d1.query.error", {
+        batchId,
+        status: response.status,
+        durationMs: traceDurationMs(startedAt),
+        message,
+      });
       throw new Error(message);
     }
 
+    traceEvent("server", "d1.query.end", {
+      batchId,
+      status: response.status,
+      durationMs: traceDurationMs(startedAt),
+      statementCount: statements.length,
+      resultCount: results.length,
+      meta: results.map((result) => result.meta ?? {}),
+    });
     return results;
   }
 }

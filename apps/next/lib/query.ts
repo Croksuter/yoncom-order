@@ -1,6 +1,13 @@
 import ky, { type SearchParamsOption } from "ky";
 import kyErrorHandler from "~/lib/ky-error-handler";
 import { useLoadingStore } from "~/stores/loading.store";
+import {
+  getTraceHeaderName,
+  newTraceId,
+  summarizePath,
+  traceDurationMs,
+  traceEvent,
+} from "~/lib/verification-trace";
 
 const API_BASE_PATH = "api";
 const csrfCookieName = "yoncom_csrf";
@@ -17,6 +24,52 @@ export const api = ky.create({
   prefixUrl: getApiPrefixUrl(),
   credentials: "include",
   retry: 0,
+  hooks: {
+    beforeRequest: [
+      (request) => {
+        const traceHeader = getTraceHeaderName();
+        if (!request.headers.has(traceHeader)) {
+          request.headers.set(traceHeader, newTraceId("http"));
+        }
+        request.headers.set("x-yoncom-request-started-at", String(Date.now()));
+        traceEvent("client", "http.request", {
+          traceId: request.headers.get(traceHeader),
+          method: request.method,
+          path: summarizePath(request.url),
+          hasIdempotencyKey: request.headers.has("idempotency-key"),
+          hasCsrfToken: request.headers.has("x-csrf-token"),
+        });
+      },
+    ],
+    afterResponse: [
+      (request, _options, response) => {
+        const startedAt = Number(request.headers.get("x-yoncom-request-started-at") ?? Date.now());
+        traceEvent("client", "http.response", {
+          traceId: request.headers.get(getTraceHeaderName()),
+          method: request.method,
+          path: summarizePath(request.url),
+          status: response.status,
+          durationMs: traceDurationMs(startedAt),
+        });
+        return response;
+      },
+    ],
+    beforeError: [
+      (error) => {
+        const request = error.request;
+        const response = error.response;
+        const startedAt = Number(request?.headers.get("x-yoncom-request-started-at") ?? Date.now());
+        traceEvent("client", "http.error", {
+          traceId: request?.headers.get(getTraceHeaderName()),
+          method: request?.method,
+          path: request ? summarizePath(request.url) : undefined,
+          status: response?.status,
+          durationMs: traceDurationMs(startedAt),
+        });
+        return error;
+      },
+    ],
+  },
 });
 
 function getCookie(name: string) {
@@ -38,6 +91,10 @@ export function mutationHeaders(headers: HeadersInit) {
 
   if (!nextHeaders.has("idempotency-key")) {
     nextHeaders.set("idempotency-key", crypto.randomUUID());
+  }
+
+  if (!nextHeaders.has(getTraceHeaderName())) {
+    nextHeaders.set(getTraceHeaderName(), newTraceId("mutation"));
   }
 
   return nextHeaders;
@@ -65,6 +122,14 @@ export default async function queryStore<Query, Result>({
   const isQuery = method === "get" || method === "head";
   const { startQuery, endQuery, startMutation, endMutation } = useLoadingStore.getState();
   const requestHeaders = isQuery ? headers : mutationHeaders(headers);
+  const startedAt = Date.now();
+
+  traceEvent("client", "store.request.start", {
+    route,
+    method,
+    mode: isQuery ? "query" : "mutation",
+    traceId: new Headers(requestHeaders).get(getTraceHeaderName()),
+  });
 
   if (isQuery) {
     startQuery();
@@ -83,11 +148,23 @@ export default async function queryStore<Query, Result>({
 
     onSuccess?.(res);
     setter?.({ isLoaded: true, error: false });
+    traceEvent("client", "store.request.success", {
+      route,
+      method,
+      mode: isQuery ? "query" : "mutation",
+      durationMs: traceDurationMs(startedAt),
+    });
     return res;
   } catch (error) {
     void kyErrorHandler(error);
     onError?.(error);
     setter?.({ isLoaded: false, error: true });
+    traceEvent("client", "store.request.error", {
+      route,
+      method,
+      mode: isQuery ? "query" : "mutation",
+      durationMs: traceDurationMs(startedAt),
+    });
     return null;
   } finally {
     if (isQuery) {

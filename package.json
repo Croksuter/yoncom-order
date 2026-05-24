@@ -13,6 +13,7 @@
     "typecheck:next": "pnpm --filter web-next typecheck",
     "test": "pnpm --filter web-next test",
     "test:next": "pnpm --filter web-next test",
+    "verify:realtime": "node scripts/verify-realtime-pipeline.mjs",
     "db:generate": "cd packages/db && pnpm db:generate",
     "db:migrate": "cd packages/db && pnpm db:migrate"
   },

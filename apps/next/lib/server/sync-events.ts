@@ -1,6 +1,7 @@
 import { generateId } from "lucia";
 import { executeD1, queryD1 } from "~/lib/server/db";
 import { notifyRealtime } from "~/lib/server/realtime-notify";
+import { traceEvent } from "~/lib/verification-trace";
 
 export const venueScope = "venue:default";
 
@@ -38,6 +39,13 @@ export async function appendDomainEvent({
   const events: DomainEventRecord[] = [];
   const createdAt = Date.now();
   const uniqueScopes = [...new Set(scopes)];
+  traceEvent("server", "domain.event.append.start", {
+    type,
+    scopes: uniqueScopes,
+    entityType,
+    entityId,
+    mutationId,
+  });
 
   for (const scope of uniqueScopes) {
     const [revisionRow] = await queryD1<{ revision: number }>(
@@ -77,9 +85,21 @@ export async function appendDomainEvent({
       ],
     );
     events.push(event);
+    traceEvent("server", "domain.event.appended", {
+      eventId: event.id,
+      type: event.type,
+      scope: event.scope,
+      revision: event.revision,
+      mutationId: event.mutationId,
+    });
   }
 
   await notifyRealtime(events);
+  traceEvent("server", "domain.event.append.end", {
+    type,
+    eventIds: events.map((event) => event.id),
+    revisions: events.map((event) => ({ scope: event.scope, revision: event.revision })),
+  });
   return events;
 }
 

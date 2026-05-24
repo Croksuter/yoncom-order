@@ -1,0 +1,278 @@
+{
+  "id": "yoncom-order-realtime-verification-pipeline",
+  "version": 1,
+  "updatedAt": "2026-05-24",
+  "scope": {
+    "include": [
+      "API request/response ordering",
+      "D1 query and batch ordering",
+      "domain event and realtime notification ordering",
+      "client store request state",
+      "modal open/close state",
+      "panel state changes",
+      "auth/authz redirects",
+      "malicious request blocking",
+      "DB migration and permission readiness",
+      "POS/Kitchen/client table workflows"
+    ],
+    "exclude": [
+      "visual pixel/UI breakage assertions",
+      "screenshot-based layout approval",
+      "marketing/landing page quality"
+    ]
+  },
+  "toolPolicy": {
+    "browserWorkflowTool": "browser:browser",
+    "browserSkillPath": "/Users/choehoyeong/.codex/plugins/cache/openai-bundled/browser/26.519.41501/skills/browser/SKILL.md",
+    "mustUseCodexInAppBrowser": true,
+    "standalonePlaywrightAllowed": false,
+    "note": "Browser workflow verification must use Codex in-app Browser via browser:browser. Standalone Playwright MCP, Playwright CLI, and @playwright/test are not accepted for the browser workflow surface. The Browser plugin may internally expose tab.playwright after browser-client setup; that is still browser:browser."
+  },
+  "traceLogContract": {
+    "prefix": "[yoncom-trace]",
+    "format": "single-line JSON after prefix",
+    "timestamps": ["ts", "clockMs"],
+    "enabledBy": ["development mode", "YONCOM_TRACE=1", "NEXT_PUBLIC_YONCOM_TRACE=1"],
+    "redactionRules": [
+      "do not log raw request bodies",
+      "do not log secrets, tokens, cookies, or payment account values",
+      "log request body byte length and query/body keys only",
+      "log SQL summary and param count only, not raw params"
+    ],
+    "requiredEventFamilies": [
+      "client:http.request",
+      "client:http.response",
+      "client:http.error",
+      "client:store.request.start",
+      "client:store.request.success",
+      "client:store.request.error",
+      "client:ui.dialog.state",
+      "client:ui.dialog.request",
+      "client:ui.panel.state",
+      "client:realtime.socket.open",
+      "client:realtime.socket.message",
+      "server:api.guard.start",
+      "server:api.guard.pass",
+      "server:api.guard.block",
+      "server:api.request.search",
+      "server:api.request.json",
+      "server:api.response.ok",
+      "server:api.response.mutation",
+      "server:api.response.fail",
+      "server:d1.query.start",
+      "server:d1.query.end",
+      "server:d1.query.error",
+      "server:domain.event.append.start",
+      "server:domain.event.appended",
+      "server:realtime.notify.start",
+      "server:realtime.notify.end",
+      "worker:realtime.notify.received",
+      "worker:realtime.broadcast"
+    ]
+  },
+  "commandPipeline": [
+    {
+      "id": "static-diff-cleanliness",
+      "command": "git diff --check",
+      "successCriteria": "exitCode == 0"
+    },
+    {
+      "id": "typecheck",
+      "command": "rtk pnpm typecheck",
+      "successCriteria": "exitCode == 0"
+    },
+    {
+      "id": "unit-integration",
+      "command": "rtk pnpm test",
+      "successCriteria": "exitCode == 0 and all tests pass"
+    },
+    {
+      "id": "production-build",
+      "command": "rtk pnpm build",
+      "successCriteria": "exitCode == 0"
+    },
+    {
+      "id": "structured-runner",
+      "command": "rtk pnpm verify:realtime",
+      "successCriteria": "exitCode == 0 and artifact JSON written under artifacts/realtime-verification"
+    }
+  ],
+  "databaseReadiness": {
+    "requiredTables": [
+      "users",
+      "sessions",
+      "tables",
+      "tableContexts",
+      "orders",
+      "menuOrders",
+      "payments",
+      "bankTransactions",
+      "tableSessions",
+      "mutationRequests",
+      "scopeRevisions",
+      "domainEvents"
+    ],
+    "requiredIndexesOrConstraints": [
+      "domainEvents(scope, revision)",
+      "scopeRevisions(scope)",
+      "tableSessions(tableId, tableContextId, expiresAt)",
+      "mutationRequests(idempotencyKey)"
+    ],
+    "permissionChecks": [
+      "D1 token can SELECT sqlite_master",
+      "D1 token can SELECT required read tables",
+      "D1 token can INSERT/UPDATE/DELETE sessions for auth lifecycle",
+      "D1 token can INSERT tableSessions for customer table session",
+      "D1 token can INSERT scopeRevisions/domainEvents in the same mutation phase",
+      "D1 token can execute Cloudflare D1 batch payloads"
+    ]
+  },
+  "endpointMatrix": [
+    { "path": "/api", "methods": ["GET"], "surface": "health/index", "auth": "public" },
+    { "path": "/api/auth/session", "methods": ["GET"], "surface": "auth", "auth": "cookie optional" },
+    { "path": "/api/auth/sign-in", "methods": ["POST"], "surface": "auth", "auth": "same-origin json" },
+    { "path": "/api/auth/sign-up", "methods": ["POST"], "surface": "auth", "auth": "same-origin json" },
+    { "path": "/api/auth/sign-out", "methods": ["POST"], "surface": "auth", "auth": "admin csrf" },
+    { "path": "/api/menu", "methods": ["GET"], "surface": "client read", "auth": "public" },
+    { "path": "/api/table/session", "methods": ["POST"], "surface": "client session", "auth": "same-origin json" },
+    { "path": "/api/table", "methods": ["GET"], "surface": "client read", "auth": "table session" },
+    { "path": "/api/order", "methods": ["POST", "DELETE"], "surface": "client mutation", "auth": "table session csrf idempotency" },
+    { "path": "/api/order/:tableId", "methods": ["GET"], "surface": "client read", "auth": "table session" },
+    { "path": "/api/order/:tableId/:orderId", "methods": ["GET"], "surface": "client read", "auth": "table session" },
+    { "path": "/api/sync/admin", "methods": ["GET"], "surface": "sync", "auth": "admin" },
+    { "path": "/api/sync/table", "methods": ["GET"], "surface": "sync", "auth": "table session" },
+    { "path": "/api/admin/table", "methods": ["GET", "POST", "PUT", "DELETE"], "surface": "POS", "auth": "admin csrf idempotency for unsafe" },
+    { "path": "/api/admin/table/occupy", "methods": ["PUT"], "surface": "POS", "auth": "admin csrf idempotency" },
+    { "path": "/api/admin/table/vacate", "methods": ["PUT"], "surface": "POS", "auth": "admin csrf idempotency" },
+    { "path": "/api/admin/order", "methods": ["PUT", "DELETE"], "surface": "POS", "auth": "admin csrf idempotency" },
+    { "path": "/api/admin/order/cancel", "methods": ["PUT"], "surface": "POS", "auth": "admin csrf idempotency" },
+    { "path": "/api/admin/order/complete", "methods": ["PUT"], "surface": "Kitchen", "auth": "admin csrf idempotency" },
+    { "path": "/api/admin/order/pick-up", "methods": ["PUT"], "surface": "POS", "auth": "admin csrf idempotency" },
+    { "path": "/api/admin/order/refund", "methods": ["PUT"], "surface": "POS", "auth": "admin csrf idempotency" },
+    { "path": "/api/admin/deposit", "methods": ["GET", "POST"], "surface": "payment", "auth": "admin csrf idempotency for POST" },
+    { "path": "/api/admin/deposit/confirm", "methods": ["PUT"], "surface": "payment", "auth": "admin csrf idempotency" },
+    { "path": "/api/admin/deposit/ignore", "methods": ["PUT"], "surface": "payment", "auth": "admin csrf idempotency" },
+    { "path": "/api/admin/menu", "methods": ["GET", "POST", "PUT", "DELETE"], "surface": "inventory", "auth": "admin csrf idempotency for unsafe" },
+    { "path": "/api/admin/menu/:menuId", "methods": ["GET"], "surface": "inventory", "auth": "admin" },
+    { "path": "/api/admin/menuCategory", "methods": ["POST", "PUT", "DELETE"], "surface": "inventory", "auth": "admin csrf idempotency" },
+    { "path": "/api/admin/image", "methods": ["PUT"], "surface": "inventory", "auth": "admin csrf idempotency" },
+    { "path": "/api/admin/payout", "methods": ["GET"], "surface": "optional", "auth": "admin" }
+  ],
+  "workflowSequences": [
+    {
+      "id": "smoke-and-redirect",
+      "steps": [
+        "start dev server with trace env",
+        "open /auth with browser:browser",
+        "open /admin and assert unauthenticated redirect to /auth",
+        "assert logs include client http request/response for /api/auth/session"
+      ],
+      "successCriteria": [
+        "no uncaught client error except missing local DB when fixture absent",
+        "redirect order is /admin -> /auth",
+        "trace timestamps are monotonic per traceId"
+      ]
+    },
+    {
+      "id": "signup-auth-authorization",
+      "steps": [
+        "POST /api/auth/sign-up with same-origin JSON",
+        "POST /api/auth/sign-in with same-origin JSON",
+        "assert yoncom_session is opaque session id and yoncom_csrf exists",
+        "GET /api/auth/session",
+        "open /admin/pos with browser:browser",
+        "POST /api/auth/sign-out with CSRF"
+      ],
+      "successCriteria": [
+        "sessions row is inserted on sign-in",
+        "server guard logs pass for unsafe auth routes",
+        "admin pages redirect when session missing or non-admin",
+        "sessions row is deleted on sign-out"
+      ]
+    },
+    {
+      "id": "malicious-request-blocking",
+      "steps": [
+        "send unsafe mutation without Origin",
+        "send unsafe mutation with cross-origin Origin",
+        "send unsafe mutation without JSON content-type",
+        "send unsafe mutation without x-csrf-token",
+        "send unsafe mutation without Idempotency-Key",
+        "send customer table/order request with missing or wrong table session"
+      ],
+      "successCriteria": [
+        "blocked requests return 400/403/415 as designed",
+        "server api.guard.block logs contain reason",
+        "no domainEvents row is created",
+        "no realtime notify is emitted"
+      ]
+    },
+    {
+      "id": "client-order-payment-sync",
+      "steps": [
+        "issue table session",
+        "load client table snapshot through /api/sync/table?afterRevision=0",
+        "open cart/order modal and create order",
+        "assert modal transition log order",
+        "assert mutation response has mutationId, revision, affectedScopes",
+        "assert domainEvents rows exist for venue:default and table:{tableId}",
+        "simulate payment/deposit match",
+        "assert client receives websocket hint then calls sync/table"
+      ],
+      "successCriteria": [
+        "stock decrement and order/payment creation are atomic for successful mutation",
+        "failed mutation emits no domain event",
+        "client state order is modal request -> HTTP mutation -> domain event -> notify -> socket message -> sync response -> store success"
+      ]
+    },
+    {
+      "id": "pos-kitchen-order-lifecycle",
+      "steps": [
+        "admin occupies table",
+        "client creates paid order",
+        "Kitchen marks menuOrder READY",
+        "POS marks menuOrder PICKED_UP",
+        "admin vacates table",
+        "assert table sessions are revoked"
+      ],
+      "successCriteria": [
+        "READY only allowed from PENDING and paid active order",
+        "PICKED_UP only allowed from READY",
+        "vacate blocked while pending/ready/refund-pending exists",
+        "venue/table revisions are monotonic",
+        "POS/Kitchen/customer sync order converges"
+      ]
+    },
+    {
+      "id": "concurrency-atomicity",
+      "steps": [
+        "send duplicate create-order with same Idempotency-Key and same body",
+        "send same Idempotency-Key with different body",
+        "send concurrent stock-depleting orders",
+        "send concurrent cancel/pay or ready/pickup transitions",
+        "disconnect/reconnect realtime client and sync after stale revision"
+      ],
+      "successCriteria": [
+        "same key and same body replays same result after mutationRequests wiring is complete",
+        "same key and different body rejects",
+        "stock race has one winner when inventory insufficient",
+        "CAS status transitions return one success and one 409",
+        "stale sync returns snapshot on gap"
+      ]
+    }
+  ],
+  "browserSequenceRequirements": {
+    "setup": [
+      "Use browser:browser skill.",
+      "Initialize Codex in-app Browser through browser-client absolute path.",
+      "Select iab browser.",
+      "Name session with a realtime verification task name.",
+      "Use DOM snapshots and console logs; screenshots are optional evidence only and not UI breakage criteria."
+    ],
+    "requiredLogCollection": [
+      "tab.dev.logs({ levels: ['log', 'error', 'warn'], limit: 200 })",
+      "server terminal output with [yoncom-trace]",
+      "structured command artifact from pnpm verify:realtime"
+    ]
+  }
+}

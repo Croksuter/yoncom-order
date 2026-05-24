@@ -15,6 +15,7 @@ import { isPaymentInstructionOrder } from "~/lib/order-status";
 import { useRealtimeSync } from "~/hooks/use-realtime-sync";
 import { api } from "~/lib/query";
 import type * as ClientTableResponse from "shared/types/responses/client/table";
+import { traceEvent } from "~/lib/verification-trace";
 
 type ClientTablePageProps = {
   params: Promise<{ id: string }>;
@@ -54,6 +55,14 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
   const [isVerified, setIsVerified] = useState(false);
   const tableScope = isValidTableId ? `table:${id}` : null;
   const revisionRef = useRef(0);
+  const setTracedActiveTab = useCallback((tab: "menu" | "orders") => {
+    traceEvent("client", "ui.panel.state", {
+      panel: "client.table.activeTab",
+      from: activeTab,
+      to: tab,
+    });
+    setActiveTab(tab);
+  }, [activeTab]);
 
   const refreshClientTable = useCallback(async () => {
     if (isValidTableId) {
@@ -204,7 +213,7 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
               ) : (
                 <OrderHistoryPanel />
               )}
-              <Footer activeTab={activeTab} setActiveTab={setActiveTab} />
+              <Footer activeTab={activeTab} setActiveTab={setTracedActiveTab} />
             </div>
 
             {/* Locked Verification Modal */}

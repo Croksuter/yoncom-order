@@ -2,6 +2,7 @@ node_modules
 .next
 apps/*/.next
 .playwright-mcp
+artifacts
 .DS_Store
 .vscode
 packages/db/.env

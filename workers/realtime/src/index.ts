@@ -33,12 +33,14 @@ export class RealtimeHub implements DurableObject {
       }
       const authorized = await this.authorizeScope(request, scope);
       if (!authorized) {
+        trace("worker", "realtime.socket.reject", { scope });
         return new Response("Forbidden", { status: 403 });
       }
 
       const pair = new WebSocketPair();
       const [client, server] = Object.values(pair);
       this.accept(server, request, scope);
+      trace("worker", "realtime.socket.accept", { scope });
       return new Response(null, { status: 101, webSocket: client });
     }
 
@@ -49,6 +51,7 @@ export class RealtimeHub implements DurableObject {
       }
 
       const hint = await request.json<RealtimeHint>();
+      trace("worker", "realtime.notify.received", hint);
       this.broadcast(hint);
       return Response.json({ result: "ok" });
     }
@@ -76,20 +79,24 @@ export class RealtimeHub implements DurableObject {
     }
 
     if (message.type === "ping") {
+      trace("worker", "realtime.client.ping", {});
       socket.send(JSON.stringify({ type: "pong" }));
       return;
     }
 
     if (message.type === "ack") {
+      trace("worker", "realtime.client.ack", { scope: message.scope ?? null });
       return;
     }
 
     if (message.type === "subscribe" && message.scope) {
       if (!(await this.authorizeScope(request, message.scope))) {
+        trace("worker", "realtime.subscribe.reject", { scope: message.scope });
         socket.close(1008, "Forbidden scope");
         return;
       }
       this.sessions.get(socket)?.add(message.scope);
+      trace("worker", "realtime.subscribe.accept", { scope: message.scope });
       return;
     }
 
@@ -127,14 +134,17 @@ export class RealtimeHub implements DurableObject {
   }
 
   private broadcast(hint: RealtimeHint) {
+    let delivered = 0;
     for (const [socket, scopes] of this.sessions.entries()) {
       if (!scopes.has(hint.scope)) continue;
       try {
         socket.send(JSON.stringify(hint));
+        delivered += 1;
       } catch {
         this.sessions.delete(socket);
       }
     }
+    trace("worker", "realtime.broadcast", { ...hint, delivered });
   }
 }
 
@@ -152,4 +162,14 @@ function cookie(request: Request, name: string) {
     .map((part) => part.trim())
     .find((part) => part.startsWith(`${name}=`))
     ?.slice(name.length + 1) ?? null;
+}
+
+function trace(layer: "worker", event: string, fields: Record<string, unknown>) {
+  console.log(`[yoncom-trace] ${JSON.stringify({
+    ts: new Date().toISOString(),
+    clockMs: Date.now(),
+    layer,
+    event,
+    ...fields,
+  })}`);
 }
