@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "~/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "~/components/ui/dialog";
+import { Dialog, BottomSheetContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
 import useCartStore, { CartState } from "~/stores/cart.store";
 import { MinusIcon, PlusIcon } from "lucide-react";
@@ -65,36 +65,80 @@ export default function OrderUpdateModal({
 
   return (
     <Dialog open={openState} onOpenChange={handleClose}>
-      <DialogContent className="fc justify-between w-[96%] h-[20rem] border-blue-500 border-2 rounded-xl">
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-bold">{menu.name}</DialogTitle>
-          <DialogDescription className="text-md">메뉴 수량을 조정할까요?</DialogDescription>
-        </DialogHeader>
-        <div className="fr justify-center items-center">
-          <Button 
-            onClick={() => quantity > 0 && setQuantity(quantity - 1)}
-            className="w-12 h-12 bg-blue-500 hover:bg-blue-600 text-white"
-          ><MinusIcon className="scale-150"/></Button>
-          <Input
-            type="number"
-            min={0}
-            max={menu.quantity}
-            value={quantity}
-            onChange={(e) => setQuantity(Number(e.target.value))}
-            className="text-center w-16 !text-2xl font-bold h-16 mx-4 input-no-spinner"
-          />
-          <Button 
-            onClick={() => quantity < menu.quantity && setQuantity(quantity + 1)}
-            className="w-12 h-12 bg-blue-500 hover:bg-blue-600 text-white"
-          ><PlusIcon className="scale-150"/></Button>
+      <BottomSheetContent className="fc justify-between max-h-[85vh]">
+        {/* Drag Handle */}
+        <div className="w-full flex justify-center pb-4">
+          <div className="w-12 h-1 bg-slate-200 dark:bg-slate-800 rounded-full"></div>
         </div>
-        <span className="text-sm text-center">주문 가능 수량: {menu.quantity}</span>
-        <DialogDescription className={`-mt-2 text-right ${invalid ? "dangerTXT" : "hidden"}`}>⚠︎ 올바른 수량을 입력하세요.</DialogDescription>
-        <DialogFooter className="fr *:flex-1 *:mx-2 *:h-14 *:rounded-2xl *:text-lg">
-          <Button variant="outline" onClick={handleClose} disabled={duringConfirm}>취소</Button>
-          <Button className="bg-blue-500 hover:bg-blue-600 text-white" onClick={handleConfirm} disabled={duringConfirm}>수정하기</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog >
+
+        {/* Header */}
+        <div className="space-y-1 text-center mb-6">
+          <DialogTitle className="text-2xl font-black text-slate-800 dark:text-slate-100">
+            {menu.name}
+          </DialogTitle>
+          <DialogDescription className="text-xs text-slate-400 font-medium">
+            수정할 메뉴 수량을 선택해 주세요.
+          </DialogDescription>
+        </div>
+
+        {/* Quantity pills counter */}
+        <div className="fc items-center justify-center space-y-3 mb-6 bg-slate-50 dark:bg-slate-950/40 p-4 rounded-2xl border border-slate-100/50 dark:border-slate-900/50">
+          <div className="text-xs text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">
+            수량 수정
+          </div>
+          <div className="flex items-center justify-between bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-full p-1.5 shadow-sm min-w-[150px]">
+            <Button
+              onClick={() => quantity > 0 && setQuantity(quantity - 1)}
+              className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 p-0 flex items-center justify-center cursor-pointer"
+              variant="ghost"
+              disabled={duringConfirm}
+            >
+              <MinusIcon className="h-4 w-4 stroke-[3px]" />
+            </Button>
+            <span className="text-lg font-black text-slate-800 dark:text-slate-100 w-10 text-center">
+              {quantity}
+            </span>
+            <Button
+              onClick={() => quantity < menu.quantity && setQuantity(quantity + 1)}
+              className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 p-0 flex items-center justify-center cursor-pointer"
+              variant="ghost"
+              disabled={quantity >= menu.quantity || duringConfirm}
+            >
+              <PlusIcon className="h-4 w-4 stroke-[3px]" />
+            </Button>
+          </div>
+
+          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold">
+            주문 가능 수량: <span className="text-slate-750 dark:text-slate-350">{menu.quantity}개</span>
+          </span>
+        </div>
+
+        {invalid && (
+          <p className="text-center text-xs text-destructive dark:text-rose-500 font-bold mb-4">
+            ⚠︎ 올바른 수량을 입력하세요.
+          </p>
+        )}
+
+        {/* Action Footer */}
+        <div className="flex gap-3">
+          <Button
+            variant="outline"
+            onClick={handleClose}
+            disabled={duringConfirm}
+            className="flex-1 py-4 h-auto rounded-xl border-slate-200 dark:border-slate-800 font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900 cursor-pointer"
+          >
+            취소
+          </Button>
+          <Button
+            onClick={handleConfirm}
+            disabled={duringConfirm}
+            className="flex-1 py-4 h-auto rounded-xl bg-primary hover:bg-brand-600 text-white font-extrabold text-sm shadow-[0_8px_20px_rgba(0,61,155,0.2)] hover:shadow-[0_12px_28px_rgba(0,61,155,0.3)] transition-all duration-300 active:scale-[0.98] cursor-pointer"
+          >
+            수정하기
+          </Button>
+        </div>
+      </BottomSheetContent>
+    </Dialog>
   );
 }
+

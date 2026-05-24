@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "~/components/ui/dialog";
+import { Dialog, BottomSheetContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "~/components/ui/dialog";
 import OrderPaymentModal from "./order.payment.modal";
 import useMenuStore from "~/stores/menu.store";
 import useTableStore from "~/stores/table.store";
@@ -8,6 +8,7 @@ import { toast } from "~/hooks/use-toast";
 import { isPaymentInstructionOrder, isPaymentPaid } from "~/lib/order-status";
 import { runWithBlockingLoading } from "~/lib/blocking-loading";
 import * as ClientTableResponse from "shared/types/responses/client/table";
+import { AlertTriangle, ArrowRight } from "lucide-react";
 
 type ClientOrder = ClientTableResponse.Get["result"]["tableContexts"][number]["orders"][number];
 
@@ -160,40 +161,97 @@ export default function OrderModal({
   return (
     <>
       <Dialog open={openState} onOpenChange={handleClose}>
-        <DialogContent className="w-[96%] border-blue-500 border-2 rounded-xl min-h-[200px] flex flex-col justify-center">
+        <BottomSheetContent className="fc justify-between max-h-[85vh] overflow-y-auto no-scrollbar">
           {!hasOrder ? (
-            <DialogHeader className="py-8 text-center space-y-2">
-              <DialogTitle className="text-xl font-bold text-muted-foreground">결제 안내를 확인할 수 없습니다</DialogTitle>
-              <DialogDescription className="text-sm text-muted-foreground">주문 내역을 다시 확인해주세요.</DialogDescription>
-            </DialogHeader>
+            <div className="fc items-center justify-center py-12 text-center space-y-4">
+              <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-full text-slate-400 dark:text-slate-500">
+                <AlertTriangle className="h-10 w-10 text-amber-500 animate-bounce" />
+              </div>
+              <div className="space-y-1">
+                <DialogTitle className="text-xl font-extrabold text-slate-800 dark:text-slate-100">
+                  결제 안내를 확인할 수 없습니다
+                </DialogTitle>
+                <DialogDescription className="text-xs text-slate-400">
+                  주문 내역을 다시 확인해주세요.
+                </DialogDescription>
+              </div>
+              <Button
+                onClick={handleClose}
+                className="mt-4 px-6 py-2.5 rounded-full bg-primary hover:bg-brand-600 text-white font-bold text-xs"
+              >
+                닫기
+              </Button>
+            </div>
           ) : (
             <>
-              <DialogHeader className="fc items-center my-4">
-                <DialogTitle className="sr-only">입금 안내</DialogTitle>
-                <div className="fr w-full justify-start !-mt-4">
+              {/* Drag Handle */}
+              <div className="w-full flex justify-center pb-4">
+                <div className="w-12 h-1 bg-slate-200 dark:bg-slate-800 rounded-full"></div>
+              </div>
+
+              {/* Header */}
+              <div className="space-y-1 text-center mb-6">
+                <DialogTitle className="text-2xl font-black text-slate-800 dark:text-slate-100">
+                  입금 안내
+                </DialogTitle>
+                <DialogDescription className="text-xs text-slate-400 font-medium">
+                  자동 결제 처리를 위해 꼭 확인해 주세요.
+                </DialogDescription>
+              </div>
+
+              {/* Content Panel */}
+              <div className="bg-brand-50/40 dark:bg-brand-950/20 border border-brand-100/50 dark:border-brand-900/30 p-5 rounded-2xl text-slate-700 dark:text-slate-200 text-sm leading-relaxed space-y-3 font-medium mb-6">
+                <div className="flex gap-2">
+                  <span className="text-primary font-bold">⋅</span>
+                  <p>주문마다 다른 <strong className="text-destructive font-black">결제코드</strong>가 부여되어 입금 금액이 결정됩니다.</p>
+                </div>
+                <div className="flex gap-2">
+                  <span className="text-primary font-bold">⋅</span>
+                  <p><strong className="text-destructive font-black">안내된 정확한 입금 금액</strong>을 이체하셔야 자동 결제 처리가 완료됩니다.</p>
+                </div>
+                <div className="flex gap-2">
+                  <span className="text-primary font-bold">⋅</span>
+                  <p>이체 금액을 임의로 변경하시면 직원의 수동 확인이 필요하여 처리가 지연될 수 있습니다.</p>
+                </div>
+                <div className="flex gap-2">
+                  <span className="text-primary font-bold">⋅</span>
+                  <p>이체 대기 및 확인 중 상태일 때는 동일 테이블에서의 추가 주문이 임시 제한됩니다.</p>
+                </div>
+              </div>
+
+              {/* Actions Footer */}
+              <div className="fc gap-3">
+                <div className="flex gap-3">
                   <Button
-                    variant="destructive"
-                    className="w-fit h-10 rounded-xl"
+                    variant="outline"
                     onClick={handleCancelOrder}
                     disabled={isBusy}
-                  >주문 취소</Button>
+                    className="flex-1 py-4 h-auto rounded-xl border-destructive/20 text-destructive dark:text-rose-500 hover:bg-destructive/5 dark:hover:bg-rose-950/25 font-bold cursor-pointer transition-colors"
+                  >
+                    주문 취소
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleDirectTransfer}
+                    disabled={isBusy}
+                    className="flex-1 py-4 h-auto rounded-xl border-slate-200 dark:border-slate-800 font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900 cursor-pointer"
+                  >
+                    직접 이체
+                  </Button>
                 </div>
-                <span className="text-blue-500 text-2xl font-extrabold text-center z-10 bg-white px-2 w-fit">입금 안내</span>
-                <DialogDescription className="fc !-mt-4 rounded-xl p-4 border-2 border-blue-500 *:text-base *:my-2 *:text-black">
-                  <span className="text-start">⋅ 주문마다 다른 <b className="dangerTXT">결제코드</b>가 붙어 입금금액이 정해집니다.</span>
-                  <span className="text-start">⋅ <b className="dangerTXT">안내된 입금금액 그대로</b> 보내야 자동으로 결제 확인됩니다.</span>
-                  <span className="text-start">⋅ 금액을 바꾸거나 원금액으로 보내면 운영자가 확인한 뒤 처리될 수 있습니다.</span>
-                  <span className="text-start">⋅ 입금 확인 전까지 같은 테이블에서 추가 주문은 잠시 제한됩니다.</span>
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter className="fr *:flex-1 *:mx-2 *:h-14 *:rounded-2xl *:text-lg *:my-2">
-                <Button variant="outline" onClick={handleDirectTransfer} disabled={isBusy}>직접 이체</Button>
-                <Button className="bg-blue-500 hover:bg-blue-600 text-white" onClick={handleTossPayment} disabled={isBusy}>토스 이체</Button>
-              </DialogFooter>
+                <Button
+                  onClick={handleTossPayment}
+                  disabled={isBusy}
+                  className="w-full py-4 h-auto rounded-xl bg-primary hover:bg-brand-600 text-white font-extrabold text-sm shadow-[0_8px_20px_rgba(0,61,155,0.2)] hover:shadow-[0_12px_28px_rgba(0,61,155,0.3)] transition-all duration-300 active:scale-[0.98] cursor-pointer flex justify-center items-center gap-2"
+                >
+                  <span>토스 앱으로 간편 송금</span>
+                  <ArrowRight className="h-4 w-4 stroke-[3px]" />
+                </Button>
+              </div>
             </>
           )}
-        </DialogContent>
-      </Dialog >
+        </BottomSheetContent>
+      </Dialog>
       {paymentSnapshot && (
         <OrderPaymentModal
           openState={orderPaymentModalOpen}
@@ -207,3 +265,4 @@ export default function OrderModal({
     </>
   );
 }
+

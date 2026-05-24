@@ -1,0 +1,238 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>연컴 홈런포차 - Menu</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-tertiary-container": "#ccd3e3",
+                      "on-secondary": "#ffffff",
+                      "on-primary-fixed": "#001848",
+                      "background": "#faf8ff",
+                      "surface": "#faf8ff",
+                      "surface-container-high": "#e2e7ff",
+                      "on-primary": "#ffffff",
+                      "primary-fixed": "#dae2ff",
+                      "surface-container-highest": "#dae2fd",
+                      "secondary-fixed": "#e1e3e4",
+                      "on-tertiary-fixed-variant": "#404754",
+                      "on-surface-variant": "#434654",
+                      "on-primary-container": "#c4d2ff",
+                      "inverse-on-surface": "#eef0ff",
+                      "on-secondary-container": "#626566",
+                      "on-tertiary-fixed": "#151c27",
+                      "on-secondary-fixed-variant": "#454748",
+                      "surface-container-low": "#f2f3ff",
+                      "tertiary": "#3d4450",
+                      "secondary-fixed-dim": "#c5c7c8",
+                      "surface-container-lowest": "#ffffff",
+                      "error-container": "#ffdad6",
+                      "primary": "#003d9b",
+                      "inverse-primary": "#b2c5ff",
+                      "surface-tint": "#0c56d0",
+                      "surface-dim": "#d2d9f4",
+                      "outline": "#737685",
+                      "error": "#ba1a1a",
+                      "tertiary-fixed": "#dce2f3",
+                      "on-error": "#ffffff",
+                      "inverse-surface": "#283044",
+                      "surface-variant": "#dae2fd",
+                      "surface-container": "#eaedff",
+                      "tertiary-fixed-dim": "#c0c7d6",
+                      "on-tertiary": "#ffffff",
+                      "on-background": "#131b2e",
+                      "on-error-container": "#93000a",
+                      "outline-variant": "#c3c6d6",
+                      "secondary-container": "#e1e3e4",
+                      "secondary": "#5c5f60",
+                      "on-secondary-fixed": "#191c1d",
+                      "on-surface": "#131b2e",
+                      "primary-container": "#0052cc",
+                      "primary-fixed-dim": "#b2c5ff",
+                      "surface-bright": "#faf8ff",
+                      "tertiary-container": "#545b68",
+                      "on-primary-fixed-variant": "#0040a2"
+              },
+              "borderRadius": {
+                      "DEFAULT": "1rem",
+                      "lg": "2rem",
+                      "xl": "3rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "stack-sm": "8px",
+                      "gutter": "16px",
+                      "container-margin": "24px",
+                      "stack-lg": "32px",
+                      "unit": "4px",
+                      "stack-md": "16px",
+                      "section-gap": "48px"
+              },
+              "fontFamily": {
+                      "body-md": ["Inter"],
+                      "headline-xl": ["Inter"],
+                      "label-sm": ["Inter"],
+                      "headline-md": ["Inter"],
+                      "headline-lg-mobile": ["Inter"],
+                      "body-lg": ["Inter"],
+                      "label-md": ["Inter"],
+                      "headline-xl-mobile": ["Inter"],
+                      "headline-lg": ["Inter"]
+              },
+              "fontSize": {
+                      "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                      "headline-xl": ["40px", {"lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                      "label-sm": ["12px", {"lineHeight": "16px", "fontWeight": "500"}],
+                      "headline-md": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                      "headline-lg-mobile": ["26px", {"lineHeight": "32px", "fontWeight": "700"}],
+                      "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                      "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                      "headline-xl-mobile": ["32px", {"lineHeight": "40px", "fontWeight": "800"}],
+                      "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}]
+              }
+            }
+          }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .icon-fill {
+            font-variation-settings: 'FILL' 1;
+        }
+        /* Custom Neo-Minimalist Elevation Levels */
+        .elevation-level-2 {
+            box-shadow: 0 8px 24px rgba(19, 27, 46, 0.08), 0 2px 8px rgba(19, 27, 46, 0.04);
+        }
+        .elevation-level-3 {
+            box-shadow: 0 16px 40px rgba(0, 61, 155, 0.15), 0 4px 12px rgba(0, 61, 155, 0.08);
+        }
+        
+        /* Hide scrollbar for category chips */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body-md antialiased pb-32 selection:bg-primary-container selection:text-on-primary-container">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-surface/80 dark:bg-surface/80 backdrop-blur-md shadow-sm transition-all duration-300 ease-in-out">
+<div class="flex justify-between items-center px-container-margin py-stack-sm w-full">
+<button aria-label="Menu" class="transition-all duration-300 ease-in-out active:scale-95 hover:bg-primary-container/10 p-2 -ml-2 rounded-full text-primary dark:text-inverse-primary">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<h1 class="font-headline-md text-headline-md-mobile font-extrabold text-primary dark:text-inverse-primary">
+                연컴 홈런포차
+            </h1>
+<div class="transition-all duration-300 ease-in-out active:scale-95 hover:bg-primary-container/10 px-4 py-2 rounded-full bg-surface-container-low text-primary font-label-md text-label-md">
+                Table 07
+            </div>
+</div>
+</header>
+<main class="pt-24 px-container-margin max-w-3xl mx-auto pb-40">
+<!-- Category Chips -->
+<section class="mb-stack-lg sticky top-20 z-40 bg-surface/90 backdrop-blur-md -mx-container-margin px-container-margin py-1">
+<div class="flex gap-stack-sm overflow-x-auto no-scrollbar">
+<button class="flex-shrink-0 px-6 py-2.5 rounded-full bg-primary text-on-primary font-label-md text-label-md transition-all duration-200 elevation-level-2">
+                    Signature
+                </button>
+<button class="flex-shrink-0 px-6 py-2.5 rounded-full bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high font-label-md text-label-md transition-all duration-200">
+                    Main Dishes
+                </button>
+<button class="flex-shrink-0 px-6 py-2.5 rounded-full bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high font-label-md text-label-md transition-all duration-200">
+                    Drinks
+                </button>
+<button class="flex-shrink-0 px-6 py-2.5 rounded-full bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high font-label-md text-label-md transition-all duration-200">
+                    Sides
+                </button>
+</div>
+</section>
+<!-- Menu Grid -->
+<section class="grid grid-cols-1 md:grid-cols-2 gap-4"><!-- Menu Item Card 1 -->
+<article class="bg-surface-container-lowest elevation-level-2 overflow-hidden flex flex-row group h-24 rounded-md">
+<div class="w-24 h-full relative overflow-hidden bg-surface-container-high flex-shrink-0">
+<img alt="Spicy Stir-fried Pork" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDUwn3ki32NSnv-DVD-JVoYeLsnbIzNZMYDkUeMN3-AcJJAOJNC9a1T8dcLSEO9U6GTqdDTqQ27MAaf_fGgVl9d0tjazcp2VS53rCrjUh90VJZmveBU5YG11KBQp4fh5G0WenfgROMpCosfqjOIJjPzHaY1nKOz5twd-kR-YKuHZ1al2wXGDTBXlNHcAZ-_2c4jtcSi3IvUAjzyZQIBegKUZsSTdoZuOxuf11i1vycljqmqD-vUVx1Q8rSHf5CBPNYk7rwHTPnOJzSF">
+</div>
+<div class="p-2 flex flex-col flex-grow min-w-0">
+<div class="flex justify-between items-start">
+<h3 class="font-semibold text-sm text-on-surface truncate uppercase">컴공 제육 덮밥</h3>
+</div>
+<p class="text-[10px] text-on-surface-variant line-clamp-2 mt-0.5 leading-tight">
+            Spicy, smoky, and absolutely vital for debugging late into the night. Served with steaming rice.
+        </p>
+<div class="flex justify-between items-center mt-auto">
+<span class="font-bold text-sm text-primary">₩ 12,000</span>
+<button aria-label="Add to order" class="w-7 h-7 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center transition-transform active:scale-90">
+<span class="material-symbols-outlined text-[16px]">add</span>
+</button>
+</div>
+</div>
+</article>
+<!-- Menu Item Card 2 -->
+<article class="bg-surface-container-lowest elevation-level-2 overflow-hidden flex flex-row group h-24 rounded-md">
+<div class="w-24 h-full relative overflow-hidden bg-surface-container-high flex-shrink-0">
+<img alt="Spicy Stir-fried Pork" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDUwn3ki32NSnv-DVD-JVoYeLsnbIzNZMYDkUeMN3-AcJJAOJNC9a1T8dcLSEO9U6GTqdDTqQ27MAaf_fGgVl9d0tjazcp2VS53rCrjUh90VJZmveBU5YG11KBQp4fh5G0WenfgROMpCosfqjOIJjPzHaY1nKOz5twd-kR-YKuHZ1al2wXGDTBXlNHcAZ-_2c4jtcSi3IvUAjzyZQIBegKUZsSTdoZuOxuf11i1vycljqmqD-vUVx1Q8rSHf5CBPNYk7rwHTPnOJzSF">
+</div>
+<div class="p-2 flex flex-col flex-grow min-w-0">
+<div class="flex justify-between items-start">
+<h3 class="font-semibold text-sm text-on-surface truncate uppercase">컴공 제육 덮밥</h3>
+</div>
+<p class="text-[10px] text-on-surface-variant line-clamp-2 mt-0.5 leading-tight">
+            Spicy, smoky, and absolutely vital for debugging late into the night.
+        </p>
+<div class="flex justify-between items-center mt-auto">
+<span class="font-bold text-sm text-primary">₩ 12,000</span>
+<button aria-label="Add to order" class="w-7 h-7 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center transition-transform active:scale-90">
+<span class="material-symbols-outlined text-[16px]">add</span>
+</button>
+</div>
+</div>
+</article></section>
+</main>
+<!-- Floating Action Button (Extended Cart) -->
+<!-- BottomNavBar -->
+<button class="fixed right-6 bottom-32 z-50 w-16 h-16 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center elevation-level-3 backdrop-blur-md transition-transform active:scale-95">
+  <div class="relative">
+    <span class="material-symbols-outlined text-3xl icon-fill">shopping_cart</span>
+    <span class="absolute -top-1 -right-1 bg-error text-on-error w-5 h-5 flex items-center justify-center rounded-full text-xs font-bold border-2 border-surface-container-lowest">2</span>
+  </div>
+</button><nav class="md:hidden fixed bottom-0 w-full z-50 rounded-t-lg bg-surface/90 dark:bg-inverse-surface/90 backdrop-blur-xl shadow-[0_-8px_24px_rgba(0,61,155,0.12)] flex justify-around items-center px-4 pb-8 pt-4 w-full">
+<!-- Active Nav Item -->
+<button class="scale-100 active:scale-90 transition-transform duration-200 flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-xl px-4 py-2 hover:text-primary dark:hover:text-inverse-primary w-16">
+<span class="material-symbols-outlined icon-fill">restaurant_menu</span>
+<span class="font-label-md text-label-md mt-1 text-[11px]">Menu</span>
+</button>
+<!-- Inactive Nav Items -->
+
+<button class="scale-100 active:scale-90 transition-transform duration-200 flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant hover:text-primary dark:hover:text-inverse-primary w-16">
+<span class="material-symbols-outlined">receipt_long</span>
+<span class="font-label-md text-label-md mt-1 text-[11px]">Orders</span>
+</button>
+<button class="scale-100 active:scale-90 transition-transform duration-200 flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant hover:text-primary dark:hover:text-inverse-primary w-16">
+<span class="material-symbols-outlined">timer</span>
+<span class="font-label-md text-label-md mt-1 text-[11px]">Status</span>
+</button>
+</nav>
+<!-- Desktop Nav Cluster (Hidden on mobile) -->
+<nav class="hidden md:flex fixed top-0 right-0 h-16 items-center px-container-margin gap-stack-lg z-50">
+<button class="font-label-md text-label-md text-primary bg-primary-container px-4 py-2 rounded-full">Menu</button>
+<button class="font-label-md text-label-md text-on-surface-variant hover:text-primary transition-colors">Orders</button>
+<button class="font-label-md text-label-md text-on-surface-variant hover:text-primary transition-colors">Status</button>
+</nav>
+
+
+
+
+</body></html>

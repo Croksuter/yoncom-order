@@ -1,0 +1,266 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Menu Item Detail</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-tertiary-container": "#ccd3e3",
+                      "on-secondary": "#ffffff",
+                      "on-primary-fixed": "#001848",
+                      "background": "#faf8ff",
+                      "surface": "#faf8ff",
+                      "surface-container-high": "#e2e7ff",
+                      "on-primary": "#ffffff",
+                      "primary-fixed": "#dae2ff",
+                      "surface-container-highest": "#dae2fd",
+                      "secondary-fixed": "#e1e3e4",
+                      "on-tertiary-fixed-variant": "#404754",
+                      "on-surface-variant": "#434654",
+                      "on-primary-container": "#c4d2ff",
+                      "inverse-on-surface": "#eef0ff",
+                      "on-secondary-container": "#626566",
+                      "on-tertiary-fixed": "#151c27",
+                      "on-secondary-fixed-variant": "#454748",
+                      "surface-container-low": "#f2f3ff",
+                      "tertiary": "#3d4450",
+                      "secondary-fixed-dim": "#c5c7c8",
+                      "surface-container-lowest": "#ffffff",
+                      "error-container": "#ffdad6",
+                      "primary": "#003d9b",
+                      "inverse-primary": "#b2c5ff",
+                      "surface-tint": "#0c56d0",
+                      "surface-dim": "#d2d9f4",
+                      "outline": "#737685",
+                      "error": "#ba1a1a",
+                      "tertiary-fixed": "#dce2f3",
+                      "on-error": "#ffffff",
+                      "inverse-surface": "#283044",
+                      "surface-variant": "#dae2fd",
+                      "surface-container": "#eaedff",
+                      "tertiary-fixed-dim": "#c0c7d6",
+                      "on-tertiary": "#ffffff",
+                      "on-background": "#131b2e",
+                      "on-error-container": "#93000a",
+                      "outline-variant": "#c3c6d6",
+                      "secondary-container": "#e1e3e4",
+                      "secondary": "#5c5f60",
+                      "on-secondary-fixed": "#191c1d",
+                      "on-surface": "#131b2e",
+                      "primary-container": "#0052cc",
+                      "primary-fixed-dim": "#b2c5ff",
+                      "surface-bright": "#faf8ff",
+                      "tertiary-container": "#545b68",
+                      "on-primary-fixed-variant": "#0040a2"
+              },
+              "borderRadius": {
+                      "DEFAULT": "1rem",
+                      "lg": "2rem",
+                      "xl": "3rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "stack-sm": "8px",
+                      "gutter": "16px",
+                      "container-margin": "24px",
+                      "stack-lg": "32px",
+                      "unit": "4px",
+                      "stack-md": "16px",
+                      "section-gap": "48px"
+              },
+              "fontFamily": {
+                      "body-md": [
+                              "Inter"
+                      ],
+                      "headline-xl": [
+                              "Inter"
+                      ],
+                      "label-sm": [
+                              "Inter"
+                      ],
+                      "headline-md": [
+                              "Inter"
+                      ],
+                      "headline-lg-mobile": [
+                              "Inter"
+                      ],
+                      "body-lg": [
+                              "Inter"
+                      ],
+                      "label-md": [
+                              "Inter"
+                      ],
+                      "headline-xl-mobile": [
+                              "Inter"
+                      ],
+                      "headline-lg": [
+                              "Inter"
+                      ]
+              },
+              "fontSize": {
+                      "body-md": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "headline-xl": [
+                              "40px",
+                              {
+                                      "lineHeight": "48px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "800"
+                              }
+                      ],
+                      "label-sm": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "headline-md": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "headline-lg-mobile": [
+                              "26px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "body-lg": [
+                              "18px",
+                              {
+                                      "lineHeight": "28px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "label-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-xl-mobile": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "fontWeight": "800"
+                              }
+                      ],
+                      "headline-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+      </script>
+<style>
+          .material-symbols-outlined {
+              font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+          }
+          .material-symbols-outlined.fill {
+              font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+          }
+      </style>
+</head>
+<body class="bg-surface font-body-md text-on-surface h-screen w-screen overflow-hidden flex flex-col items-center justify-end relative">
+<!-- Blurred Background Context (Simulating the underlying app screen) -->
+<div class="absolute inset-0 bg-surface-container-low z-0 overflow-hidden">
+<div class="w-full h-full flex flex-col items-center p-8 opacity-40 blur-md">
+<div class="w-full h-64 bg-surface-container-high rounded-lg mb-8 shadow-sm"></div>
+<div class="w-full h-32 bg-surface-container-high rounded-lg mb-4 shadow-sm"></div>
+<div class="w-full h-32 bg-surface-container-high rounded-lg mb-4 shadow-sm"></div>
+</div>
+</div>
+<!-- Overlay -->
+<div class="absolute inset-0 bg-on-background/40 backdrop-blur-sm z-10"></div>
+<!-- Bottom Sheet -->
+<div class="w-full max-w-md bg-surface rounded-t-[32px] z-20 flex flex-col shadow-[0_-16px_40px_rgba(0,61,155,0.12)] transform transition-transform duration-300 ease-out translate-y-0 h-[751px]">
+<!-- Drag Handle -->
+<div class="w-full flex justify-center py-4">
+<div class="w-12 h-1 bg-outline-variant rounded-full"></div>
+</div>
+<!-- Scrollable Content -->
+<div class="flex-1 overflow-y-auto px-container-margin pb-stack-lg no-scrollbar">
+<!-- Hero Image -->
+<div class="w-full h-64 rounded-xl overflow-hidden mb-stack-lg relative shadow-md">
+<img alt="Sesame Oil Bibimbap" class="w-full h-full object-cover" data-alt="A close-up, high-quality photograph of a beautiful, vibrant bowl of Sesame Oil Bibimbap. The dish features brightly colored, fresh vegetables, perfectly cooked rice, and a drizzle of rich sesame oil, presented in a minimalist, modern white bowl. The lighting is soft, natural, and bright, emphasizing the fresh ingredients and appetizing textures. The scene reflects a clean, high-energy aesthetic consistent with a premium food experience." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAzPZT1vH3fgAUauFKHszvWDepdpWFBeYQ8zREk33g5XTbjld0fLE9wbJY18-2ASLNHr5pt7oR0oXlHKH4wd1nSkmTnW8lmKm-AnTivCt6Q6fQAxGnnSWCvS8_eOS6HfYb6UxPSucNOL5j0PQdiSIFuXYx6En1NVRaED-VD1sShBAQOStJFg7LvMPkUPwbPsRlCPSKj1vHn9q-x9Cnp2FnBxAp3qaWDf7uJiiofDg93frWEIx6m0iEmr_MAz52GMo6ibPqOqN5WmPYx">
+<button aria-label="Close" class="absolute top-4 right-4 bg-surface/80 backdrop-blur-md p-2 rounded-full text-on-surface shadow-sm hover:bg-surface transition-colors">
+<span class="material-symbols-outlined text-[24px]">close</span>
+</button>
+</div>
+<!-- Header & Details -->
+<div class="flex flex-col gap-stack-sm mb-section-gap">
+<div class="flex justify-between items-start">
+<h2 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">Sesame Oil Bibimbap</h2>
+<span class="font-headline-md text-headline-md text-primary shrink-0 ml-4">$12.00</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant">A classic Korean mixed rice bowl featuring fresh, seasonal vegetables, a perfectly fried egg, and a generous drizzle of our signature toasted sesame oil. Mix thoroughly for a harmonious blend of flavors.</p>
+</div>
+<!-- Options / Customization (Optional/Placeholder) -->
+<div class="flex flex-col gap-stack-md mb-section-gap">
+<h3 class="font-label-md text-label-md text-on-surface uppercase tracking-widest">Options</h3>
+<div class="flex items-center justify-between p-4 bg-surface-container-low rounded-lg">
+<span class="font-body-md text-body-md text-on-surface">Extra Egg</span>
+<div class="flex items-center gap-4">
+<span class="font-body-md text-body-md text-primary">+$1.50</span>
+<div class="w-6 h-6 border-2 border-outline-variant rounded flex items-center justify-center">
+<!-- Checkbox placeholder -->
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Sticky Footer Action -->
+<div class="w-full bg-surface border-t border-surface-container-highest p-container-margin pb-8 flex flex-col gap-stack-md shrink-0">
+<!-- Quantity Selector -->
+<div class="flex items-center justify-between bg-surface-container-low rounded-full p-2 max-w-[160px] mx-auto shadow-inner">
+<button class="w-10 h-10 rounded-full flex items-center justify-center text-primary hover:bg-surface-container-high transition-colors active:scale-95">
+<span class="material-symbols-outlined">remove</span>
+</button>
+<span class="font-headline-md text-headline-md text-on-surface w-12 text-center">1</span>
+<button class="w-10 h-10 rounded-full flex items-center justify-center text-primary hover:bg-surface-container-high transition-colors active:scale-95">
+<span class="material-symbols-outlined">add</span>
+</button>
+</div>
+<!-- Add to Cart Button -->
+<button class="w-full bg-primary text-on-primary font-headline-md text-headline-md py-4 rounded-xl shadow-[0_8px_24px_rgba(0,61,155,0.2)] hover:bg-primary-container hover:text-on-primary-container hover:shadow-[0_12px_32px_rgba(0,61,155,0.3)] transition-all duration-300 active:scale-[0.98] flex items-center justify-center gap-2">
+<span>Add to Cart</span>
+<span class="font-body-md text-body-md opacity-80 border-l border-on-primary/30 pl-2 ml-2">$12.00</span>
+</button>
+</div>
+</div>
+<style>
+        /* Utility for hiding scrollbar but allowing scroll */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
+        }
+    </style>
+</body></html>

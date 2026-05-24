@@ -1,18 +1,15 @@
-
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
-import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "~/components/ui/dialog";
-import { DialogContent } from "~/components/ui/dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
+import { Dialog, DialogDescription, DialogHeader, DialogTitle, BottomSheetContent } from "~/components/ui/dialog";
 import useCartStore, { CartState } from "~/stores/cart.store";
 import useMenuStore from "~/stores/menu.store";
-import OrderUpdateModal from "../order/order.update.modal";
 import OrderModal from "../order/order.modal";
 import useTableStore from "~/stores/table.store";
 import { toast } from "~/hooks/use-toast";
 import { useValidateOrder } from "~/hooks/validate-order";
 import { runWithBlockingLoading } from "~/lib/blocking-loading";
 import { isPaymentInstructionOrder } from "~/lib/order-status";
+import { MinusIcon, PlusIcon, ArrowRight, ShoppingCart } from "lucide-react";
 
 type MenuOrderInfo = {
   menuId: CartState["menuOrders"][number]["menuId"];
@@ -119,83 +116,155 @@ export default function CartModal({
     setOpenState(false);
   }
 
+  const updateQuantity = (menuId: string, delta: number) => {
+    const currentOrder = menuOrders.find((order) => order.menuId === menuId);
+    if (!currentOrder) return;
+    const targetMenu = menus.find((m) => m.id === menuId);
+    if (!targetMenu) return;
+
+    const newQuantity = currentOrder.quantity + delta;
+    if (newQuantity <= 0) {
+      useCartStore.getState().removeMenuOrder(menuId);
+    } else if (newQuantity <= targetMenu.quantity) {
+      useCartStore.getState().updateMenuOrder(menuId, {
+        menuId,
+        quantity: newQuantity,
+      });
+    } else {
+      toast({
+        title: `주문 가능한 최대 수량은 ${targetMenu.quantity}개입니다.`,
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <>
       <Dialog open={openState} onOpenChange={handleClose}>
-        <DialogContent className="fixed bottom-0 top-auto left-0 translate-x-0 translate-y-0 w-full max-w-full rounded-t-[2rem] rounded-b-none border-t border-x border-b-0 border-brand-100 bg-background/95 backdrop-blur-lg p-6 pb-8 shadow-[0_-8px_30px_rgb(0,0,0,0.08)] data-[state=open]:animate-in data-[state=open]:slide-in-from-bottom sm:bottom-auto sm:top-[50%] sm:left-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:max-w-md sm:rounded-2xl sm:border sm:shadow-lg sm:p-6 smooth-transition fc justify-between min-h-[25rem] max-h-[85vh]">
+        <BottomSheetContent className="fc justify-between max-h-[85vh]">
           {noMenuOrder || invalidMenuOrder ? (
-            <DialogHeader className="py-8 text-center space-y-2">
-              <DialogTitle className="text-xl font-bold text-muted-foreground">{
-                noMenuOrder ? "장바구니에 담은 메뉴가 없습니다" : "주문 정보가 잘못되었습니다"
-              }</DialogTitle>
-              <DialogDescription className="text-xs">원하는 메뉴를 먼저 장바구니에 담아주세요.</DialogDescription>
-            </DialogHeader>
+            <div className="fc items-center justify-center py-12 text-center space-y-4">
+              <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-full text-slate-400 dark:text-slate-500">
+                <ShoppingCart className="h-10 w-10" />
+              </div>
+              <div className="space-y-1">
+                <DialogTitle className="text-xl font-extrabold text-slate-800 dark:text-slate-100">
+                  장바구니가 비어 있습니다
+                </DialogTitle>
+                <DialogDescription className="text-xs text-slate-400">
+                  원하는 메뉴를 먼저 장바구니에 담아주세요.
+                </DialogDescription>
+              </div>
+              <Button
+                onClick={handleClose}
+                className="mt-4 px-6 py-2.5 rounded-full bg-primary hover:bg-brand-600 text-white font-bold text-xs"
+              >
+                메뉴 보러 가기
+              </Button>
+            </div>
           ) : (
             <>
-              <DialogHeader className="space-y-1">
-                <DialogTitle className="text-2xl font-bold tracking-tight text-foreground text-center">장바구니</DialogTitle>
-                <DialogDescription className="text-xs text-center text-muted-foreground">주문을 수정하려면 해당 품목을 클릭하세요.</DialogDescription>
-              </DialogHeader>
-              
-              <div className="flex-1 overflow-y-auto my-4 max-h-[40vh] border rounded-xl border-slate-100">
-                <Table>
-                  <TableHeader className="bg-slate-50 sticky top-0 z-10">
-                    <TableRow className="border-b border-slate-100 hover:bg-transparent">
-                      <TableHead className="!text-left font-semibold text-slate-500 h-10">메뉴</TableHead>
-                      <TableHead className="!text-right font-semibold text-slate-500 h-10">단가</TableHead>
-                      <TableHead className="!text-right font-semibold text-slate-500 h-10">수량</TableHead>
-                      <TableHead className="!text-right font-semibold text-slate-500 h-10">가격</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {visibleMenuOrderInfos.map((menuOrderInfo, index) => (
-                      <TableRow
-                        key={menuOrderInfo!.menuId}
-                        onClick={() => {
-                          if (duringPurchase) return;
-                          setModalMenuOrder(menuOrders[index]);
-                          setModalOpenState(true)
-                        }}
-                        className={`h-12 border-b border-slate-50 transition-colors ${duringPurchase ? "cursor-not-allowed opacity-80" : "hover:bg-slate-50/50 active:bg-slate-100/50 cursor-pointer"}`}
-                      >
-                        <TableCell className="text-left font-bold text-foreground text-sm py-2">{menuOrderInfo!.menuName}</TableCell>
-                        <TableCell className="text-right text-xs text-muted-foreground py-2">{menuOrderInfo!.menuPrice.toLocaleString()}원</TableCell>
-                        <TableCell className="text-right text-sm py-2 font-medium">{menuOrderInfo!.quantity}개</TableCell>
-                        <TableCell className="text-right text-sm font-semibold text-foreground py-2">{menuOrderInfo!.totalPrice.toLocaleString()}원</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+              {/* Drag Handle */}
+              <div className="w-full flex justify-center pb-4">
+                <div className="w-12 h-1 bg-slate-200 dark:bg-slate-800 rounded-full"></div>
               </div>
 
-              <div className="fr justify-between items-center py-2 px-1 mb-4">
-                <span className="text-base text-muted-foreground font-medium">최종 결제 금액</span>
-                <span className="text-2xl font-bold text-brand-600">
-                  {visibleMenuOrderInfos.reduce((acc, menuOrderInfo) => acc + menuOrderInfo!.totalPrice, 0).toLocaleString()}원
+              {/* Header */}
+              <div className="space-y-1 text-center mb-4">
+                <DialogTitle className="text-2xl font-black text-slate-800 dark:text-slate-100">
+                  장바구니
+                </DialogTitle>
+                <DialogDescription className="text-xs text-slate-400 font-medium">
+                  주문할 품목과 수량을 확인해 주세요.
+                </DialogDescription>
+              </div>
+
+              {/* Cart Items List */}
+              <div className="flex-1 overflow-y-auto no-scrollbar space-y-4 my-2 pr-1 max-h-[45vh]">
+                {visibleMenuOrderInfos.map((menuOrderInfo) => {
+                  const menuObj = menus.find((m) => m.id === menuOrderInfo!.menuId);
+                  return (
+                    <div key={menuOrderInfo!.menuId} className="fc">
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <img
+                            src={menuObj?.image || "/favicon.ico"}
+                            alt={menuOrderInfo!.menuName}
+                            className="w-14 h-14 rounded-xl object-cover shadow-sm bg-slate-100 dark:bg-slate-800"
+                          />
+                          <div className="min-w-0">
+                            <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-100 truncate">
+                              {menuOrderInfo!.menuName}
+                            </h3>
+                            <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-0.5">
+                              ₩ {menuOrderInfo!.menuPrice.toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Interactive Counter Pill */}
+                        <div className="flex items-center bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700/60 rounded-full p-1 shadow-sm">
+                          <button
+                            onClick={() => updateQuantity(menuOrderInfo!.menuId, -1)}
+                            disabled={duringPurchase}
+                            className="text-slate-500 hover:text-primary hover:bg-white dark:hover:bg-slate-700 p-1 rounded-full transition-all active:scale-90"
+                          >
+                            <MinusIcon className="h-3.5 w-3.5 stroke-[3px]" />
+                          </button>
+                          <span className="font-extrabold text-xs text-slate-800 dark:text-slate-100 w-6 text-center">
+                            {menuOrderInfo!.quantity}
+                          </span>
+                          <button
+                            onClick={() => updateQuantity(menuOrderInfo!.menuId, 1)}
+                            disabled={duringPurchase}
+                            className="text-slate-500 hover:text-primary hover:bg-white dark:hover:bg-slate-700 p-1 rounded-full transition-all active:scale-90"
+                          >
+                            <PlusIcon className="h-3.5 w-3.5 stroke-[3px]" />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="h-px bg-slate-100 dark:bg-slate-800/60 w-full mt-4"></div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Total Summary Row */}
+              <div className="flex justify-between items-center py-4 border-t border-slate-100 dark:border-slate-800 mt-2">
+                <span className="text-sm text-slate-400 dark:text-slate-500 font-bold">최종 결제 금액</span>
+                <span className="text-2xl font-black text-primary dark:text-brand-400">
+                  ₩ {visibleMenuOrderInfos.reduce((acc, item) => acc + item!.totalPrice, 0).toLocaleString()}
                 </span>
               </div>
 
-              <DialogFooter className="fr gap-3 *:flex-1 *:h-12 *:rounded-xl *:text-base">
-                <Button variant="outline" onClick={handleClose} disabled={duringPurchase} className="border-slate-200 hover:bg-slate-50">취소</Button>
-                <Button className="bg-brand-500 hover:bg-brand-600 text-white shadow-md shadow-brand-500/10 hover-lift active:scale-98 transition-all" onClick={handleConfirm} disabled={duringPurchase}>
-                  주문 완료하기
+              {/* Actions Footer */}
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  onClick={handleClose}
+                  disabled={duringPurchase}
+                  className="flex-1 py-4 h-auto rounded-xl border-slate-200 dark:border-slate-800 font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900 cursor-pointer"
+                >
+                  더 담기
                 </Button>
-              </DialogFooter>
+                <Button
+                  onClick={handleConfirm}
+                  disabled={duringPurchase}
+                  className="flex-[2] py-4 h-auto rounded-xl bg-primary hover:bg-brand-600 text-white font-extrabold text-sm shadow-[0_8px_20px_rgba(0,61,155,0.2)] hover:shadow-[0_12px_28px_rgba(0,61,155,0.3)] transition-all duration-300 active:scale-[0.98] cursor-pointer flex justify-center items-center gap-2"
+                >
+                  <span>주문 완료하기</span>
+                  <ArrowRight className="h-4 w-4 stroke-[3px]" />
+                </Button>
+              </div>
             </>
           )}
-        </DialogContent>
+        </BottomSheetContent>
       </Dialog>
-      {modalMenuOrder && (
-        <OrderUpdateModal
-          menuOrder={modalMenuOrder}
-          openState={modalOpenState}
-          setOpenState={setModalOpenState}
-        />
-      )}
       <OrderModal
         openState={confirmModalOpenState}
         setOpenState={setConfirmModalOpenState}
       />
     </>
-  )
+  );
 }
+

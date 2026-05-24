@@ -7,6 +7,7 @@ import Footer from "./components/footer";
 import Header from "./components/header";
 import Menus from "./components/menu/menus";
 import ShopIntro from "./components/shop.intro";
+import OrderHistoryPanel from "./components/order/order.history.panel";
 import { Skeleton } from "~/components/ui/skeleton";
 
 type ClientTablePageProps = {
@@ -18,6 +19,7 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
   const { clientTable } = useTableStore();
   const { clientMenuCategories } = useMenuStore();
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<"menu" | "orders">("menu");
   const isValidTableId = id.length === 15;
 
   useEffect(() => {
@@ -49,6 +51,18 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
 
     void useMenuStore.getState().clientLoad({});
   }, [clientTable]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !clientMenuCategories) return;
+    clientMenuCategories
+      .flatMap((cat) => cat.menus)
+      .forEach((menu) => {
+        if (menu.image) {
+          const img = new window.Image();
+          img.src = menu.image;
+        }
+      });
+  }, [clientMenuCategories]);
 
   if (loading) {
     return (
@@ -98,10 +112,16 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
       {clientTable && clientMenuCategories ? (
         <>
           <Header />
-          <div className="w-full max-w-[600px] flex-1 overflow-hidden px-2 fc">
-            <ShopIntro tableName={clientTable.name} tableSeats={clientTable.seats} />
-            <Menus menuCategories={clientMenuCategories} />
-            <Footer />
+          <div className="w-full max-w-[600px] flex-1 overflow-hidden px-4 fc relative pt-16">
+            {activeTab === "menu" ? (
+              <div className="flex-1 fc overflow-hidden w-full">
+                <ShopIntro tableName={clientTable.name} tableSeats={clientTable.seats} />
+                <Menus menuCategories={clientMenuCategories} />
+              </div>
+            ) : (
+              <OrderHistoryPanel />
+            )}
+            <Footer activeTab={activeTab} setActiveTab={setActiveTab} />
           </div>
         </>
       ) : (
@@ -115,3 +135,4 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
     </main>
   );
 }
+

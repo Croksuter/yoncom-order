@@ -1,10 +1,9 @@
 import { Button } from "~/components/ui/button";
-import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "~/components/ui/dialog";
-import { DialogContent } from "~/components/ui/dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
+import { Dialog, DialogDescription, DialogTitle, BottomSheetContent } from "~/components/ui/dialog";
 import useMenuStore from "~/stores/menu.store";
 import * as ClientTableResponse from "shared/types/responses/client/table";
 import { getMenuOrderStatusLabel, getPaymentStatusLabel } from "~/lib/order-status";
+import { Receipt, Calendar, Info } from "lucide-react";
 
 export default function OrderDetailModal({
   openState, setOpenState,
@@ -19,7 +18,7 @@ export default function OrderDetailModal({
   if (!orderDetail) return null;
 
   const menuOrderInfos = orderDetail.menuOrders.map((menuOrder) => {
-    const menu = menus.find((menu) => menu.id === menuOrder.menuId);
+    const menu = menus.find((m) => m.id === menuOrder.menuId);
     if (!menu) return null;
     return {
       menuId: menuOrder.menuId,
@@ -27,82 +26,132 @@ export default function OrderDetailModal({
       menuPrice: menu.price,
       quantity: menuOrder.quantity,
       totalPrice: menu.price * menuOrder.quantity,
-    }
-  })
+    };
+  });
   const originalAmount = orderDetail.payment.originalAmount ?? orderDetail.payment.amount;
   const expectedTransferAmount = orderDetail.payment.expectedTransferAmount ?? orderDetail.payment.amount;
 
   const handleClose = () => {
     setOpenState(false);
-  }
+  };
+
+  const isRefunded = orderDetail.payment.status === "REFUNDED";
+  const isRefundPending = orderDetail.payment.status === "REFUND_PENDING";
 
   return (
     <>
       <Dialog open={openState} onOpenChange={setOpenState}>
-        <DialogContent className="fc w-[96%] min-h-[25rem] max-h-[40rem] justify-between border-blue-500 border-2 rounded-xl">
+        <BottomSheetContent className="fc justify-between max-h-[85vh] overflow-y-auto no-scrollbar">
           <>
-            <DialogHeader>
-              <DialogTitle className="text-2xl">주문 내역</DialogTitle>
-              <DialogDescription className="text-md text-center">{new Date(orderDetail.createdAt).toLocaleString("ko-KR", {
-                year: "numeric",
-                month: "2-digit",
-                day: "2-digit",
-                hour: "2-digit",
-                minute: "2-digit",
-              })}</DialogDescription>
-              <DialogDescription className="text-center">
-                {getPaymentStatusLabel(orderDetail.payment, orderDetail)} · 주문금액 {originalAmount.toLocaleString()}원 · 결제코드 {orderDetail.payment.paymentCode ?? "-"} · 입금금액 {expectedTransferAmount.toLocaleString()}원
+            {/* Drag Handle */}
+            <div className="w-full flex justify-center pb-4">
+              <div className="w-12 h-1 bg-slate-200 dark:bg-slate-800 rounded-full"></div>
+            </div>
+
+            {/* Header */}
+            <div className="space-y-1 text-center mb-4">
+              <DialogTitle className="text-2xl font-black text-slate-800 dark:text-slate-100 flex items-center justify-center gap-1.5">
+                <Receipt className="h-5 w-5 text-primary" />
+                주문 상세 내역
+              </DialogTitle>
+              <DialogDescription className="text-xs text-slate-400 font-bold flex items-center justify-center gap-1">
+                <Calendar className="h-3.5 w-3.5" />
+                {new Date(orderDetail.createdAt).toLocaleString("ko-KR", {
+                  year: "numeric",
+                  month: "2-digit",
+                  day: "2-digit",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
               </DialogDescription>
-              {orderDetail.payment.status === "REFUND_PENDING" && (
-                <DialogDescription className="text-center text-amber-600">
-                  운영자가 환불 확인 중입니다.
-                </DialogDescription>
-              )}
-              {orderDetail.payment.status === "REFUNDED" && (
-                <DialogDescription className="text-center text-emerald-600">
-                  환불 완료 처리되었습니다.
-                </DialogDescription>
-              )}
-            </DialogHeader>
-            <Table>
-              <TableHeader className="bg-gray-200">
-                <TableRow>
-                  <TableHead className="!text-left font-bold">메뉴</TableHead>
-                  <TableHead className="!text-right">단가</TableHead>
-                  <TableHead className="!text-right">수량</TableHead>
-                  <TableHead className="!text-right">가격</TableHead>
-                  <TableHead className="!text-center">상태</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            </div>
+
+            {/* Payment Warning Banners */}
+            {isRefundPending && (
+              <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30 text-amber-600 dark:text-amber-500 rounded-xl p-3 flex items-center gap-2 text-xs font-bold mb-4 animate-pulse">
+                <Info className="h-4 w-4 shrink-0" />
+                <span>운영자가 환불 확인 중입니다.</span>
+              </div>
+            )}
+            {isRefunded && (
+              <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 text-emerald-600 dark:text-emerald-500 rounded-xl p-3 flex items-center gap-2 text-xs font-bold mb-4">
+                <Info className="h-4 w-4 shrink-0" />
+                <span>환불 처리가 완료되었습니다.</span>
+              </div>
+            )}
+
+            {/* Status Summary Banner */}
+            <div className="bg-slate-50 dark:bg-slate-950/30 border border-slate-100 dark:border-slate-850 p-4 rounded-2xl flex flex-col gap-1 text-xs mb-4">
+              <div className="flex justify-between font-bold text-slate-500">
+                <span>결제 상태</span>
+                <span className="text-primary dark:text-brand-400 font-extrabold">
+                  {getPaymentStatusLabel(orderDetail.payment, orderDetail)}
+                </span>
+              </div>
+              <div className="flex justify-between font-bold text-slate-500">
+                <span>결제코드</span>
+                <span className="text-slate-700 dark:text-slate-300">
+                  {orderDetail.payment.paymentCode !== null ? `${orderDetail.payment.paymentCode}원` : "-"}
+                </span>
+              </div>
+            </div>
+
+            {/* Receipt Item List */}
+            <div className="flex-1 overflow-y-auto no-scrollbar space-y-4 my-2 pr-1 max-h-[35vh]">
+              <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest pl-1">
+                주문 상품 목록
+              </div>
+              <div className="border border-slate-100 dark:border-slate-850 rounded-2xl p-4 bg-slate-50/20 dark:bg-slate-950/10 space-y-3">
                 {menuOrderInfos.map((menuOrderInfo) => {
                   const menuOrder = orderDetail.menuOrders.find((item) => item.menuId === menuOrderInfo!.menuId);
-
                   return (
-                    <TableRow key={menuOrderInfo!.menuId} className="h-14 *:text-base"
-                    >
-                      <TableCell className="text-left font-bold">{menuOrderInfo!.menuName}</TableCell>
-                      <TableCell className="text-right">{menuOrderInfo!.menuPrice.toLocaleString()}</TableCell>
-                      <TableCell className="text-right">{menuOrderInfo!.quantity}</TableCell>
-                      <TableCell className="text-right">{menuOrderInfo!.totalPrice.toLocaleString()}</TableCell>
-                      <TableCell className="text-center">{menuOrder ? getMenuOrderStatusLabel(menuOrder, orderDetail) : "-"}</TableCell>
-                    </TableRow>
+                    <div key={menuOrderInfo!.menuId} className="fc">
+                      <div className="flex justify-between items-start gap-4">
+                        <div className="min-w-0">
+                          <h4 className="font-extrabold text-sm text-slate-800 dark:text-slate-100">
+                            {menuOrderInfo!.menuName}
+                          </h4>
+                          <div className="flex items-center gap-1.5 text-xs text-slate-400 mt-0.5">
+                            <span>₩ {menuOrderInfo!.menuPrice.toLocaleString()}</span>
+                            <span>×</span>
+                            <span className="font-bold text-slate-600 dark:text-slate-300">{menuOrderInfo!.quantity}개</span>
+                          </div>
+                        </div>
+
+                        <div className="fc items-end shrink-0">
+                          <span className="font-extrabold text-sm text-slate-800 dark:text-slate-100">
+                            ₩ {menuOrderInfo!.totalPrice.toLocaleString()}
+                          </span>
+                          <span className="text-[10px] font-bold text-primary dark:text-brand-400 mt-0.5">
+                            {menuOrder ? getMenuOrderStatusLabel(menuOrder, orderDetail) : "-"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
                   );
                 })}
-              </TableBody>
-            </Table>
-            <div className="text-right">
-              <span className="text-right text-lg mr-2">입금금액</span>
-              <span className="text-right text-2xl font-bold">
-                {expectedTransferAmount.toLocaleString()} 원
+              </div>
+            </div>
+
+            {/* Total Row */}
+            <div className="flex justify-between items-center py-4 border-t border-slate-100 dark:border-slate-800 mt-2">
+              <span className="text-sm text-slate-400 dark:text-slate-500 font-bold">최종 입금 금액</span>
+              <span className="text-2xl font-black text-primary dark:text-brand-400">
+                ₩ {expectedTransferAmount.toLocaleString()}
               </span>
             </div>
-            <DialogFooter className="h-fit fr *:flex-1 *:mx-2 *:h-14 *:rounded-2xl *:text-lg">
-              <Button className="bg-blue-500 hover:bg-blue-600 text-white" onClick={handleClose}>닫기</Button>
-            </DialogFooter>
+
+            {/* Close Button */}
+            <Button
+              className="w-full py-4 h-auto rounded-xl bg-primary hover:bg-brand-600 text-white font-extrabold text-sm shadow-[0_8px_20px_rgba(0,61,155,0.2)] hover:shadow-[0_12px_28px_rgba(0,61,155,0.3)] transition-all duration-300 active:scale-[0.98] cursor-pointer"
+              onClick={handleClose}
+            >
+              닫기
+            </Button>
           </>
-        </DialogContent>
+        </BottomSheetContent>
       </Dialog>
     </>
-  )
+  );
 }
+
