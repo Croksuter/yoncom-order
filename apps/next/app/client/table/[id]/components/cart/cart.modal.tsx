@@ -11,21 +11,28 @@ import OrderModal from "../order/order.modal";
 import useTableStore from "~/stores/table.store";
 import { toast } from "~/hooks/use-toast";
 import { useValidateOrder } from "~/hooks/validate-order";
-import { Loader2 } from "lucide-react";
+import { runWithBlockingLoading } from "~/lib/blocking-loading";
+import { isPaymentInstructionOrder } from "~/lib/order-status";
+
+type MenuOrderInfo = {
+  menuId: CartState["menuOrders"][number]["menuId"];
+  menuName: string;
+  menuPrice: number;
+  quantity: CartState["menuOrders"][number]["quantity"];
+  totalPrice: number;
+} | null;
 
 export default function CartModal({
   openState, setOpenState,
-  setPurchaseModalOpenState,
 }: {
   openState: boolean;
   setOpenState: (open: boolean) => void;
-  setPurchaseModalOpenState: (open: boolean) => void;
 }) {
   const [confirmModalOpenState, setConfirmModalOpenState] = useState(false);
   const [modalOpenState, setModalOpenState] = useState(false);
   const [modalMenuOrder, setModalMenuOrder] = useState<CartState["menuOrders"][number] | null>(null);
   const [duringPurchase, setDuringPurchase] = useState(false);
-  const [isOrderCompleted, setIsOrderCompleted] = useState(false);
+  const [checkoutMenuOrderInfos, setCheckoutMenuOrderInfos] = useState<MenuOrderInfo[] | null>(null);
 
   const { clientMenuCategories } = useMenuStore();
   const { menuOrders, purchaseMenuOrders } = useCartStore();
@@ -33,7 +40,7 @@ export default function CartModal({
   const validateOrder = useValidateOrder();
 
   const menus = clientMenuCategories?.flatMap((menuCategory) => menuCategory.menus) ?? [];
-  const menuOrderInfos = menuOrders.map((menuOrder) => {
+  const menuOrderInfos: MenuOrderInfo[] = menuOrders.map((menuOrder) => {
     const menu = menus.find((menu) => menu.id === menuOrder.menuId);
     if (!menu) return null;
     return {
@@ -44,51 +51,77 @@ export default function CartModal({
       totalPrice: menu.price * menuOrder.quantity,
     }
   })
+  const visibleMenuOrderInfos = checkoutMenuOrderInfos ?? menuOrderInfos;
 
-  const noMenuOrder = menuOrderInfos.length === 0 && !isOrderCompleted;
-  const invalidMenuOrder = (menuOrderInfos.length === 0 && !isOrderCompleted)
-    || menuOrderInfos.some((menuOrderInfo) => menuOrderInfo === null)
+  const noMenuOrder = visibleMenuOrderInfos.length === 0;
+  const invalidMenuOrder = visibleMenuOrderInfos.length === 0 || visibleMenuOrderInfos.some((menuOrderInfo) => menuOrderInfo === null)
 
   const handleConfirm = async () => {
     if (duringPurchase) return;
     setDuringPurchase(true);
-    const isValid = await validateOrder(menuOrders);
-    if (!isValid) {
-      setDuringPurchase(false);
-      return;
-    }
-    
-    const res = await purchaseMenuOrders();
-    if (res === null) {
-      setDuringPurchase(false);
-      return;
-    }
-
-    setIsOrderCompleted(true);
-    useCartStore.getState().clearMenuOrders();
-
-    await useTableStore.getState().clientGetTable({
-      tableId: clientTable!.id,
-    });
-    
+    setCheckoutMenuOrderInfos(menuOrderInfos);
     setOpenState(false);
-    
-    setTimeout(() => {
-      setConfirmModalOpenState(true);
-    }, 250);
 
-    setTimeout(() => {
-      setIsOrderCompleted(false);
+    const restoreCartModal = () => {
+      setCheckoutMenuOrderInfos(null);
+      setOpenState(true);
+    };
+
+    try {
+      await runWithBlockingLoading(async () => {
+        const isValid = await validateOrder(menuOrders);
+        if (!isValid) {
+          restoreCartModal();
+          return;
+        }
+
+        const res = await purchaseMenuOrders();
+        if (res === null) {
+          restoreCartModal();
+          return;
+        }
+
+        const tableResponse = await useTableStore.getState().clientGetTable({
+          tableId: clientTable!.id,
+        });
+        if (!tableResponse) {
+          restoreCartModal();
+          return;
+        }
+
+        const latestPaymentOrder = tableResponse.result.tableContexts[0]?.orders.find(isPaymentInstructionOrder);
+        if (!latestPaymentOrder) {
+          toast({
+            title: "결제 안내를 확인할 수 없습니다.",
+            description: "주문 내역을 다시 확인해주세요.",
+            variant: "destructive",
+          });
+          restoreCartModal();
+          return;
+        }
+
+        useCartStore.getState().clearMenuOrders();
+        setCheckoutMenuOrderInfos(null);
+        setConfirmModalOpenState(true);
+      });
+    } finally {
       setDuringPurchase(false);
-    }, 300);
+      if (!useCartStore.getState().menuOrders.length) {
+        setCheckoutMenuOrderInfos(null);
+      }
+    }
   }
+
   const handleClose = () => {
+    if (!duringPurchase) {
+      setCheckoutMenuOrderInfos(null);
+    }
     setOpenState(false);
   }
 
   return (
     <>
-      <Dialog open={openState} onOpenChange={setOpenState}>
+      <Dialog open={openState} onOpenChange={handleClose}>
         <DialogContent className="fixed bottom-0 top-auto left-0 translate-x-0 translate-y-0 w-full max-w-full rounded-t-[2rem] rounded-b-none border-t border-x border-b-0 border-brand-100 bg-background/95 backdrop-blur-lg p-6 pb-8 shadow-[0_-8px_30px_rgb(0,0,0,0.08)] data-[state=open]:animate-in data-[state=open]:slide-in-from-bottom sm:bottom-auto sm:top-[50%] sm:left-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:max-w-md sm:rounded-2xl sm:border sm:shadow-lg sm:p-6 smooth-transition fc justify-between min-h-[25rem] max-h-[85vh]">
           {noMenuOrder || invalidMenuOrder ? (
             <DialogHeader className="py-8 text-center space-y-2">
@@ -115,14 +148,15 @@ export default function CartModal({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {menuOrderInfos.map((menuOrderInfo, index) => (
+                    {visibleMenuOrderInfos.map((menuOrderInfo, index) => (
                       <TableRow
                         key={menuOrderInfo!.menuId}
                         onClick={() => {
+                          if (duringPurchase) return;
                           setModalMenuOrder(menuOrders[index]);
                           setModalOpenState(true)
                         }}
-                        className="h-12 hover:bg-slate-50/50 active:bg-slate-100/50 cursor-pointer border-b border-slate-50 transition-colors"
+                        className={`h-12 border-b border-slate-50 transition-colors ${duringPurchase ? "cursor-not-allowed opacity-80" : "hover:bg-slate-50/50 active:bg-slate-100/50 cursor-pointer"}`}
                       >
                         <TableCell className="text-left font-bold text-foreground text-sm py-2">{menuOrderInfo!.menuName}</TableCell>
                         <TableCell className="text-right text-xs text-muted-foreground py-2">{menuOrderInfo!.menuPrice.toLocaleString()}원</TableCell>
@@ -137,22 +171,15 @@ export default function CartModal({
               <div className="fr justify-between items-center py-2 px-1 mb-4">
                 <span className="text-base text-muted-foreground font-medium">최종 결제 금액</span>
                 <span className="text-2xl font-bold text-brand-600">
-                  {menuOrderInfos.reduce((acc, menuOrderInfo) => acc + menuOrderInfo!.totalPrice, 0).toLocaleString()}원
+                  {visibleMenuOrderInfos.reduce((acc, menuOrderInfo) => acc + menuOrderInfo!.totalPrice, 0).toLocaleString()}원
                 </span>
               </div>
 
               <DialogFooter className="fr gap-3 *:flex-1 *:h-12 *:rounded-xl *:text-base">
                 <Button variant="outline" onClick={handleClose} disabled={duringPurchase} className="border-slate-200 hover:bg-slate-50">취소</Button>
-                {duringPurchase ? (
-                  <Button disabled className="bg-brand-400 text-white cursor-not-allowed">
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    주문 처리 중...
-                  </Button>
-                ) : (
-                  <Button className="bg-brand-500 hover:bg-brand-600 text-white shadow-md shadow-brand-500/10 hover-lift active:scale-98 transition-all" onClick={handleConfirm}>
-                    주문 완료하기
-                  </Button>
-                )}
+                <Button className="bg-brand-500 hover:bg-brand-600 text-white shadow-md shadow-brand-500/10 hover-lift active:scale-98 transition-all" onClick={handleConfirm} disabled={duringPurchase}>
+                  주문 완료하기
+                </Button>
               </DialogFooter>
             </>
           )}

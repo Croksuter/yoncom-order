@@ -80,8 +80,6 @@ const useCartStore = create<CartState>((set, get) => ({
           title: "주문이 완료되었습니다.",
           duration: 3000,
         });
-        get().clearMenuOrders();
-        useTableStore.getState().clientGetTable({ tableId: table.id });
       },
     })
   },

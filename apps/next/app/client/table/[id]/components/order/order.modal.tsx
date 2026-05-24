@@ -1,5 +1,4 @@
-
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "~/components/ui/dialog";
 import OrderPaymentModal from "./order.payment.modal";
@@ -7,6 +6,17 @@ import useMenuStore from "~/stores/menu.store";
 import useTableStore from "~/stores/table.store";
 import { toast } from "~/hooks/use-toast";
 import { isPaymentInstructionOrder, isPaymentPaid } from "~/lib/order-status";
+import { runWithBlockingLoading } from "~/lib/blocking-loading";
+import * as ClientTableResponse from "shared/types/responses/client/table";
+
+type ClientOrder = ClientTableResponse.Get["result"]["tableContexts"][number]["orders"][number];
+
+type PaymentSnapshot = {
+  originalAmount: number;
+  paymentCode: number | null;
+  expectedTransferAmount: number;
+  expiresAt: number | null;
+};
 
 export default function OrderModal({
   openState, setOpenState,
@@ -15,191 +25,157 @@ export default function OrderModal({
   setOpenState: (open: boolean) => void;
 }) {
   const [orderPaymentModalOpen, setOrderPaymentModalOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const paymentModalTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [paymentSnapshot, setPaymentSnapshot] = useState<PaymentSnapshot | null>(null);
+  const [isBusy, setIsBusy] = useState(false);
   const { clientTable } = useTableStore();
   const { clientMenuCategories } = useMenuStore();
-
-  useEffect(() => {
-    let cancelled = false;
-
-    if (!openState || !clientTable?.id) {
-      setLoading(false);
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    const refreshTable = async () => {
-      setLoading(true);
-      try {
-        await useTableStore.getState().clientGetTable({
-          tableId: clientTable.id,
-        });
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    };
-
-    void refreshTable();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [openState, clientTable?.id]);
-
-  useEffect(() => {
-    return () => {
-      if (paymentModalTimerRef.current) {
-        clearTimeout(paymentModalTimerRef.current);
-      }
-    };
-  }, []);
 
   const menus = clientMenuCategories ? clientMenuCategories.flatMap((menuCategory) => menuCategory.menus) : [];
   const order = clientTable?.tableContexts[0]?.orders.find(isPaymentInstructionOrder);
   const menuOrders = order?.menuOrders ?? [];
   const hasOrder = !!order && menuOrders.length > 0;
 
-  const calculatedAmount = menuOrders.reduce((acc, menuOrder) => {
-    const targetMenu = menus.find((menu) => menu.id === menuOrder.menuId);
-    return acc + (targetMenu ? targetMenu.price : 0) * menuOrder.quantity;
-  }, 0);
-  const originalAmount = order?.payment.originalAmount ?? calculatedAmount;
-  const expectedTransferAmount = order?.payment.expectedTransferAmount ?? order?.payment.amount ?? 0;
-  const paymentCode = order?.payment.paymentCode ?? null;
-  const expiresAt = typeof order?.payment.expiresAt === "number" ? order.payment.expiresAt : null;
+  const createPaymentSnapshot = (targetOrder: ClientOrder): PaymentSnapshot => {
+    const calculatedAmount = targetOrder.menuOrders.reduce((acc, menuOrder) => {
+      const targetMenu = menus.find((menu) => menu.id === menuOrder.menuId);
+      return acc + (targetMenu ? targetMenu.price : 0) * menuOrder.quantity;
+    }, 0);
+
+    return {
+      originalAmount: targetOrder.payment.originalAmount ?? calculatedAmount,
+      expectedTransferAmount: targetOrder.payment.expectedTransferAmount ?? targetOrder.payment.amount ?? 0,
+      paymentCode: targetOrder.payment.paymentCode ?? null,
+      expiresAt: typeof targetOrder.payment.expiresAt === "number" ? targetOrder.payment.expiresAt : null,
+    };
+  };
+
+  const getLatestPaymentInstructionOrder = async () => {
+    if (!clientTable?.id) {
+      toast({
+        title: "테이블 정보를 불러오는데 실패했습니다.",
+        description: "다시 시도해주세요.",
+        variant: "destructive",
+      });
+      return null;
+    }
+
+    const success = await useTableStore.getState().clientGetTable({
+      tableId: clientTable.id,
+    });
+    if (!success) return null;
+
+    const latestOrder = success.result.tableContexts[0]?.orders.find(isPaymentInstructionOrder);
+    if (!latestOrder || isPaymentPaid(latestOrder.payment)) {
+      toast({
+        title: "결제 안내가 종료되었습니다.",
+        description: isPaymentPaid(latestOrder?.payment) ? "이미 결제 완료된 주문입니다." : "확인할 주문이 없습니다.",
+      });
+      return null;
+    }
+
+    return latestOrder;
+  };
+
+  const restoreOrderModal = () => {
+    setOpenState(true);
+  };
 
   const handleTossPayment = async () => {
-    if (loading) return;
-    setLoading(true);
-    try {
-      const success = await useTableStore.getState().clientGetTable({
-        tableId: clientTable!.id,
-      });
-      if (!success) {
-        toast({
-          title: "테이블 정보를 불러오는데 실패했습니다.",
-          description: "다시 시도해주세요.",
-          variant: "destructive",
-        });
-        return;
-      }
-      const latestOrder = success.result.tableContexts[0]?.orders.find(isPaymentInstructionOrder);
-      if (!latestOrder || isPaymentPaid(latestOrder.payment)) {
-        toast({
-          title: "결제 안내가 종료되었습니다.",
-          description: isPaymentPaid(latestOrder?.payment) ? "이미 결제 완료된 주문입니다." : "확인할 주문이 없습니다.",
-        });
-        handleClose();
-        return;
-      }
+    if (isBusy) return;
+    setIsBusy(true);
+    setOpenState(false);
 
-      const transferAmount = latestOrder.payment.expectedTransferAmount ?? latestOrder.payment.amount;
-      window.open(`supertoss://send?amount=${transferAmount}&bank=국민은행&accountNo=94580201548620`, "_blank");
-      handleClose();
+    try {
+      await runWithBlockingLoading(async () => {
+        const latestOrder = await getLatestPaymentInstructionOrder();
+        if (!latestOrder) {
+          restoreOrderModal();
+          return;
+        }
+
+        const transferAmount = latestOrder.payment.expectedTransferAmount ?? latestOrder.payment.amount;
+        window.open(`supertoss://send?amount=${transferAmount}&bank=국민은행&accountNo=94580201548620`, "_blank");
+      });
     } finally {
-      setLoading(false);
+      setIsBusy(false);
     }
-  }
+  };
 
   const handleDirectTransfer = async () => {
-    if (loading) return;
-    setLoading(true);
+    if (isBusy) return;
+    setIsBusy(true);
+    setOpenState(false);
+
     try {
-      const success = await useTableStore.getState().clientGetTable({
-        tableId: clientTable!.id,
-      });
-      if (!success) {
-        toast({
-          title: "테이블 정보를 불러오는데 실패했습니다.",
-          description: "다시 시도해주세요.",
-          variant: "destructive",
-        });
-        return;
-      }
-      const latestOrder = success.result.tableContexts[0]?.orders.find(isPaymentInstructionOrder);
-      if (!latestOrder || isPaymentPaid(latestOrder.payment)) {
-        toast({
-          title: "결제 안내가 종료되었습니다.",
-          description: isPaymentPaid(latestOrder?.payment) ? "이미 결제 완료된 주문입니다." : "확인할 주문이 없습니다.",
-        });
-        handleClose();
-        return;
-      }
-      handleClose();
-      if (paymentModalTimerRef.current) {
-        clearTimeout(paymentModalTimerRef.current);
-      }
-      paymentModalTimerRef.current = setTimeout(() => {
+      await runWithBlockingLoading(async () => {
+        const latestOrder = await getLatestPaymentInstructionOrder();
+        if (!latestOrder) {
+          restoreOrderModal();
+          return;
+        }
+
+        setPaymentSnapshot(createPaymentSnapshot(latestOrder));
         setOrderPaymentModalOpen(true);
-        paymentModalTimerRef.current = null;
-      }, 250);
+      });
     } finally {
-      setLoading(false);
+      setIsBusy(false);
     }
-  }
+  };
 
   const handleCancelOrder = async () => {
-    if (loading) return;
-    setLoading(true);
+    if (isBusy) return;
+    setIsBusy(true);
+    setOpenState(false);
+
     try {
-      const success = await useTableStore.getState().clientGetTable({
-        tableId: clientTable!.id,
-      });
-      if (!success) {
-        toast({
-          title: "테이블 정보를 불러오는데 실패했습니다.",
-          description: "다시 시도해주세요.",
-          variant: "destructive",
-        });
-        return;
-      }
-      const latestOrder = success.result.tableContexts[0]?.orders.find(isPaymentInstructionOrder);
-      if (!latestOrder || isPaymentPaid(latestOrder.payment)) {
-        toast({
-          title: "주문을 취소할 수 없습니다.",
-          description: isPaymentPaid(latestOrder?.payment) ? "이미 결제 완료된 주문은 운영자에게 문의해주세요." : "취소할 주문이 없습니다.",
-        });
-        handleClose();
-        return;
-      }
+      await runWithBlockingLoading(async () => {
+        const latestOrder = await getLatestPaymentInstructionOrder();
+        if (!latestOrder) {
+          restoreOrderModal();
+          return;
+        }
 
-      await useTableStore.getState().clientCancelOrder({
-        orderId: latestOrder.id,
-      });
+        const cancelled = await useTableStore.getState().clientCancelOrder({
+          orderId: latestOrder.id,
+        });
+        if (!cancelled) {
+          restoreOrderModal();
+          return;
+        }
 
-      setOpenState(false);
+        if (clientTable?.id) {
+          await useTableStore.getState().clientGetTable({ tableId: clientTable.id });
+        }
+      });
     } finally {
-      setLoading(false);
+      setIsBusy(false);
     }
-  }
+  };
 
   const handleClose = () => {
+    if (isBusy) return;
     setOpenState(false);
-  }
+  };
 
   return (
     <>
       <Dialog open={openState} onOpenChange={handleClose}>
         <DialogContent className="w-[96%] border-blue-500 border-2 rounded-xl min-h-[200px] flex flex-col justify-center">
-          {loading || !hasOrder ? (
-            <div className="flex flex-col items-center justify-center py-12 space-y-4">
-              <div className="w-12 h-12 border-4 border-blue-100 border-t-blue-500 rounded-full animate-spin"></div>
-              <p className="text-blue-500 font-semibold text-lg animate-pulse">입금 정보를 불러오고 있습니다...</p>
-            </div>
+          {!hasOrder ? (
+            <DialogHeader className="py-8 text-center space-y-2">
+              <DialogTitle className="text-xl font-bold text-muted-foreground">결제 안내를 확인할 수 없습니다</DialogTitle>
+              <DialogDescription className="text-sm text-muted-foreground">주문 내역을 다시 확인해주세요.</DialogDescription>
+            </DialogHeader>
           ) : (
             <>
               <DialogHeader className="fc items-center my-4">
-                <DialogTitle />
+                <DialogTitle className="sr-only">입금 안내</DialogTitle>
                 <div className="fr w-full justify-start !-mt-4">
                   <Button
                     variant="destructive"
                     className="w-fit h-10 rounded-xl"
                     onClick={handleCancelOrder}
-                    disabled={loading}
+                    disabled={isBusy}
                   >주문 취소</Button>
                 </div>
                 <span className="text-blue-500 text-2xl font-extrabold text-center z-10 bg-white px-2 w-fit">입금 안내</span>
@@ -211,21 +187,23 @@ export default function OrderModal({
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter className="fr *:flex-1 *:mx-2 *:h-14 *:rounded-2xl *:text-lg *:my-2">
-                <Button variant="outline" onClick={handleDirectTransfer} disabled={loading}>직접 이체</Button>
-                <Button className="bg-blue-500 hover:bg-blue-600 text-white" onClick={handleTossPayment} disabled={loading}>토스 이체</Button>
+                <Button variant="outline" onClick={handleDirectTransfer} disabled={isBusy}>직접 이체</Button>
+                <Button className="bg-blue-500 hover:bg-blue-600 text-white" onClick={handleTossPayment} disabled={isBusy}>토스 이체</Button>
               </DialogFooter>
             </>
           )}
         </DialogContent>
       </Dialog >
-      <OrderPaymentModal
-        openState={orderPaymentModalOpen}
-        setOpenState={setOrderPaymentModalOpen}
-        originalAmount={originalAmount}
-        paymentCode={paymentCode}
-        expectedTransferAmount={expectedTransferAmount}
-        expiresAt={expiresAt}
-      />
+      {paymentSnapshot && (
+        <OrderPaymentModal
+          openState={orderPaymentModalOpen}
+          setOpenState={setOrderPaymentModalOpen}
+          originalAmount={paymentSnapshot.originalAmount}
+          paymentCode={paymentSnapshot.paymentCode}
+          expectedTransferAmount={paymentSnapshot.expectedTransferAmount}
+          expiresAt={paymentSnapshot.expiresAt}
+        />
+      )}
     </>
   );
 }

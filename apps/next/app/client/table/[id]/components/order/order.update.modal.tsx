@@ -1,14 +1,13 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "~/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "~/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
 import useCartStore, { CartState } from "~/stores/cart.store";
-import { MinusIcon, PlusIcon, Loader2 } from "lucide-react";
+import { MinusIcon, PlusIcon } from "lucide-react";
 import useMenuStore from "~/stores/menu.store";
-import { toast } from "~/hooks/use-toast";
-import useTableStore from "~/stores/table.store";
 import { useValidateOrder } from "~/hooks/validate-order";
+import { runWithBlockingLoading } from "~/lib/blocking-loading";
 
 export default function OrderUpdateModal({
   menuOrder,
@@ -18,7 +17,6 @@ export default function OrderUpdateModal({
   openState: boolean;
   setOpenState: any;
 }) {
-  const { clientTable } = useTableStore();
   const [quantity, setQuantity] = useState<number>(0);
   const [invalid, setInvalid] = useState(false);
   const [duringConfirm, setDuringConfirm] = useState(false);
@@ -41,18 +39,25 @@ export default function OrderUpdateModal({
     }
 
     setDuringConfirm(true);
+    setInvalid(false);
+    setOpenState(false);
     try {
-      const isValid = await validateOrder([{ menuId: menu.id, quantity }]);
-      if (!isValid) return;
+      await runWithBlockingLoading(async () => {
+        const isValid = await validateOrder([{ menuId: menu.id, quantity }]);
+        if (!isValid) {
+          setOpenState(true);
+          return;
+        }
 
-      updateMenuOrder(menuOrder.menuId, { menuId: menuOrder.menuId, quantity });
-      handleClose();
+        updateMenuOrder(menuOrder.menuId, { menuId: menuOrder.menuId, quantity });
+      });
     } finally {
       setDuringConfirm(false);
     }
   }
 
   const handleClose = () => {
+    if (duringConfirm) return;
     setInvalid(false);
     setQuantity(menuOrder.quantity);
     setOpenState(false);
@@ -87,14 +92,7 @@ export default function OrderUpdateModal({
         <DialogDescription className={`-mt-2 text-right ${invalid ? "dangerTXT" : "hidden"}`}>⚠︎ 올바른 수량을 입력하세요.</DialogDescription>
         <DialogFooter className="fr *:flex-1 *:mx-2 *:h-14 *:rounded-2xl *:text-lg">
           <Button variant="outline" onClick={handleClose} disabled={duringConfirm}>취소</Button>
-          {duringConfirm ? (
-            <Button disabled className="bg-blue-400 text-white cursor-not-allowed">
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              수정 중...
-            </Button>
-          ) : (
-            <Button className="bg-blue-500 hover:bg-blue-600 text-white" onClick={handleConfirm}>수정하기</Button>
-          )}
+          <Button className="bg-blue-500 hover:bg-blue-600 text-white" onClick={handleConfirm} disabled={duringConfirm}>수정하기</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog >

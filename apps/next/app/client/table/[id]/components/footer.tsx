@@ -6,7 +6,7 @@ import useTableStore from "~/stores/table.store";
 import OrderModal from "./order/order.modal";
 import OrderHistoryModal from "./order/order.history.modal";
 import { isPaymentInstructionOrder, isUnresolvedPaymentOrder } from "~/lib/order-status";
-import { Loader2 } from "lucide-react";
+import { runWithBlockingLoading } from "~/lib/blocking-loading";
 
 export default function Footer() {
   const [purchaseModalOpen, setPurchaseModalOpen] = useState(false);
@@ -38,10 +38,10 @@ export default function Footer() {
   }, [clientTable]);
 
   const refreshClientTable = async () => {
-    if (!clientTable?.id) return clientTable;
+    if (!clientTable?.id) return null;
 
     const response = await clientGetTable({ tableId: clientTable.id });
-    return response?.result ?? useTableStore.getState().clientTable ?? clientTable;
+    return response?.result ?? null;
   }
 
   const handleOpenOrderHistory = async () => {
@@ -49,8 +49,12 @@ export default function Footer() {
 
     setIsRefreshingTable(true);
     try {
-      await refreshClientTable();
-      setOrderHistoryModalOpen(true);
+      await runWithBlockingLoading(async () => {
+        const latestClientTable = await refreshClientTable();
+        if (latestClientTable) {
+          setOrderHistoryModalOpen(true);
+        }
+      });
     } finally {
       setIsRefreshingTable(false);
     }
@@ -61,13 +65,17 @@ export default function Footer() {
 
     setIsRefreshingTable(true);
     try {
-      const latestClientTable = await refreshClientTable();
-      const latestUnresolvedPaymentOrder = findUnresolvedPaymentOrder(latestClientTable);
-      if (latestUnresolvedPaymentOrder && isPaymentInstructionOrder(latestUnresolvedPaymentOrder)) {
-        setPurchaseModalOpen(true);
-      } else {
-        setOrderHistoryModalOpen(true);
-      }
+      await runWithBlockingLoading(async () => {
+        const latestClientTable = await refreshClientTable();
+        if (!latestClientTable) return;
+
+        const latestUnresolvedPaymentOrder = findUnresolvedPaymentOrder(latestClientTable);
+        if (latestUnresolvedPaymentOrder && isPaymentInstructionOrder(latestUnresolvedPaymentOrder)) {
+          setPurchaseModalOpen(true);
+        } else {
+          setOrderHistoryModalOpen(true);
+        }
+      });
     } finally {
       setIsRefreshingTable(false);
     }
@@ -83,7 +91,7 @@ export default function Footer() {
             onClick={handleOpenOrderHistory}
             disabled={isRefreshingTable}
           >
-            <span className="leading-6 text-gray-500">{isRefreshingTable ? "확인 중" : <>이전<br />주문내역</>}</span>
+            <span className="leading-6 text-gray-500">이전<br />주문내역</span>
           </Button>
         </div>
         {inProgressOrderRemain
@@ -92,7 +100,7 @@ export default function Footer() {
               onClick={handleOpenUnresolvedOrder}
               disabled={isRefreshingTable}
               className="fc flex-1 h-full rounded-3xl bg-gray-500 text-white text-2xl hover:cursor-pointer hover:bg-gray-600"
-            >{isRefreshingTable && <Loader2 className="mb-1 h-5 w-5 animate-spin" />}{needsManualReview ? "입금 확인 중" : "입금 안내"}<br /><span className="-mt-2 text-sm text-gray-300">
+            >{needsManualReview ? "입금 확인 중" : "입금 안내"}<br /><span className="-mt-2 text-sm text-gray-300">
               {needsManualReview ? "운영자 확인이 필요한 주문이 있습니다." : "입금 확인 전 주문이 있습니다."}
             </span>
             </Button>
@@ -114,7 +122,6 @@ export default function Footer() {
         <CartModal
           openState={orderModalOpen}
           setOpenState={setOrderModalOpen}
-          setPurchaseModalOpenState={setPurchaseModalOpen}
         />
         <OrderHistoryModal
           openState={orderHistoryModalOpen}

@@ -7,6 +7,7 @@ import { useLoadingStore } from "~/stores/loading.store";
 export default function GlobalLoading() {
   const activeQueries = useLoadingStore((state) => state.activeQueries);
   const activeMutations = useLoadingStore((state) => state.activeMutations);
+  const activeBlockingLoads = useLoadingStore((state) => state.activeBlockingLoads);
 
   // CSR(Client Side Rendering) 수화(Hydration) 에러 방지
   const [mounted, setMounted] = useState(false);
@@ -19,7 +20,8 @@ export default function GlobalLoading() {
   if (!mounted) return null;
 
   const showQueryBar = activeQueries > 0;
-  const showMutationOverlay = activeMutations > 0;
+  const showBlockingOverlay = activeMutations > 0 || activeBlockingLoads > 0;
+  const overlayLabel = activeMutations > 0 ? "처리 중" : "로딩 중";
 
   return (
     <>
@@ -30,10 +32,10 @@ export default function GlobalLoading() {
         }`}
       />
 
-      {/* 2. Glassmorphic Dimmed Overlay (POST/PUT/DELETE Mutations) */}
+      {/* 2. Glassmorphic Dimmed Overlay (mutations and user-triggered blocking loads) */}
       <div
         className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-slate-950/20 dark:bg-black/40 backdrop-blur-sm transition-all duration-300 ${
-          showMutationOverlay
+          showBlockingOverlay
             ? "opacity-100 pointer-events-auto scale-100"
             : "opacity-0 pointer-events-none scale-105"
         }`}
@@ -45,10 +47,7 @@ export default function GlobalLoading() {
             <Loader2 className="w-10 h-10 text-brand-500 animate-spin relative z-10" />
           </div>
           <div className="space-y-1.5">
-            <p className="font-semibold text-foreground text-base">요청 처리 중</p>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              안전하게 처리하고 있습니다.<br />잠시만 기다려 주세요.
-            </p>
+            <p className="font-semibold text-foreground text-base">{overlayLabel}</p>
           </div>
         </div>
       </div>

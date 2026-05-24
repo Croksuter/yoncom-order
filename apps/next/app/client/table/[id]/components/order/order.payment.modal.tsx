@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "~/components/ui/button";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "~/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "~/components/ui/dialog";
 import { toast } from "~/hooks/use-toast";
 import { Copy, Check, Clock, AlertTriangle } from "lucide-react";
 
@@ -141,6 +141,9 @@ export default function OrderPaymentModal({
           <DialogTitle className="text-2xl font-bold tracking-tight text-center text-foreground">
             입금 정보 안내
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            결제코드가 반영된 입금액과 계좌 정보를 확인합니다.
+          </DialogDescription>
           
           {expiresAt && (
             <div className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 rounded-2xl p-4 flex flex-col items-center justify-center space-y-2 relative overflow-hidden">
