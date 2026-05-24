@@ -24,6 +24,10 @@ function getUserFacingErrorMessage(error?: string) {
     "Payment Cannot Be Marked Paid": "취소, 만료, 환불 상태의 결제는 결제 완료로 되돌릴 수 없습니다.",
     "There are unfinished orders": "아직 조리 중이거나 수령 대기 중인 메뉴가 있어 테이블을 비울 수 없습니다.",
     "Refund Pending Orders Exist": "환불 대기 중인 주문이 있어 테이블을 비울 수 없습니다.",
+    "Active table session not available": "현재 비활성화된 테이블입니다. 직원에게 테이블 활성화를 요청해주세요.",
+    "Table session required": "테이블 접속 세션이 필요합니다. 테이블 페이지를 다시 열어주세요.",
+    "Invalid table session": "테이블 접속 세션이 만료되었습니다. 직원에게 테이블 활성화를 요청해주세요.",
+    "Image Not Found": "이미지를 찾을 수 없습니다.",
     FEATURE_UNAVAILABLE: "현재 운영 화면에서 사용하지 않는 기능입니다.",
     Unauthorized: "로그인이 필요합니다.",
     Forbidden: "관리자 권한이 필요합니다.",
@@ -41,7 +45,7 @@ export default async function kyErrorHandler(error: unknown) {
   if (error instanceof HTTPError) {
     const res = await error.response.json<ClientErrorResponse.Error>().catch(() => null);
 
-    console.error(new Date().toLocaleString(), "HTTP Error:", res?.error ?? error.response.status);
+    console.warn(new Date().toLocaleString(), "HTTP Error:", res?.error ?? error.response.status);
     toast({
       variant: "destructive",
       title: "오류가 발생했습니다.",
@@ -49,7 +53,7 @@ export default async function kyErrorHandler(error: unknown) {
       duration: 3000,
     });
   } else {
-    console.error(new Date().toLocaleString(), "Fetch Error:", error);
+    console.warn(new Date().toLocaleString(), "Fetch Error:", error);
     toast({
       variant: "destructive",
       title: "오류가 발생했습니다.",

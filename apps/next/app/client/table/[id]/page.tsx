@@ -1,5 +1,6 @@
 "use client";
 
+import { HTTPError } from "ky";
 import { use, useCallback, useEffect, useRef, useState } from "react";
 import useMenuStore from "~/stores/menu.store";
 import useTableStore from "~/stores/table.store";
@@ -16,6 +17,7 @@ import { useRealtimeSync } from "~/hooks/use-realtime-sync";
 import { api } from "~/lib/query";
 import type * as ClientTableResponse from "shared/types/responses/client/table";
 import { traceEvent } from "~/lib/verification-trace";
+import kyErrorHandler from "~/lib/ky-error-handler";
 
 type ClientTablePageProps = {
   params: Promise<{ id: string }>;
@@ -32,6 +34,10 @@ type TableSyncResponse = {
   };
 };
 
+const TABLE_UNAVAILABLE_MESSAGE = "현재 이용할 수 없는 테이블입니다.";
+const TABLE_UNAVAILABLE_DESCRIPTION = "직원에게 테이블 활성화를 요청해주세요.";
+const tableAccessFailureStatuses = new Set([401, 403, 404, 409]);
+
 function normalizeClientTable(table: ClientTableResponse.Get["result"]) {
   return {
     ...table,
@@ -44,16 +50,21 @@ function normalizeClientTable(table: ClientTableResponse.Get["result"]) {
   };
 }
 
+function isTableAccessFailure(error: unknown) {
+  return error instanceof HTTPError && tableAccessFailureStatuses.has(error.response.status);
+}
+
 export default function ClientTablePage({ params }: ClientTablePageProps) {
   const { id } = use(params);
   const { clientTable } = useTableStore();
   const { clientMenuCategories } = useMenuStore();
   const [loading, setLoading] = useState(true);
+  const [tableAccessMessage, setTableAccessMessage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"menu" | "orders">("menu");
   const isValidTableId = id.length === 15;
   const activeUnpaidOrder = clientTable?.tableContexts[0]?.orders.find(isPaymentInstructionOrder);
   const [isVerified, setIsVerified] = useState(false);
-  const tableScope = isValidTableId ? `table:${id}` : null;
+  const tableScope = isValidTableId && clientTable?.id === id && !tableAccessMessage ? `table:${id}` : null;
   const revisionRef = useRef(0);
   const setTracedActiveTab = useCallback((tab: "menu" | "orders") => {
     traceEvent("client", "ui.panel.state", {
@@ -70,27 +81,41 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
     }
   }, [id, isValidTableId]);
 
+  const markTableUnavailable = useCallback(() => {
+    revisionRef.current = 0;
+    setTableAccessMessage(TABLE_UNAVAILABLE_MESSAGE);
+    useTableStore.setState({ clientTable: null, isLoaded: false, error: true });
+  }, []);
+
   const syncClientTable = useCallback(async (afterRevision = revisionRef.current) => {
     if (!isValidTableId) return;
 
-    const response = await api.get("sync/table", {
-      searchParams: { tableId: id, afterRevision },
-    }).json<TableSyncResponse>();
-    revisionRef.current = response.result.revision;
+    try {
+      const response = await api.get("sync/table", {
+        searchParams: { tableId: id, afterRevision },
+      }).json<TableSyncResponse>();
+      revisionRef.current = response.result.revision;
 
-    if (response.result.snapshot?.table) {
-      useTableStore.setState({
-        clientTable: normalizeClientTable(response.result.snapshot.table),
-        isLoaded: true,
-        error: false,
-      });
-      return;
-    }
+      if (response.result.snapshot?.table) {
+        setTableAccessMessage(null);
+        useTableStore.setState({
+          clientTable: normalizeClientTable(response.result.snapshot.table),
+          isLoaded: true,
+          error: false,
+        });
+        return;
+      }
 
-    if (response.result.events.length > 0 || response.result.gap) {
-      await refreshClientTable();
+      if (response.result.events.length > 0 || response.result.gap) {
+        await refreshClientTable();
+      }
+    } catch (error) {
+      if (isTableAccessFailure(error)) {
+        markTableUnavailable();
+      }
+      void kyErrorHandler(error);
     }
-  }, [id, isValidTableId, refreshClientTable]);
+  }, [id, isValidTableId, markTableUnavailable, refreshClientTable]);
 
   const syncClientTableFromRealtime = useCallback(() => {
     void syncClientTable();
@@ -110,6 +135,7 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
   useEffect(() => {
     const fetchTableData = async () => {
       setLoading(true);
+      setTableAccessMessage(null);
       useTableStore.setState({ clientTable: null });
 
       if (!isValidTableId) {
@@ -119,19 +145,25 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
 
       try {
         const session = await useTableStore.getState().clientStartTableSession({ tableId: id });
-        if (!session) return;
+        if (!session) {
+          markTableUnavailable();
+          return;
+        }
 
         revisionRef.current = 0;
         await syncClientTable(0);
       } catch (error) {
-        console.error("Failed to load table:", error);
+        if (isTableAccessFailure(error)) {
+          markTableUnavailable();
+        }
+        void kyErrorHandler(error);
       } finally {
         setLoading(false);
       }
     };
 
     void fetchTableData();
-  }, [id, isValidTableId, syncClientTable]);
+  }, [id, isValidTableId, markTableUnavailable, syncClientTable]);
 
   useEffect(() => {
     if (!clientTable) {
@@ -229,9 +261,11 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
       ) : (
         <div className="p-6 text-center">
           <h1 className="text-xl font-bold">
-            {isValidTableId ? "존재하지 않는 테이블입니다." : "올바르지 않은 테이블 주소입니다."}
+            {isValidTableId ? tableAccessMessage ?? "존재하지 않는 테이블입니다." : "올바르지 않은 테이블 주소입니다."}
           </h1>
-          <p className="mt-2 text-sm text-slate-500">tableId: {id}</p>
+          <p className="mt-2 text-sm text-slate-500">
+            {isValidTableId && tableAccessMessage ? TABLE_UNAVAILABLE_DESCRIPTION : `tableId: ${id}`}
+          </p>
         </div>
       )}
     </main>
