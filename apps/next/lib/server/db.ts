@@ -54,6 +54,10 @@ class D1HttpPreparedStatement {
     const result = await this.database.query<Record<string, T>>(this.sql, this.params);
     return (result.results ?? []).map((row) => Object.values(row));
   }
+
+  toD1Query() {
+    return { sql: this.sql, params: this.params };
+  }
 }
 
 class D1HttpDatabase {
@@ -72,7 +76,7 @@ class D1HttpDatabase {
   }
 
   async batch<T = D1ApiRow>(statements: D1HttpPreparedStatement[]) {
-    return Promise.all(statements.map((statement) => statement.all<T>()));
+    return this.queryBatch<T>(statements.map((statement) => statement.toD1Query()));
   }
 
   async exec(sql: string) {
@@ -81,7 +85,7 @@ class D1HttpDatabase {
       .map((statement) => statement.trim())
       .filter(Boolean);
 
-    const results = await Promise.all(statements.map((statement) => this.query(statement, [])));
+    const results = await this.queryBatch(statements.map((statement) => ({ sql: statement, params: [] })));
     return {
       count: results.reduce((count, result) => count + (result.results?.length ?? 0), 0),
       duration: results.reduce((duration, result) => duration + Number(result.meta?.duration ?? 0), 0),
@@ -89,28 +93,35 @@ class D1HttpDatabase {
   }
 
   async query<T = D1ApiRow>(sql: string, params: unknown[]): Promise<D1ApiQueryResult<T>> {
+    return (await this.queryBatch<T>([{ sql, params }]))[0];
+  }
+
+  async queryBatch<T = D1ApiRow>(
+    statements: Array<{ sql: string; params: unknown[] }>,
+  ): Promise<Array<D1ApiQueryResult<T>>> {
     const response = await fetch(this.endpoint, {
       method: "POST",
       headers: {
         authorization: `Bearer ${this.token}`,
         "content-type": "application/json",
       },
-      body: JSON.stringify({ sql, params }),
+      body: JSON.stringify(statements.length === 1 ? statements[0] : { batch: statements }),
       cache: "no-store",
     });
 
     const payload = (await response.json().catch(() => null)) as D1ApiResponse<T> | null;
-    const result = payload?.result?.[0];
+    const results = payload?.result ?? [];
+    const failed = results.find((result) => !result.success);
 
-    if (!response.ok || !payload?.success || !result?.success) {
+    if (!response.ok || !payload?.success || failed || results.length === 0) {
       const message =
-        result?.error ??
+        failed?.error ??
         payload?.errors?.map((error) => error.message).join(", ") ??
         `D1 query failed with ${response.status}`;
       throw new Error(message);
     }
 
-    return result;
+    return results;
   }
 }
 
@@ -238,6 +249,18 @@ export async function queryD1<T = D1ApiRow>(sql: string, params: unknown[] = [])
 export async function queryD1Result<T = D1ApiRow>(sql: string, params: unknown[] = []) {
   const { database } = getD1Database();
   return await database.query<T>(sql, params);
+}
+
+export async function queryD1Batch<T = D1ApiRow>(
+  statements: Array<{ sql: string; params?: unknown[] }>,
+) {
+  const { database } = getD1Database();
+  return await database.queryBatch<T>(
+    statements.map((statement) => ({
+      sql: statement.sql,
+      params: statement.params ?? [],
+    })),
+  );
 }
 
 export async function executeD1(sql: string, params: unknown[] = []) {

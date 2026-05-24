@@ -6,6 +6,7 @@ export type D1Request = {
   authorization: string | null;
   sql: string;
   params: unknown[];
+  batch?: Array<{ sql: string; params: unknown[] }>;
 };
 
 export function d1Success(results: unknown[], meta: Record<string, unknown> = { duration: 1 }) {
@@ -50,13 +51,15 @@ export function installD1FetchMock(
     const body = JSON.parse(String(init?.body ?? "{}")) as {
       sql?: string;
       params?: unknown[];
+      batch?: Array<{ sql: string; params: unknown[] }>;
     };
     const request = {
       url,
       method: init?.method ?? "GET",
       authorization: headers.get("authorization"),
-      sql: body.sql ?? "",
-      params: body.params ?? [],
+      sql: body.batch ? "" : body.sql ?? "",
+      params: body.batch ? [] : body.params ?? [],
+      ...(body.batch ? { batch: body.batch } : {}),
     };
     requests.push(request);
     return resolver(request);

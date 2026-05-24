@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Button } from "~/components/ui/button";
 import CartModal from "./cart/cart.modal";
 import useCartStore from "~/stores/cart.store";
@@ -30,19 +30,6 @@ export default function Footer({
   const unresolvedPaymentOrder = findUnresolvedPaymentOrder(clientTable);
   const inProgressOrderRemain = !!unresolvedPaymentOrder;
   const needsManualReview = unresolvedPaymentOrder?.payment.status === "MANUAL_REVIEW";
-
-  useEffect(() => {
-    if (inProgressOrderRemain) {
-      const interval = setInterval(() => {
-        if (inProgressOrderRemain) {
-          void clientGetTable({
-            tableId: clientTable!.id,
-          });
-        }
-      }, 1000);
-      return () => clearInterval(interval);
-    }
-  }, [clientTable, inProgressOrderRemain, clientGetTable]);
 
   const refreshClientTable = async () => {
     if (!clientTable?.id) return null;
@@ -163,5 +150,4 @@ export default function Footer({
     </>
   );
 }
-
 

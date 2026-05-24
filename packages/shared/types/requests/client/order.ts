@@ -6,20 +6,20 @@ export const createValidation = z.object({
   menuOrders: z.array(
     z.object({
       menuId: z.string().length(15),
-      quantity: z.number().int().min(1),
-    }),
-  ),
-});
+      quantity: z.number().int().min(1).max(99),
+    }).strict(),
+  ).min(1).max(50),
+}).strict();
 export type Create = z.infer<typeof createValidation>;
 
 export const getValidation = z.object({
   orderId: z.string().length(15),
   tableId: z.string().length(15),
-});
+}).strict();
 export type Get = z.infer<typeof getValidation>;
 
 export const removeValidation = z.object({
   orderId: z.string().length(15),
-});
+}).strict();
 
 export type Remove = z.infer<typeof removeValidation>;

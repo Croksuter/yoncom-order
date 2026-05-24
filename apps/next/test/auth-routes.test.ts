@@ -1,5 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+function guardedPost(url: string, body?: unknown, headers: HeadersInit = {}) {
+  return new Request(url, {
+    method: "POST",
+    headers: {
+      origin: "http://order.test",
+      ...(body === undefined ? {} : { "content-type": "application/json" }),
+      ...headers,
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+}
+
 describe("implemented auth route handlers", () => {
   beforeEach(() => {
     vi.resetModules();
@@ -19,13 +31,13 @@ describe("implemented auth route handlers", () => {
     }));
 
     const { POST } = await import("~/app/api/auth/sign-in/route");
-    const response = await POST(new Request("http://order.test/api/auth/sign-in", {
-      method: "POST",
-      body: JSON.stringify({
+    const response = await POST(guardedPost(
+      "http://order.test/api/auth/sign-in",
+      {
         email: "missing@example.com",
         password: "demo-admin-1234",
-      }),
-    }));
+      },
+    ));
 
     expect(response.status).toBe(401);
     await expect(response.json()).resolves.toEqual({ error: "Invalid credentials" });
@@ -48,14 +60,14 @@ describe("implemented auth route handlers", () => {
     }));
 
     const { POST } = await import("~/app/api/auth/sign-up/route");
-    const response = await POST(new Request("http://order.test/api/auth/sign-up", {
-      method: "POST",
-      body: JSON.stringify({
+    const response = await POST(guardedPost(
+      "http://order.test/api/auth/sign-up",
+      {
         name: "Demo Admin",
         email: "demo.admin@yoncom.local",
         password: "demo-admin-1234",
-      }),
-    }));
+      },
+    ));
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ error: "User with that email already exists." });
@@ -64,7 +76,10 @@ describe("implemented auth route handlers", () => {
 
   it("POST /api/auth/sign-out clears the local auth cookie", async () => {
     const { POST } = await import("~/app/api/auth/sign-out/route");
-    const response = await POST();
+    const response = await POST(guardedPost("http://order.test/api/auth/sign-out", undefined, {
+      cookie: "yoncom_csrf=csrf-token",
+      "x-csrf-token": "csrf-token",
+    }));
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ result: "Success" });

@@ -131,6 +131,12 @@ describe("implemented Next API route handlers", () => {
         },
       ],
     }));
+    vi.doMock("~/lib/server/table-session", () => ({
+      requireTableSession: vi.fn(async () => ({
+        session: { tableContextId: "ctx_12345678901" },
+        response: null,
+      })),
+    }));
     vi.doMock("~/lib/server/table-queries", () => ({ getCustomerOrderResponse }));
 
     const { GET } = await import("~/app/api/order/[tableId]/route");
@@ -164,6 +170,12 @@ describe("implemented Next API route handlers", () => {
       tableName: "A1",
       tableContextId: "ctx_12345678901",
       orders: [],
+    }));
+    vi.doMock("~/lib/server/table-session", () => ({
+      requireTableSession: vi.fn(async () => ({
+        session: { tableContextId: "ctx_12345678901" },
+        response: null,
+      })),
     }));
     vi.doMock("~/lib/server/table-queries", () => ({ getCustomerOrderResponse }));
 

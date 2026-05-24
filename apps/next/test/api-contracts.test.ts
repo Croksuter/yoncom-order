@@ -9,7 +9,22 @@ type ContractCase = {
 
 const unavailableFeatureContracts: ContractCase[] = [
   { label: "GET /api/admin/payout", importPath: "~/app/api/admin/payout/route", method: "GET" },
-  { label: "PUT /api/admin/image", importPath: "~/app/api/admin/image/route", method: "PUT" },
+  {
+    label: "PUT /api/admin/image",
+    importPath: "~/app/api/admin/image/route",
+    method: "PUT",
+    args: [
+      new Request("http://order.test/api/admin/image", {
+        method: "PUT",
+        headers: {
+          origin: "http://order.test",
+          cookie: "yoncom_csrf=csrf-token",
+          "x-csrf-token": "csrf-token",
+          "idempotency-key": "test-idempotency-key",
+        },
+      }),
+    ],
+  },
   {
     label: "GET /api/admin/menu/[menuId]",
     importPath: "~/app/api/admin/menu/[menuId]/route",
@@ -26,6 +41,7 @@ describe("disabled optional API contracts", () => {
     vi.resetModules();
     vi.clearAllMocks();
     vi.doMock("~/lib/server/auth-session", () => ({
+      csrfCookieName: "yoncom_csrf",
       requireAdmin: vi.fn(async () => null),
     }));
   });

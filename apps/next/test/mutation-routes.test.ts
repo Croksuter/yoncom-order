@@ -47,19 +47,65 @@ function tableInfo(columns: string[]) {
   return d1Success(columns.map((name) => ({ name })));
 }
 
+const guardedHeaders = {
+  origin: "http://order.test",
+  "content-type": "application/json",
+  cookie: "yoncom_csrf=csrf-token",
+  "x-csrf-token": "csrf-token",
+  "idempotency-key": "test-idempotency-key",
+};
+
+function guardedJsonRequest(url: string, method: string, body: unknown) {
+  return new Request(url, {
+    method,
+    headers: guardedHeaders,
+    body: JSON.stringify(body),
+  });
+}
+
+function handleRealtimeSql(sql: string) {
+  if (sql.startsWith("INSERT INTO scopeRevisions")) {
+    return d1Success([{ revision: 1 }], { duration: 1, changes: 1 });
+  }
+  if (sql.startsWith("INSERT INTO domainEvents")) {
+    return d1Success([], { duration: 1, changes: 1 });
+  }
+  if (sql.startsWith("SELECT tc.tableId, mo.orderId")) {
+    return d1Success([{ tableId: "table_e2e_00001", orderId: "ord_paid_000001" }]);
+  }
+  if (sql.startsWith("SELECT tc.tableId")) {
+    return d1Success([{ tableId: "table_e2e_00001" }]);
+  }
+  return null;
+}
+
 describe("implemented mutation route handlers", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
     vi.doMock("~/lib/server/auth-session", () => ({
+      csrfCookieName: "yoncom_csrf",
       requireAdmin: vi.fn(async () => null),
       requireAdminUser: vi.fn(async () => ({ user: { id: "user_admin0000", role: "ADMIN" }, response: null })),
+    }));
+    vi.doMock("~/lib/server/table-session", () => ({
+      requireTableSession: vi.fn(async () => ({
+        session: { tableContextId: "ctx_12345678901" },
+        response: null,
+      })),
+      requireTableSessionForOrder: vi.fn(async () => ({
+        session: { tableContextId: "ctx_12345678901" },
+        response: null,
+      })),
+      revokeTableSessions: vi.fn(async () => undefined),
     }));
     stubCloudflareEnv();
   });
 
   it("POST /api/order creates an idempotent order, decrements stock conditionally, and issues the smallest payment code", async () => {
     const { requests } = installD1FetchMock(({ sql, params }) => {
+      const realtime = handleRealtimeSql(sql);
+      if (realtime) return realtime;
       if (sql === "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?") {
         return d1Success(params[0] === "tableContexts" || params[0] === "paymentCodeLeases" ? [{ name: params[0] }] : []);
       }
@@ -146,14 +192,15 @@ describe("implemented mutation route handlers", () => {
     });
 
     const { POST } = await import("~/app/api/order/route");
-    const response = await POST(new Request("http://order.test/api/order", {
-      method: "POST",
-      body: JSON.stringify({
+    const response = await POST(guardedJsonRequest(
+      "http://order.test/api/order",
+      "POST",
+      {
         tableId: "table_e2e_00001",
         clientOrderId: "client-order-001",
         menuOrders: [{ menuId: "menu_e2e_000001", quantity: 2 }],
-      }),
-    }));
+      },
+    ));
 
     expect(response.status).toBe(200);
     const body = await response.json();
@@ -175,6 +222,8 @@ describe("implemented mutation route handlers", () => {
 
   it("POST /api/admin/deposit stores a bank transaction and auto-matches only a single exact expected amount", async () => {
     const { requests } = installD1FetchMock(({ sql, params }) => {
+      const realtime = handleRealtimeSql(sql);
+      if (realtime) return realtime;
       if (sql === "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?") {
         return d1Success(params[0] === "tableContexts" || params[0] === "paymentCodeLeases" ? [{ name: params[0] }] : []);
       }
@@ -219,26 +268,27 @@ describe("implemented mutation route handlers", () => {
     });
 
     const { POST } = await import("~/app/api/admin/deposit/route");
-    const response = await POST(new Request("http://order.test/api/admin/deposit", {
-      method: "POST",
-      body: JSON.stringify({
+    const response = await POST(guardedJsonRequest(
+      "http://order.test/api/admin/deposit",
+      "POST",
+      {
         amount: 23999,
         bank: "테스트은행",
         timestamp: 1710000000000,
         name: "테스터",
         source: "MANUAL",
-      }),
-    }));
+      },
+    ));
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
+    await expect(response.json()).resolves.toEqual(expect.objectContaining({
       result: {
         bankTransactionId: expect.any(String),
         status: "AUTO_MATCHED",
         matchedPaymentId: "pay_e2e_000001",
         candidateCount: 1,
       },
-    });
+    }));
     const update = requests.find((request) => request.sql.startsWith("UPDATE \"payments\""));
     expect(update?.params).toContain(1);
     expect(update?.params).toContain("PAID");
@@ -248,6 +298,8 @@ describe("implemented mutation route handlers", () => {
 
   it("POST /api/admin/table includes legacy userId when the live tables schema requires it", async () => {
     const { requests } = installD1FetchMock(({ sql }) => {
+      const realtime = handleRealtimeSql(sql);
+      if (realtime) return realtime;
       if (sql === "SELECT * FROM tables WHERE name = ? AND deletedAt IS NULL LIMIT 1") {
         return d1Success([]);
       }
@@ -270,15 +322,16 @@ describe("implemented mutation route handlers", () => {
     });
 
     const { POST } = await import("~/app/api/admin/table/route");
-    const response = await POST(new Request("http://order.test/api/admin/table", {
-      method: "POST",
-      body: JSON.stringify({
+    const response = await POST(guardedJsonRequest(
+      "http://order.test/api/admin/table",
+      "POST",
+      {
         tableOptions: { name: "E2E 신규 테이블", seats: 3 },
-      }),
-    }));
+      },
+    ));
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ result: "Table created" });
+    await expect(response.json()).resolves.toEqual(expect.objectContaining({ result: "Table created" }));
     const insert = requests.find((request) => request.sql.startsWith("INSERT INTO \"tables\""));
     expect(insert?.sql).toContain("\"userId\"");
     expect(insert?.params).toContain("user_admin0000");
@@ -287,21 +340,23 @@ describe("implemented mutation route handlers", () => {
   it("admin mutation routes reject requests when requireAdmin fails", async () => {
     vi.resetModules();
     vi.doMock("~/lib/server/auth-session", () => ({
+      csrfCookieName: "yoncom_csrf",
       requireAdmin: vi.fn(async () => Response.json({ error: "Forbidden" }, { status: 403 })),
     }));
     stubCloudflareEnv();
     const { POST } = await import("~/app/api/admin/deposit/route");
 
-    const response = await POST(new Request("http://order.test/api/admin/deposit", {
-      method: "POST",
-      body: JSON.stringify({
+    const response = await POST(guardedJsonRequest(
+      "http://order.test/api/admin/deposit",
+      "POST",
+      {
         amount: 23999,
         bank: "테스트은행",
         timestamp: 1710000000000,
         name: "테스터",
         source: "MANUAL",
-      }),
-    }));
+      },
+    ));
 
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({ error: "Forbidden" });
@@ -309,6 +364,8 @@ describe("implemented mutation route handlers", () => {
 
   it("DELETE /api/admin/order keeps a paid cancelled order visible and marks its payment refund pending", async () => {
     const { requests } = installD1FetchMock(({ sql }) => {
+      const realtime = handleRealtimeSql(sql);
+      if (realtime) return realtime;
       if (sql === "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?") {
         return d1Success([{ name: "paymentCodeLeases" }]);
       }
@@ -377,13 +434,14 @@ describe("implemented mutation route handlers", () => {
     });
 
     const { DELETE } = await import("~/app/api/admin/order/route");
-    const response = await DELETE(new Request("http://order.test/api/admin/order", {
-      method: "DELETE",
-      body: JSON.stringify({ orderId: "ord_paid_000001", cancelReason: "고객 요청" }),
-    }));
+    const response = await DELETE(guardedJsonRequest(
+      "http://order.test/api/admin/order",
+      "DELETE",
+      { orderId: "ord_paid_000001", cancelReason: "고객 요청" },
+    ));
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ result: "Order cancelled; refund pending" });
+    await expect(response.json()).resolves.toEqual(expect.objectContaining({ result: "Order cancelled; refund pending" }));
     const paymentUpdate = requests.find((request) => request.sql.startsWith("UPDATE \"payments\""));
     expect(paymentUpdate?.sql).not.toContain("\"deletedAt\"");
     expect(paymentUpdate?.params).toContain("REFUND_PENDING");
@@ -396,6 +454,8 @@ describe("implemented mutation route handlers", () => {
 
   it("PUT /api/admin/order/refund only completes refund pending payments", async () => {
     const { requests } = installD1FetchMock(({ sql }) => {
+      const realtime = handleRealtimeSql(sql);
+      if (realtime) return realtime;
       if (sql === "PRAGMA table_info(\"payments\")") {
         return tableInfo(paymentColumns);
       }
@@ -429,13 +489,14 @@ describe("implemented mutation route handlers", () => {
     });
 
     const { PUT } = await import("~/app/api/admin/order/refund/route");
-    const response = await PUT(new Request("http://order.test/api/admin/order/refund", {
-      method: "PUT",
-      body: JSON.stringify({ orderId: "ord_refund_0001", refundNote: "계좌 환불 완료" }),
-    }));
+    const response = await PUT(guardedJsonRequest(
+      "http://order.test/api/admin/order/refund",
+      "PUT",
+      { orderId: "ord_refund_0001", refundNote: "계좌 환불 완료" },
+    ));
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ result: "Order refund completed" });
+    await expect(response.json()).resolves.toEqual(expect.objectContaining({ result: "Order refund completed" }));
     const paymentUpdate = requests.find((request) => request.sql.startsWith("UPDATE \"payments\""));
     expect(paymentUpdate?.params).toContain(0);
     expect(paymentUpdate?.params).toContain("REFUNDED");

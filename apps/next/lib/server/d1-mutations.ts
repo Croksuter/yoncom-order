@@ -1,6 +1,8 @@
 import { generateId } from "lucia";
 import { bankTransactionStatus, menuOrderStatus, orderStatus, paymentStatus } from "db/schema";
 import { executeD1, hasD1Table, queryD1 } from "~/lib/server/db";
+import { revokeTableSessions } from "~/lib/server/table-session";
+import { appendDomainEvent, tableScope, venueScope, type DomainEventRecord } from "~/lib/server/sync-events";
 
 type BaseRow = {
   id: string;
@@ -72,6 +74,10 @@ type MutationResult = {
   result?: unknown;
   error?: string;
   status: number;
+  mutationId?: string;
+  revision?: number;
+  affectedScopes?: string[];
+  events?: DomainEventRecord[];
 };
 
 type CreateOrderResult = {
@@ -210,6 +216,69 @@ export function newId() {
 
 export function now() {
   return Date.now();
+}
+
+async function withDomainEvent(
+  result: MutationResult,
+  {
+    type,
+    scopes,
+    entityType,
+    entityId,
+    payload,
+    mutationId = newId(),
+  }: {
+    type: string;
+    scopes: string[];
+    entityType?: string | null;
+    entityId?: string | null;
+    payload?: unknown;
+    mutationId?: string;
+  },
+) {
+  if (result.error) return result;
+  const affectedScopes = [...new Set(scopes)];
+  const events = await appendDomainEvent({
+    scopes: affectedScopes,
+    type,
+    entityType,
+    entityId,
+    payload,
+    mutationId,
+  });
+
+  return {
+    ...result,
+    mutationId,
+    affectedScopes,
+    revision: Math.max(...events.map((event) => event.revision), 0),
+    events,
+  };
+}
+
+async function getTableIdForOrder(orderId: string) {
+  const [row] = await queryD1<{ tableId: string }>(
+    `SELECT tc.tableId
+     FROM orders o
+     INNER JOIN tableContexts tc ON tc.id = o.tableContextId
+     WHERE o.id = ?
+     LIMIT 1`,
+    [orderId],
+  );
+  return row?.tableId ?? null;
+}
+
+async function getTableIdForMenuOrder(menuOrderId: string) {
+  const [row] = await queryD1<{ tableId: string; orderId: string }>(
+    `SELECT tc.tableId, mo.orderId
+     FROM menuOrders mo
+     INNER JOIN orders o ON o.id = mo.orderId
+     INNER JOIN tableContexts tc ON tc.id = o.tableContextId
+     WHERE mo.id = ?
+     LIMIT 1`,
+    [menuOrderId],
+  );
+  return row ?? null;
 }
 
 export function aggregateMenuOrders(menuOrders: MenuOrderInput[]) {
@@ -621,10 +690,16 @@ export async function createClientOrder(
       method: "미결제",
     });
 
-    return {
-      result: buildCreateOrderResult({ id: orderId, displayNumber }, payment),
-      status: 200,
-    };
+      return await withDomainEvent({
+        result: buildCreateOrderResult({ id: orderId, displayNumber }, payment),
+        status: 200,
+      }, {
+        type: "order.created",
+        scopes: [venueScope, tableScope(tableId)],
+        entityType: "order",
+        entityId: orderId,
+        payload: { tableId, orderId, paymentId },
+      });
   } catch (error) {
     await restoreStock(deducted, timestamp);
     await releasePaymentCodeLease(paymentId);
@@ -732,7 +807,17 @@ export async function cancelOrder(
     );
     await releasePaymentCodeLease(payment.id);
 
-    return { result: "Order cancelled; refund pending", status: 200 };
+    const tableId = await getTableIdForOrder(orderId);
+    return await withDomainEvent(
+      { result: "Order cancelled; refund pending", status: 200 },
+      {
+        type: "order.cancelled",
+        scopes: [venueScope, ...(tableId ? [tableScope(tableId)] : [])],
+        entityType: "order",
+        entityId: orderId,
+        payload: { tableId, refundPending: true },
+      },
+    );
   }
 
   for (const menuOrder of menuOrders) {
@@ -778,7 +863,17 @@ export async function cancelOrder(
     await releasePaymentCodeLease(payment.id);
   }
 
-  return { result: "Order Deleted", status: 200 };
+  const tableId = await getTableIdForOrder(orderId);
+  return await withDomainEvent(
+    { result: "Order Deleted", status: 200 },
+    {
+      type: terminalOrderStatus === orderStatus.EXPIRED ? "order.expired" : "order.cancelled",
+      scopes: [venueScope, ...(tableId ? [tableScope(tableId)] : [])],
+      entityType: "order",
+      entityId: orderId,
+      payload: { tableId, terminalPaymentStatus, terminalOrderStatus },
+    },
+  );
 }
 
 type BankTransactionCandidate = {
@@ -935,7 +1030,7 @@ export async function ingestBankTransaction(input: BankTransactionInput): Promis
     });
   }
 
-  return {
+  return await withDomainEvent({
     result: {
       bankTransactionId: transactionId,
       status,
@@ -943,7 +1038,13 @@ export async function ingestBankTransaction(input: BankTransactionInput): Promis
       candidateCount: candidates.length,
     },
     status: 200,
-  };
+  }, {
+    type: autoCandidate ? "bankTransaction.autoMatched" : "bankTransaction.ingested",
+    scopes: [venueScope],
+    entityType: "bankTransaction",
+    entityId: transactionId,
+    payload: { paymentId: autoCandidate?.paymentId ?? null, amount: input.amount, status },
+  });
 }
 
 export async function getPendingBankTransactions(): Promise<MutationResult> {
@@ -998,7 +1099,16 @@ export async function confirmBankTransaction(bankTransactionId: string, paymentI
     [bankTransactionId],
   );
 
-  return { result: "Payment matched", status: 200 };
+  return await withDomainEvent(
+    { result: "Payment matched", status: 200 },
+    {
+      type: "bankTransaction.confirmed",
+      scopes: [venueScope],
+      entityType: "bankTransaction",
+      entityId: bankTransactionId,
+      payload: { paymentId },
+    },
+  );
 }
 
 export async function ignoreBankTransaction(bankTransactionId: string): Promise<MutationResult> {
@@ -1008,7 +1118,15 @@ export async function ignoreBankTransaction(bankTransactionId: string): Promise<
     "id = ?",
     [bankTransactionId],
   );
-  return { result: "Bank transaction ignored", status: 200 };
+  return await withDomainEvent(
+    { result: "Bank transaction ignored", status: 200 },
+    {
+      type: "bankTransaction.ignored",
+      scopes: [venueScope],
+      entityType: "bankTransaction",
+      entityId: bankTransactionId,
+    },
+  );
 }
 
 export async function setMenuOrderStatus(menuOrderId: string, status: string): Promise<MutationResult> {
@@ -1043,8 +1161,26 @@ export async function setMenuOrderStatus(menuOrderId: string, status: string): P
     }
   }
 
-  await updateD1Rows("menuOrders", { status, updatedAt: now() }, "id = ?", [menuOrderId]);
-  return { result: "Success", status: 200 };
+  const statusUpdate = await updateD1Rows(
+    "menuOrders",
+    { status, updatedAt: now() },
+    "id = ? AND status = ?",
+    [menuOrderId, menuOrder.status],
+  );
+  if (!statusUpdate || statusUpdate.changed <= 0) {
+    return { error: "Menu order status changed", status: 409 };
+  }
+  const scopeInfo = await getTableIdForMenuOrder(menuOrderId);
+  return await withDomainEvent(
+    { result: "Success", status: 200 },
+    {
+      type: status === menuOrderStatus.READY ? "menuOrder.ready" : "menuOrder.pickedUp",
+      scopes: [venueScope, ...(scopeInfo?.tableId ? [tableScope(scopeInfo.tableId)] : [])],
+      entityType: "menuOrder",
+      entityId: menuOrderId,
+      payload: { tableId: scopeInfo?.tableId ?? null, orderId: scopeInfo?.orderId ?? menuOrder.orderId, status },
+    },
+  );
 }
 
 export async function markOrderPaid(orderId: string): Promise<MutationResult> {
@@ -1065,7 +1201,17 @@ export async function markOrderPaid(orderId: string): Promise<MutationResult> {
   }
 
   await markPaymentPaidById(payment.id);
-  return { result: "Order marked as paid", status: 200 };
+  const tableId = await getTableIdForOrder(orderId);
+  return await withDomainEvent(
+    { result: "Order marked as paid", status: 200 },
+    {
+      type: "payment.paid",
+      scopes: [venueScope, ...(tableId ? [tableScope(tableId)] : [])],
+      entityType: "order",
+      entityId: orderId,
+      payload: { tableId, paymentId: payment.id },
+    },
+  );
 }
 
 export async function completeOrderRefund(
@@ -1105,7 +1251,17 @@ export async function completeOrderRefund(
     [payment.id],
   );
 
-  return { result: "Order refund completed", status: 200 };
+  const tableId = await getTableIdForOrder(orderId);
+  return await withDomainEvent(
+    { result: "Order refund completed", status: 200 },
+    {
+      type: "order.refunded",
+      scopes: [venueScope, ...(tableId ? [tableScope(tableId)] : [])],
+      entityType: "order",
+      entityId: orderId,
+      payload: { tableId, paymentId: payment.id },
+    },
+  );
 }
 
 export async function createAdminTable(name: string, seats: number): Promise<MutationResult> {
@@ -1123,8 +1279,9 @@ export async function createAdminTable(name: string, seats: number): Promise<Mut
   const key = Array.from({ length: 100 }, (_, index) => index + 1).find((candidate) => !usedKeys.has(candidate)) ?? 101;
   const timestamp = now();
 
+  const tableId = newId();
   await insertD1Row("tables", {
-    id: newId(),
+    id: tableId,
     key,
     name,
     seats,
@@ -1133,7 +1290,15 @@ export async function createAdminTable(name: string, seats: number): Promise<Mut
     deletedAt: null,
   });
 
-  return { result: "Table created", status: 200 };
+  return await withDomainEvent(
+    { result: "Table created", status: 200 },
+    {
+      type: "table.created",
+      scopes: [venueScope],
+      entityType: "table",
+      entityId: tableId,
+    },
+  );
 }
 
 export async function updateAdminTable(
@@ -1150,7 +1315,15 @@ export async function updateAdminTable(
   }
 
   await updateD1Rows("tables", { ...tableOptions, updatedAt: now() }, "id = ?", [tableId]);
-  return { result: "Table updated", status: 200 };
+  return await withDomainEvent(
+    { result: "Table updated", status: 200 },
+    {
+      type: "table.updated",
+      scopes: [venueScope, tableScope(tableId)],
+      entityType: "table",
+      entityId: tableId,
+    },
+  );
 }
 
 export async function removeAdminTable(tableId: string): Promise<MutationResult> {
@@ -1161,7 +1334,16 @@ export async function removeAdminTable(tableId: string): Promise<MutationResult>
   }
 
   await updateD1Rows("tables", { deletedAt: now(), updatedAt: now() }, "id = ?", [tableId]);
-  return { result: "Table removed", status: 200 };
+  await revokeTableSessions(tableId);
+  return await withDomainEvent(
+    { result: "Table removed", status: 200 },
+    {
+      type: "table.removed",
+      scopes: [venueScope, tableScope(tableId)],
+      entityType: "table",
+      entityId: tableId,
+    },
+  );
 }
 
 export async function occupyAdminTable(tableId: string): Promise<MutationResult> {
@@ -1178,8 +1360,17 @@ export async function occupyAdminTable(tableId: string): Promise<MutationResult>
     return { error: "Table is already occupied", status: 409 };
   }
 
-  await createTableContext(tableId);
-  return { result: "Table occupied", status: 200 };
+  const tableContext = await createTableContext(tableId);
+  return await withDomainEvent(
+    { result: "Table occupied", status: 200 },
+    {
+      type: "table.occupied",
+      scopes: [venueScope, tableScope(tableId)],
+      entityType: "table",
+      entityId: tableId,
+      payload: { tableContextId: tableContext.id },
+    },
+  );
 }
 
 export async function vacateAdminTable(tableId: string): Promise<MutationResult> {
@@ -1210,7 +1401,17 @@ export async function vacateAdminTable(tableId: string): Promise<MutationResult>
 
   const contextTable = await getTableContextTableName();
   await updateD1Rows(contextTable, { deletedAt: now(), updatedAt: now() }, "id = ?", [activeContext.id]);
-  return { result: "Table vacated", status: 200 };
+  await revokeTableSessions(tableId, activeContext.id);
+  return await withDomainEvent(
+    { result: "Table vacated", status: 200 },
+    {
+      type: "table.vacated",
+      scopes: [venueScope, tableScope(tableId)],
+      entityType: "table",
+      entityId: tableId,
+      payload: { tableContextId: activeContext.id },
+    },
+  );
 }
 
 export async function createAdminMenu(menuOptions: {
@@ -1231,8 +1432,9 @@ export async function createAdminMenu(menuOptions: {
     return { error: "Menu Category Not Found", status: 404 };
   }
 
+  const menuId = newId();
   await insertD1Row("menus", {
-    id: newId(),
+    id: menuId,
     ...menuOptions,
     available: menuOptions.available ? 1 : 0,
     createdAt: now(),
@@ -1240,7 +1442,15 @@ export async function createAdminMenu(menuOptions: {
     deletedAt: null,
   });
 
-  return { result: "Menu created", status: 201 };
+  return await withDomainEvent(
+    { result: "Menu created", status: 201 },
+    {
+      type: "menu.created",
+      scopes: [venueScope],
+      entityType: "menu",
+      entityId: menuId,
+    },
+  );
 }
 
 export async function updateAdminMenu(
@@ -1266,26 +1476,51 @@ export async function updateAdminMenu(
     [menuId],
   );
 
-  return { result: "Menu updated", status: 200 };
+  return await withDomainEvent(
+    { result: "Menu updated", status: 200 },
+    {
+      type: "menu.updated",
+      scopes: [venueScope],
+      entityType: "menu",
+      entityId: menuId,
+    },
+  );
 }
 
 export async function removeAdminMenu(menuId: string): Promise<MutationResult> {
   await updateD1Rows("menus", { deletedAt: now(), updatedAt: now() }, "id = ?", [menuId]);
-  return { result: "Menu deleted successfully", status: 200 };
+  return await withDomainEvent(
+    { result: "Menu deleted successfully", status: 200 },
+    {
+      type: "menu.removed",
+      scopes: [venueScope],
+      entityType: "menu",
+      entityId: menuId,
+    },
+  );
 }
 
 export async function createAdminMenuCategory(
   menuCategoryOptions: { name: string; description: string },
 ): Promise<MutationResult> {
+  const menuCategoryId = newId();
   await insertD1Row("menuCategories", {
-    id: newId(),
+    id: menuCategoryId,
     ...menuCategoryOptions,
     createdAt: now(),
     updatedAt: now(),
     deletedAt: null,
   });
 
-  return { result: "Menu category created", status: 201 };
+  return await withDomainEvent(
+    { result: "Menu category created", status: 201 },
+    {
+      type: "menuCategory.created",
+      scopes: [venueScope],
+      entityType: "menuCategory",
+      entityId: menuCategoryId,
+    },
+  );
 }
 
 export async function updateAdminMenuCategory(
@@ -1299,10 +1534,26 @@ export async function updateAdminMenuCategory(
     [menuCategoryId],
   );
 
-  return { result: "Menu category updated", status: 200 };
+  return await withDomainEvent(
+    { result: "Menu category updated", status: 200 },
+    {
+      type: "menuCategory.updated",
+      scopes: [venueScope],
+      entityType: "menuCategory",
+      entityId: menuCategoryId,
+    },
+  );
 }
 
 export async function removeAdminMenuCategory(menuCategoryId: string): Promise<MutationResult> {
   await updateD1Rows("menuCategories", { deletedAt: now(), updatedAt: now() }, "id = ?", [menuCategoryId]);
-  return { result: "Menu category deleted", status: 200 };
+  return await withDomainEvent(
+    { result: "Menu category deleted", status: 200 },
+    {
+      type: "menuCategory.removed",
+      scopes: [venueScope],
+      entityType: "menuCategory",
+      entityId: menuCategoryId,
+    },
+  );
 }

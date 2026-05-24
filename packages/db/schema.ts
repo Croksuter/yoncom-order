@@ -202,6 +202,41 @@ export const tableContextsRelations = relations(
 
 export type TableContext = typeof tableContexts.$inferSelect;
 
+export const tableSessions = sqliteTable("tableSessions", {
+  id: text("id")
+    .primaryKey()
+    .notNull()
+    .$defaultFn(() => generateId(40)),
+  tableId: text("tableId")
+    .notNull()
+    .references(() => tables.id),
+  tableContextId: text("tableContextId")
+    .notNull()
+    .references(() => tableContexts.id),
+  csrfToken: text("csrfToken").notNull(),
+  expiresAt: integer("expiresAt").notNull(),
+  revokedAt: integer("revokedAt"),
+  createdAt: integer("createdAt")
+    .notNull()
+    .$defaultFn(() => Date.now()),
+  updatedAt: integer("updatedAt")
+    .notNull()
+    .$defaultFn(() => Date.now()),
+});
+
+export const tableSessionsRelations = relations(tableSessions, ({ one }) => ({
+  table: one(tables, {
+    fields: [tableSessions.tableId],
+    references: [tables.id],
+  }),
+  tableContext: one(tableContexts, {
+    fields: [tableSessions.tableContextId],
+    references: [tableContexts.id],
+  }),
+}));
+
+export type TableSession = typeof tableSessions.$inferSelect;
+
 export const orders = sqliteTable("orders", {
   id: text("id")
     .primaryKey()
@@ -366,3 +401,53 @@ export const menuOrdersRelations = relations(menuOrders, ({ one }) => ({
 }));
 
 export type MenuOrder = typeof menuOrders.$inferSelect;
+
+export const mutationRequests = sqliteTable("mutationRequests", {
+  id: text("id")
+    .primaryKey()
+    .notNull()
+    .$defaultFn(() => generateId(15)),
+  actorScope: text("actorScope").notNull(),
+  idempotencyKey: text("idempotencyKey").notNull(),
+  requestHash: text("requestHash").notNull(),
+  status: text("status").notNull(),
+  resultJson: text("resultJson"),
+  revision: integer("revision"),
+  createdAt: integer("createdAt")
+    .notNull()
+    .$defaultFn(() => Date.now()),
+  updatedAt: integer("updatedAt")
+    .notNull()
+    .$defaultFn(() => Date.now()),
+});
+
+export type MutationRequest = typeof mutationRequests.$inferSelect;
+
+export const scopeRevisions = sqliteTable("scopeRevisions", {
+  scope: text("scope").primaryKey().notNull(),
+  revision: integer("revision").notNull().default(0),
+  updatedAt: integer("updatedAt")
+    .notNull()
+    .$defaultFn(() => Date.now()),
+});
+
+export type ScopeRevision = typeof scopeRevisions.$inferSelect;
+
+export const domainEvents = sqliteTable("domainEvents", {
+  id: text("id")
+    .primaryKey()
+    .notNull()
+    .$defaultFn(() => generateId(15)),
+  scope: text("scope").notNull(),
+  revision: integer("revision").notNull(),
+  type: text("type").notNull(),
+  entityType: text("entityType"),
+  entityId: text("entityId"),
+  payloadJson: text("payloadJson"),
+  mutationId: text("mutationId"),
+  createdAt: integer("createdAt")
+    .notNull()
+    .$defaultFn(() => Date.now()),
+});
+
+export type DomainEvent = typeof domainEvents.$inferSelect;

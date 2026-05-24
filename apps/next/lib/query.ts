@@ -3,6 +3,7 @@ import kyErrorHandler from "~/lib/ky-error-handler";
 import { useLoadingStore } from "~/stores/loading.store";
 
 const API_BASE_PATH = "api";
+const csrfCookieName = "yoncom_csrf";
 
 function getApiPrefixUrl() {
   if (typeof window !== "undefined") {
@@ -17,6 +18,30 @@ export const api = ky.create({
   credentials: "include",
   retry: 0,
 });
+
+function getCookie(name: string) {
+  if (typeof document === "undefined") return null;
+  return document.cookie
+    .split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(`${name}=`))
+    ?.slice(name.length + 1) ?? null;
+}
+
+export function mutationHeaders(headers: HeadersInit) {
+  const nextHeaders = new Headers(headers);
+  const csrfToken = getCookie(csrfCookieName);
+
+  if (csrfToken && !nextHeaders.has("x-csrf-token")) {
+    nextHeaders.set("x-csrf-token", csrfToken);
+  }
+
+  if (!nextHeaders.has("idempotency-key")) {
+    nextHeaders.set("idempotency-key", crypto.randomUUID());
+  }
+
+  return nextHeaders;
+}
 
 export default async function queryStore<Query, Result>({
   route,
@@ -39,6 +64,7 @@ export default async function queryStore<Query, Result>({
 
   const isQuery = method === "get" || method === "head";
   const { startQuery, endQuery, startMutation, endMutation } = useLoadingStore.getState();
+  const requestHeaders = isQuery ? headers : mutationHeaders(headers);
 
   if (isQuery) {
     startQuery();
@@ -51,9 +77,9 @@ export default async function queryStore<Query, Result>({
       method === "get" || method === "head"
         ? await api[method](route, {
             searchParams: query as SearchParamsOption,
-            headers,
+            headers: requestHeaders,
           }).json<Result>()
-        : await api[method](route, { json: query, headers }).json<Result>();
+        : await api[method](route, { json: query, headers: requestHeaders }).json<Result>();
 
     onSuccess?.(res);
     setter?.({ isLoaded: true, error: false });

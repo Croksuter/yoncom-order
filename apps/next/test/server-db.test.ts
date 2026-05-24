@@ -34,6 +34,32 @@ describe("Cloudflare D1 HTTP adapter", () => {
     expect(requests[0].params).toEqual(["tableContext"]);
   });
 
+  it("sends multi-statement work through Cloudflare D1 batch payloads", async () => {
+    stubCloudflareEnv();
+    const { requests } = installD1FetchMock(() => Response.json({
+      success: true,
+      errors: [],
+      result: [
+        { success: true, results: [{ revision: 1 }], meta: { duration: 1, changes: 1 } },
+        { success: true, results: [], meta: { duration: 1, changes: 1 } },
+      ],
+    }));
+
+    const { queryD1Batch } = await import("~/lib/server/db");
+    const results = await queryD1Batch([
+      { sql: "INSERT INTO scopeRevisions VALUES (?)", params: ["venue:default"] },
+      { sql: "INSERT INTO domainEvents VALUES (?)", params: ["event_1"] },
+    ]);
+
+    expect(results).toHaveLength(2);
+    expect(requests[0].sql).toBe("");
+    expect(requests[0].params).toEqual([]);
+    expect(requests[0].batch).toEqual([
+      { sql: "INSERT INTO scopeRevisions VALUES (?)", params: ["venue:default"] },
+      { sql: "INSERT INTO domainEvents VALUES (?)", params: ["event_1"] },
+    ]);
+  });
+
   it("surfaces D1 API failures to route handlers without returning fake data", async () => {
     stubCloudflareEnv();
     installD1FetchMock(() => d1Failure("no such table: tableContexts"));

@@ -5,11 +5,14 @@ import { users } from "db/schema";
 import { signInValidation } from "shared/types/requests/client/auth";
 import { authResponse } from "~/lib/server/auth-session";
 import { getDb } from "~/lib/server/db";
-import { routeError } from "~/lib/server/api";
+import { guardUnsafeRequest, parseJsonBody, routeError } from "~/lib/server/api";
 
 export async function POST(request: Request) {
+  const guardError = guardUnsafeRequest(request, { csrf: false, idempotency: false });
+  if (guardError) return guardError;
+
   try {
-    const { email, password } = signInValidation.parse(await request.json());
+    const { email, password } = await parseJsonBody(request, signInValidation);
     const user = await getDb().query.users.findFirst({
       where: eq(users.email, email),
     });
@@ -18,7 +21,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 
-    return authResponse({ result: "Success" }, user.id);
+    return await authResponse({ result: "Success" }, user.id);
   } catch (error) {
     return routeError(error);
   }

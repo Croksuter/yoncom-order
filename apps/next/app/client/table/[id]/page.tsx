@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useRef, useState } from "react";
 import useMenuStore from "~/stores/menu.store";
 import useTableStore from "~/stores/table.store";
 import Footer from "./components/footer";
@@ -12,10 +12,36 @@ import OrderModal from "./components/order/order.modal";
 import OrderPaymentPanel from "./components/order/order.payment.panel";
 import { Skeleton } from "~/components/ui/skeleton";
 import { isPaymentInstructionOrder } from "~/lib/order-status";
+import { useRealtimeSync } from "~/hooks/use-realtime-sync";
+import { api } from "~/lib/query";
+import type * as ClientTableResponse from "shared/types/responses/client/table";
 
 type ClientTablePageProps = {
   params: Promise<{ id: string }>;
 };
+
+type TableSyncResponse = {
+  result: {
+    revision: number;
+    events: unknown[];
+    snapshot: {
+      table: ClientTableResponse.Get["result"];
+    } | null;
+    gap: boolean;
+  };
+};
+
+function normalizeClientTable(table: ClientTableResponse.Get["result"]) {
+  return {
+    ...table,
+    tableContexts: table.tableContexts
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .map((tableContext) => ({
+        ...tableContext,
+        orders: tableContext.orders.sort((a, b) => b.createdAt - a.createdAt),
+      })),
+  };
+}
 
 export default function ClientTablePage({ params }: ClientTablePageProps) {
   const { id } = use(params);
@@ -26,6 +52,42 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
   const isValidTableId = id.length === 15;
   const activeUnpaidOrder = clientTable?.tableContexts[0]?.orders.find(isPaymentInstructionOrder);
   const [isVerified, setIsVerified] = useState(false);
+  const tableScope = isValidTableId ? `table:${id}` : null;
+  const revisionRef = useRef(0);
+
+  const refreshClientTable = useCallback(async () => {
+    if (isValidTableId) {
+      await useTableStore.getState().clientGetTable({ tableId: id });
+    }
+  }, [id, isValidTableId]);
+
+  const syncClientTable = useCallback(async (afterRevision = revisionRef.current) => {
+    if (!isValidTableId) return;
+
+    const response = await api.get("sync/table", {
+      searchParams: { tableId: id, afterRevision },
+    }).json<TableSyncResponse>();
+    revisionRef.current = response.result.revision;
+
+    if (response.result.snapshot?.table) {
+      useTableStore.setState({
+        clientTable: normalizeClientTable(response.result.snapshot.table),
+        isLoaded: true,
+        error: false,
+      });
+      return;
+    }
+
+    if (response.result.events.length > 0 || response.result.gap) {
+      await refreshClientTable();
+    }
+  }, [id, isValidTableId, refreshClientTable]);
+
+  const syncClientTableFromRealtime = useCallback(() => {
+    void syncClientTable();
+  }, [syncClientTable]);
+
+  useRealtimeSync(tableScope, syncClientTableFromRealtime);
 
   useEffect(() => {
     if (activeUnpaidOrder) {
@@ -47,7 +109,11 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
       }
 
       try {
-        await useTableStore.getState().clientGetTable({ tableId: id });
+        const session = await useTableStore.getState().clientStartTableSession({ tableId: id });
+        if (!session) return;
+
+        revisionRef.current = 0;
+        await syncClientTable(0);
       } catch (error) {
         console.error("Failed to load table:", error);
       } finally {
@@ -56,7 +122,7 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
     };
 
     void fetchTableData();
-  }, [id, isValidTableId]);
+  }, [id, isValidTableId, syncClientTable]);
 
   useEffect(() => {
     if (!clientTable) {
@@ -162,4 +228,3 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
     </main>
   );
 }
-
