@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "~/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "~/components/ui/dialog";
+import { Dialog, BottomSheetContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "~/components/ui/dialog";
 import { toast } from "~/hooks/use-toast";
 import { Copy, Check, Clock, AlertTriangle } from "lucide-react";
 
@@ -136,141 +136,141 @@ export default function OrderPaymentModal({
 
   return (
     <Dialog open={openState} onOpenChange={handleClose}>
-      <DialogContent className="fixed bottom-0 top-auto left-0 translate-x-0 translate-y-0 w-full max-w-full rounded-t-[2rem] rounded-b-none border-t border-x border-b-0 border-brand-100 bg-background/95 backdrop-blur-lg p-6 pb-8 shadow-[0_-8px_30px_rgb(0,0,0,0.08)] data-[state=open]:animate-in data-[state=open]:slide-in-from-bottom sm:bottom-auto sm:top-[50%] sm:left-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:max-w-md sm:rounded-2xl sm:border sm:shadow-lg sm:p-6 smooth-transition fc justify-between min-h-[25rem] max-h-[85vh]">
-        <DialogHeader className="space-y-3">
-          <DialogTitle className="text-2xl font-bold tracking-tight text-center text-foreground">
+      <BottomSheetContent className="fc justify-between max-h-[85vh] overflow-y-auto no-scrollbar">
+        {/* Drag Handle */}
+        <div className="w-full flex justify-center pb-4">
+          <div className="w-12 h-1 bg-slate-200 dark:bg-slate-800 rounded-full"></div>
+        </div>
+
+        {/* Header */}
+        <div className="space-y-1 text-center mb-6">
+          <DialogTitle className="text-2xl font-black text-slate-800 dark:text-slate-100">
             입금 정보 안내
           </DialogTitle>
-          <DialogDescription className="sr-only">
-            결제코드가 반영된 입금액과 계좌 정보를 확인합니다.
+          <DialogDescription className="text-xs text-slate-400 font-medium">
+            입금액과 입금 계좌를 다시 한 번 확인해주세요.
           </DialogDescription>
-          
-          {expiresAt && (
-            <div className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 rounded-2xl p-4 flex flex-col items-center justify-center space-y-2 relative overflow-hidden">
-              <div className="flex items-center space-x-2">
-                {isExpired ? (
-                  <AlertTriangle className="h-5 w-5 text-destructive animate-bounce" />
-                ) : (
-                  <Clock className={`h-5 w-5 ${isLowTime ? "text-destructive animate-pulse" : "text-brand-500"}`} />
-                )}
-                <span className={`text-base font-semibold ${isExpired ? "text-destructive" : "text-muted-foreground"}`}>
-                  {isExpired ? "입금 기한 만료" : "남은 입금 기한"}
-                </span>
-              </div>
-              <span className={`text-3xl font-extrabold tracking-wider ${
-                isExpired 
-                  ? "text-destructive" 
-                  : isLowTime 
-                    ? "text-destructive animate-pulse" 
-                    : "text-brand-600"
-              }`}>
-                {isExpired ? "00:00" : formatTime(timeLeft)}
-              </span>
+        </div>
 
-              {/* Progress Bar */}
-              <div className="w-full bg-slate-200/60 dark:bg-slate-800 rounded-full h-2 mt-2 overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all duration-1000 ${
-                    isLowTime ? "bg-destructive animate-pulse" : "bg-brand-500"
-                  }`}
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
-              
-              {isLowTime && (
-                <span className="text-xs text-destructive font-medium animate-pulse mt-1">
-                  기한이 얼마 남지 않았습니다! 서둘러 입금해주세요.
-                </span>
-              )}
-              {isExpired && (
-                <span className="text-xs text-destructive font-medium mt-1">
-                  입금 기한이 만료되었습니다. 주문이 자동 취소될 수 있습니다.
-                </span>
-              )}
-            </div>
-          )}
-
-          <div className="w-full space-y-4 pt-2">
-            <div className="grid w-full grid-cols-2 gap-y-2 border-b border-slate-100 dark:border-slate-800 pb-3 text-sm">
-              <span className="font-medium text-muted-foreground">주문금액</span>
-              <span className="text-right font-semibold text-foreground">{originalAmount.toLocaleString()}원</span>
-              
-              <span className="font-medium text-muted-foreground">결제코드</span>
-              <span className="text-right font-semibold text-slate-500 dark:text-slate-400">
-                {paymentCode !== null ? `${paymentCode}원 차감` : "-"}
-              </span>
-
-              <span className="font-bold text-foreground">입금액</span>
-              <span className="text-right font-bold text-brand-600 text-base">{expectedTransferAmount.toLocaleString()}원</span>
-              
-              <span className="font-medium text-muted-foreground">입금 예정 시각</span>
-              <span className="text-right font-medium text-foreground">
-                {expiresAt ? new Date(expiresAt).toLocaleTimeString("ko-KR", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  second: "2-digit",
-                  hour12: false,
-                }) : "-"}
+        {/* Timer Box */}
+        {expiresAt && (
+          <div className="w-full bg-slate-50 dark:bg-slate-950/30 border border-slate-100 dark:border-slate-800 rounded-2xl p-5 flex flex-col items-center justify-center space-y-2 relative overflow-hidden mb-6 shadow-inner">
+            <div className="flex items-center space-x-2">
+              <Clock className={`h-4 w-4 ${isLowTime || isExpired ? "text-destructive animate-pulse" : "text-primary"}`} />
+              <span className={`text-xs font-bold ${isExpired ? "text-destructive" : "text-slate-500"}`}>
+                {isExpired ? "입금 기한 만료" : "남은 입금 기한"}
               </span>
             </div>
+            <span className={`text-4xl font-black tracking-wider ${
+              isExpired || isLowTime
+                ? "text-destructive animate-pulse" 
+                : "text-primary"
+            }`}>
+              {isExpired ? "00:00" : formatTime(timeLeft)}
+            </span>
 
-            {/* Account Information Section */}
-            <div className="space-y-1.5">
-              <span className="block text-sm font-bold text-foreground pl-0.5">⋅ 입금 계좌</span>
-              <button
-                onClick={copyAccount}
-                className="flex w-full items-center justify-between overflow-hidden rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/30 p-4 transition-all hover:bg-slate-100/70 dark:hover:bg-slate-900/50 active:scale-[0.99]"
-              >
-                <span className="truncate text-lg font-bold text-slate-700 dark:text-slate-200">
-                  국민은행 94580201548620
-                </span>
-                <div className="flex items-center space-x-1 text-slate-500">
-                  <span className="text-xs font-medium">{copiedAccount ? "복사 완료" : "복사"}</span>
-                  {copiedAccount ? (
-                    <Check className="h-4 w-4 text-emerald-500" />
-                  ) : (
-                    <Copy className="h-4 w-4" />
-                  )}
-                </div>
-              </button>
+            {/* Progress Bar */}
+            <div className="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-1.5 mt-2 overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-1000 ${
+                  isLowTime ? "bg-destructive animate-pulse" : "bg-primary"
+                }`}
+                style={{ width: `${progress}%` }}
+              />
             </div>
-
-            {/* Target Amount Section */}
-            <div className="space-y-1.5">
-              <span className="block text-sm font-bold text-foreground pl-0.5">⋅ 정확히 보낼 금액</span>
-              <button
-                onClick={copyAmount}
-                className="flex w-full items-center justify-between overflow-hidden rounded-xl border border-brand-100/50 dark:border-brand-900/30 bg-brand-50/50 dark:bg-brand-950/20 p-4 transition-all hover:bg-brand-50 dark:hover:bg-brand-950/30 active:scale-[0.99]"
-              >
-                <span className="text-2xl font-extrabold text-brand-600">
-                  {expectedTransferAmount.toLocaleString()}원
-                </span>
-                <div className="flex items-center space-x-1 text-brand-600">
-                  <span className="text-xs font-semibold">{copiedAmount ? "복사 완료" : "복사"}</span>
-                  {copiedAmount ? (
-                    <Check className="h-5 w-5 text-emerald-500" />
-                  ) : (
-                    <Copy className="h-5 w-5" />
-                  )}
-                </div>
-              </button>
-            </div>
-
-            <p className="text-xs text-muted-foreground leading-relaxed pl-0.5">
-              ⚠️ 주문금액이 아니라 결제코드가 차감된 <strong className="text-brand-600 font-semibold">입금액을 정확하게</strong> 이체해 주세요. 입금액이 다를 경우 입금 확인이 되지 않습니다.
-            </p>
           </div>
-        </DialogHeader>
+        )}
 
-        <DialogFooter className="fr gap-3 mt-6 *:flex-1 *:h-12 *:rounded-xl *:text-base">
-          <Button 
-            className="bg-brand-500 hover:bg-brand-600 text-white shadow-md shadow-brand-500/10 hover-lift active:scale-98 transition-all" 
-            onClick={handleConfirm}
-          >
-            확인했습니다
-          </Button>
-        </DialogFooter>
-      </DialogContent>
+        {/* Receipt Container */}
+        <div className="bg-slate-50 dark:bg-slate-950/30 border border-slate-100 dark:border-slate-800/80 rounded-2xl p-5 mb-6 flex flex-col gap-4 relative overflow-hidden">
+          {/* Receipt Dotted Border separator */}
+          <div className="grid w-full grid-cols-2 gap-y-2.5 pb-4 border-b border-dashed border-slate-200 dark:border-slate-800 text-xs">
+            <span className="font-bold text-slate-400 dark:text-slate-500">주문금액</span>
+            <span className="text-right font-bold text-slate-800 dark:text-slate-100">{originalAmount.toLocaleString()}원</span>
+            
+            <span className="font-bold text-slate-400 dark:text-slate-500">결제코드</span>
+            <span className="text-right font-bold text-slate-500 dark:text-slate-400">
+              {paymentCode !== null ? `${paymentCode}원 차감` : "-"}
+            </span>
+
+            <span className="font-bold text-slate-400 dark:text-slate-500">입금 예정 시각</span>
+            <span className="text-right font-bold text-slate-800 dark:text-slate-100">
+              {expiresAt ? new Date(expiresAt).toLocaleTimeString("ko-KR", {
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+                hour12: false,
+              }) : "-"}
+            </span>
+          </div>
+
+          {/* Account Box */}
+          <div className="space-y-1.5 pt-1">
+            <span className="block text-[11px] font-bold text-slate-400 dark:text-slate-500 pl-0.5 uppercase tracking-wider">
+              ⋅ 입금 계좌
+            </span>
+            <button
+              onClick={copyAccount}
+              className="flex w-full items-center justify-between overflow-hidden rounded-xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 transition-all hover:bg-slate-50 dark:hover:bg-slate-800/60 active:scale-[0.99] shadow-sm cursor-pointer"
+            >
+              <div className="flex flex-col text-left">
+                <span className="text-xs text-slate-400 font-bold leading-none mb-1">토스뱅크</span>
+                <span className="text-base font-black text-slate-800 dark:text-slate-100 leading-tight">
+                  1000-1234-5678
+                </span>
+                <span className="text-[10px] text-slate-400 mt-1 leading-none">예금주: 연컴 홈런포차</span>
+              </div>
+              <div className="flex items-center space-x-1 text-slate-400 hover:text-primary transition-colors shrink-0 pl-4 border-l border-slate-100 dark:border-slate-800 h-8">
+                <span className="text-xs font-bold">{copiedAccount ? "복사 완료" : "복사"}</span>
+                {copiedAccount ? (
+                  <Check className="h-4 w-4 text-emerald-500 stroke-[3px]" />
+                ) : (
+                  <Copy className="h-4 w-4" />
+                )}
+              </div>
+            </button>
+          </div>
+
+          {/* Target Amount Box */}
+          <div className="space-y-1.5">
+            <span className="block text-[11px] font-bold text-slate-400 dark:text-slate-500 pl-0.5 uppercase tracking-wider">
+              ⋅ 정확히 보낼 금액
+            </span>
+            <button
+              onClick={copyAmount}
+              className="flex w-full items-center justify-between overflow-hidden rounded-xl border border-brand-100 dark:border-brand-900 bg-brand-50/40 dark:bg-brand-950/20 p-4 transition-all hover:bg-brand-50 dark:hover:bg-brand-950/30 active:scale-[0.99] shadow-sm cursor-pointer"
+            >
+              <span className="text-2xl font-black text-primary dark:text-brand-400">
+                {expectedTransferAmount.toLocaleString()}원
+              </span>
+              <div className="flex items-center space-x-1 text-primary dark:text-brand-400 shrink-0 pl-4 border-l border-brand-100 dark:border-brand-900 h-8">
+                <span className="text-xs font-bold">{copiedAmount ? "복사 완료" : "복사"}</span>
+                {copiedAmount ? (
+                  <Check className="h-4 w-4 text-emerald-500 stroke-[3px]" />
+                ) : (
+                  <Copy className="h-4 w-4" />
+                )}
+              </div>
+            </button>
+          </div>
+        </div>
+
+        {/* Warning Alert banner */}
+        <div className="bg-red-50 dark:bg-red-950/20 border border-red-100/50 dark:border-red-900/30 text-destructive dark:text-rose-500 rounded-2xl p-4 flex items-start gap-3 text-xs leading-relaxed font-semibold mb-6">
+          <AlertTriangle className="h-5 w-5 shrink-0 text-destructive" />
+          <p>
+            주문금액이 아니라 결제코드가 차감된 <strong className="underline decoration-2">입금액을 1원 단위까지 정확하게</strong> 이체해 주세요. 입금액이 다를 경우 입금 확인이 불가능합니다.
+          </p>
+        </div>
+
+        {/* Sticky Footer */}
+        <Button
+          className="w-full py-4 h-auto rounded-xl bg-primary hover:bg-brand-600 text-white font-extrabold text-sm shadow-[0_8px_20px_rgba(0,61,155,0.2)] hover:shadow-[0_12px_28px_rgba(0,61,155,0.3)] transition-all duration-300 active:scale-[0.98] cursor-pointer"
+          onClick={handleConfirm}
+        >
+          확인했습니다
+        </Button>
+      </BottomSheetContent>
     </Dialog>
   );
 }

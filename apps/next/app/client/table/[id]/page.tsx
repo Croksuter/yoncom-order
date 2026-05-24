@@ -7,7 +7,11 @@ import Footer from "./components/footer";
 import Header from "./components/header";
 import Menus from "./components/menu/menus";
 import ShopIntro from "./components/shop.intro";
+import OrderHistoryPanel from "./components/order/order.history.panel";
+import OrderModal from "./components/order/order.modal";
+import OrderPaymentPanel from "./components/order/order.payment.panel";
 import { Skeleton } from "~/components/ui/skeleton";
+import { isPaymentInstructionOrder } from "~/lib/order-status";
 
 type ClientTablePageProps = {
   params: Promise<{ id: string }>;
@@ -18,7 +22,19 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
   const { clientTable } = useTableStore();
   const { clientMenuCategories } = useMenuStore();
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<"menu" | "orders">("menu");
   const isValidTableId = id.length === 15;
+  const activeUnpaidOrder = clientTable?.tableContexts[0]?.orders.find(isPaymentInstructionOrder);
+  const [isVerified, setIsVerified] = useState(false);
+
+  useEffect(() => {
+    if (activeUnpaidOrder) {
+      const verified = localStorage.getItem(`verified_order_${activeUnpaidOrder.id}`) === "true";
+      setIsVerified(verified);
+    } else {
+      setIsVerified(false);
+    }
+  }, [activeUnpaidOrder]);
 
   useEffect(() => {
     const fetchTableData = async () => {
@@ -49,6 +65,18 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
 
     void useMenuStore.getState().clientLoad({});
   }, [clientTable]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !clientMenuCategories) return;
+    clientMenuCategories
+      .flatMap((cat) => cat.menus)
+      .forEach((menu) => {
+        if (menu.image) {
+          const img = new window.Image();
+          img.src = menu.image;
+        }
+      });
+  }, [clientMenuCategories]);
 
   if (loading) {
     return (
@@ -96,14 +124,33 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
   return (
     <main className="h-screen w-screen items-center justify-center overflow-hidden fc">
       {clientTable && clientMenuCategories ? (
-        <>
-          <Header />
-          <div className="w-full max-w-[600px] flex-1 overflow-hidden px-2 fc">
-            <ShopIntro tableName={clientTable.name} tableSeats={clientTable.seats} />
-            <Menus menuCategories={clientMenuCategories} />
-            <Footer />
-          </div>
-        </>
+        activeUnpaidOrder && isVerified ? (
+          <OrderPaymentPanel order={activeUnpaidOrder} />
+        ) : (
+          <>
+            <Header />
+            <div className="w-full max-w-[600px] flex-1 overflow-hidden px-4 fc relative pt-16">
+              {activeTab === "menu" ? (
+                <div className="flex-1 fc overflow-hidden w-full">
+                  <ShopIntro tableName={clientTable.name} tableSeats={clientTable.seats} />
+                  <Menus menuCategories={clientMenuCategories} />
+                </div>
+              ) : (
+                <OrderHistoryPanel />
+              )}
+              <Footer activeTab={activeTab} setActiveTab={setActiveTab} />
+            </div>
+
+            {/* Locked Verification Modal */}
+            {activeUnpaidOrder && !isVerified && (
+              <OrderModal
+                openState={true}
+                setOpenState={() => {}}
+                onVerify={() => setIsVerified(true)}
+              />
+            )}
+          </>
+        )
       ) : (
         <div className="p-6 text-center">
           <h1 className="text-xl font-bold">
@@ -115,3 +162,4 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
     </main>
   );
 }
+

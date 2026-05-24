@@ -1,14 +1,12 @@
-
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
-import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "~/components/ui/dialog";
-import { DialogContent } from "~/components/ui/dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
+import { Dialog, DialogDescription, DialogHeader, DialogTitle, BottomSheetContent } from "~/components/ui/dialog";
 import useMenuStore from "~/stores/menu.store";
 import useTableStore from "~/stores/table.store";
 import OrderDetailModal from "./order.detail.modal";
 import * as ClientTableResponse from "shared/types/responses/client/table"
 import { getOrderStatusLabel } from "~/lib/order-status";
+import { History, Receipt, ArrowRight } from "lucide-react";
 
 export default function OrderHistoryModal({
   openState, setOpenState,
@@ -53,65 +51,119 @@ export default function OrderHistoryModal({
   return (
     <>
       <Dialog open={openState} onOpenChange={setOpenState}>
-        <DialogContent className="fc w-[96%] min-h-[25rem] max-h-[40rem] justify-between border-blue-500 border-2 rounded-xl">
+        <BottomSheetContent className="fc justify-between max-h-[85vh]">
           {orderHistories.length === 0 ? (
-            <DialogHeader >
-              <DialogTitle>주문 내역이 없습니다</DialogTitle>
-              <DialogDescription />
-            </DialogHeader>
+            <div className="fc items-center justify-center py-12 text-center space-y-4">
+              <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-full text-slate-400 dark:text-slate-500">
+                <History className="h-10 w-10" />
+              </div>
+              <div className="space-y-1">
+                <DialogTitle className="text-xl font-extrabold text-slate-800 dark:text-slate-100">
+                  주문 내역이 없습니다
+                </DialogTitle>
+                <DialogDescription className="text-xs text-slate-400">
+                  아직 주문하신 내역이 존재하지 않습니다.
+                </DialogDescription>
+              </div>
+              <Button
+                onClick={handleClose}
+                className="mt-4 px-6 py-2.5 rounded-full bg-primary hover:bg-brand-600 text-white font-bold text-xs"
+              >
+                닫기
+              </Button>
+            </div>
           ) : (
             <>
-              <DialogHeader>
-                <DialogTitle className="text-2xl">주문 내역</DialogTitle>
-                <DialogDescription className="text-md text-center">주문을 조회하려면 주문 목록을 클릭하세요.</DialogDescription>
-              </DialogHeader>
-              <Table>
-                <TableHeader className="bg-gray-200">
-                  <TableRow>
-                    {/* <TableHead></TableHead> */}
-                    <TableHead className="!text-left font-bold">주문 일시</TableHead>
-                    <TableHead className="!text-center">상태</TableHead>
-                    <TableHead className="!text-right">주문금액</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {orderHistories.map((orderHistory) => (
-                    <TableRow
+              {/* Drag Handle */}
+              <div className="w-full flex justify-center pb-4">
+                <div className="w-12 h-1 bg-slate-200 dark:bg-slate-800 rounded-full"></div>
+              </div>
+
+              {/* Header */}
+              <div className="space-y-1 text-center mb-6">
+                <DialogTitle className="text-2xl font-black text-slate-800 dark:text-slate-100">
+                  주문 내역
+                </DialogTitle>
+                <DialogDescription className="text-xs text-slate-400 font-medium">
+                  주문을 터치하시면 상세 정보를 확인하실 수 있습니다.
+                </DialogDescription>
+              </div>
+
+              {/* Order List */}
+              <div className="flex-1 overflow-y-auto no-scrollbar space-y-3 my-2 pr-1 max-h-[45vh]">
+                {orderHistories.map((orderHistory) => {
+                  const statusLabel = getOrderStatusLabel(orderHistory.order);
+                  const isCancelled = orderHistory.order.deletedAt !== null;
+                  const isPaid = orderHistory.order.payment?.status === "PAID";
+                  
+                  return (
+                    <div
                       key={orderHistory.orderId}
                       onClick={() => {
                         setOrderDetail(orderHistory.order);
-                        setOrderDetailModalOpenState(true)
+                        setOrderDetailModalOpenState(true);
                       }}
-                      className="h-14 *:text-base *:tracking-tighter"
+                      className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-950/20 hover:bg-slate-50 dark:hover:bg-slate-850 cursor-pointer transition-all active:scale-[0.99]"
                     >
-                      {/* <TableCell className="text-center">{index + 1}</TableCell> */}
-                      <TableCell className="text-left">{new Date(orderHistory.orderDate).toLocaleString("ko-KR", {
-                        year: "numeric",
-                        month: "2-digit",
-                        day: "2-digit",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        second: "2-digit",
-                        hour12: false,
-                      })}</TableCell>
-                      <TableCell className="text-center">{getOrderStatusLabel(orderHistory.order)}</TableCell>
-                      <TableCell className="text-right">{orderHistory.totalPrice.toLocaleString()}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              <div className="text-right">
-                <span className="text-right text-lg mr-2">주문금액 합계</span>
-                <span className="text-right text-2xl font-bold">
-                  {orderHistories.filter((orderHistory) => orderHistory.order.deletedAt === null).reduce((acc, orderHistory) => acc + orderHistory.totalPrice, 0).toLocaleString()} 원
+                      <div className="fc gap-1 min-w-0">
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold">
+                          {new Date(orderHistory.orderDate).toLocaleString("ko-KR", {
+                            year: "numeric",
+                            month: "2-digit",
+                            day: "2-digit",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            hour12: false,
+                          })}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-extrabold text-sm text-slate-800 dark:text-slate-100 truncate">
+                            {orderHistory.menuOrders[0]?.menuName} 
+                            {orderHistory.menuOrders.length > 1 && ` 외 ${orderHistory.menuOrders.length - 1}개`}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <div className="fc items-end">
+                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-black tracking-wider ${
+                            isCancelled 
+                              ? "bg-red-50 text-red-500 dark:bg-red-950/30 dark:text-rose-400"
+                              : isPaid
+                                ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400"
+                                : "bg-amber-50 text-amber-600 dark:bg-amber-950/30 dark:text-amber-400"
+                          }`}>
+                            {statusLabel}
+                          </span>
+                          <span className="font-extrabold text-xs text-slate-800 dark:text-slate-100 mt-1">
+                            ₩ {orderHistory.totalPrice.toLocaleString()}
+                          </span>
+                        </div>
+                        <ArrowRight className="h-4 w-4 text-slate-400 shrink-0" />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Total Summary Row */}
+              <div className="flex justify-between items-center py-4 border-t border-slate-100 dark:border-slate-800 mt-2">
+                <span className="text-sm text-slate-400 dark:text-slate-500 font-bold">누적 총 주문금액</span>
+                <span className="text-2xl font-black text-primary dark:text-brand-400">
+                  ₩ {orderHistories.filter((oh) => oh.order.deletedAt === null).reduce((acc, oh) => acc + oh.totalPrice, 0).toLocaleString()}
                 </span>
               </div>
-              <DialogFooter className="h-fit fr *:flex-1 *:mx-2 *:h-14 *:rounded-2xl *:text-lg">
-                <Button className="bg-blue-500 hover:bg-blue-600 text-white" onClick={handleClose}>닫기</Button>
-              </DialogFooter>
+
+              {/* Close Button */}
+              <Button
+                className="w-full py-4 h-auto rounded-xl bg-primary hover:bg-brand-600 text-white font-extrabold text-sm shadow-[0_8px_20px_rgba(0,61,155,0.2)] hover:shadow-[0_12px_28px_rgba(0,61,155,0.3)] transition-all duration-300 active:scale-[0.98] cursor-pointer"
+                onClick={handleClose}
+              >
+                닫기
+              </Button>
             </>
           )}
-        </DialogContent>
+        </BottomSheetContent>
       </Dialog>
       <OrderDetailModal
         openState={orderDetailModalOpenState}

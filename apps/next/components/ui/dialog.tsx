@@ -106,6 +106,32 @@ const DialogDescription = React.forwardRef<
 ))
 DialogDescription.displayName = DialogPrimitive.Description.displayName
 
+const BottomSheetContent = React.forwardRef<
+  React.ElementRef<typeof DialogPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & { hideClose?: boolean }
+>(({ className, children, hideClose, ...props }, ref) => (
+  <DialogPortal>
+    <DialogOverlay />
+    <DialogPrimitive.Content
+      ref={ref}
+      className={cn(
+        "fixed bottom-0 left-0 right-0 mx-auto z-50 w-full max-w-[600px] border-t border-x border-b-0 border-slate-100 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl p-6 pb-10 shadow-[0_-12px_40px_rgba(0,0,0,0.12)] duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom rounded-t-[2.5rem] rounded-b-none",
+        className
+      )}
+      {...props}
+    >
+      {children}
+      {!hideClose && (
+        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+          <X className="h-4 w-4 scale-[2]" />
+          <span className="sr-only">Close</span>
+        </DialogPrimitive.Close>
+      )}
+    </DialogPrimitive.Content>
+  </DialogPortal>
+))
+BottomSheetContent.displayName = "BottomSheetContent"
+
 export {
   Dialog,
   DialogPortal,
@@ -113,8 +139,10 @@ export {
   DialogTrigger,
   DialogClose,
   DialogContent,
+  BottomSheetContent,
   DialogHeader,
   DialogFooter,
   DialogTitle,
   DialogDescription,
 }
+
