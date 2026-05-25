@@ -341,6 +341,7 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
                   {/* <ShopIntro tableName={clientTable.name} tableSeats={clientTable.seats} /> */}
                   <Menus
                     menuCategories={clientMenuCategories}
+                    isHeaderCollapsed={scrollY > 0}
                     onContentScroll={handleContentScroll}
                   />
                 </div>

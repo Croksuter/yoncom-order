@@ -8,9 +8,11 @@ import { useCallback, useEffect, useRef, useState, type UIEventHandler } from "r
 
 export default function Menus({
   menuCategories,
+  isHeaderCollapsed,
   onContentScroll,
 }: {
   menuCategories: ClientMenuResponse.Get["result"];
+  isHeaderCollapsed: boolean;
   onContentScroll?: UIEventHandler<HTMLDivElement>;
 }) {
   const firstCategoryId = menuCategories[0]?.id ?? "";
@@ -24,6 +26,7 @@ export default function Menus({
     categoryTabsHeight > 0
       ? `max(0px, calc(100dvh - var(--client-header-height) - ${categoryTabsHeight}px - var(--client-footer-height)))`
       : `max(0px, calc(100dvh - var(--client-header-height) - var(--client-footer-height)))`;
+  const categoryResetScrollTop = isHeaderCollapsed ? 1 : 0;
 
   useEffect(() => {
     if (!firstCategoryId) return;
@@ -54,18 +57,18 @@ export default function Menus({
     suppressNextScrollSyncRef.current = true;
     const currentContainer = scrollContainersRef.current.get(categoryId);
     if (currentContainer) {
-      currentContainer.scrollTop = 0;
+      currentContainer.scrollTop = categoryResetScrollTop;
     }
     window.requestAnimationFrame(() => {
       const nextContainer = scrollContainersRef.current.get(categoryId);
       if (nextContainer) {
-        nextContainer.scrollTop = 0;
+        nextContainer.scrollTop = categoryResetScrollTop;
       }
       window.requestAnimationFrame(() => {
         suppressNextScrollSyncRef.current = false;
       });
     });
-  }, []);
+  }, [categoryResetScrollTop]);
 
   const handleCategoryChange = useCallback((categoryId: string) => {
     setActiveCategoryId(categoryId);
