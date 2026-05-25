@@ -3,7 +3,6 @@ import { Button } from "~/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle, BottomSheetContent } from "~/components/ui/dialog";
 import useCartStore, { CartState } from "~/stores/cart.store";
 import useMenuStore from "~/stores/menu.store";
-import OrderModal from "../order/order.modal";
 import useTableStore from "~/stores/table.store";
 import { toast } from "~/hooks/use-toast";
 import { useValidateOrder } from "~/hooks/validate-order";
@@ -25,10 +24,7 @@ export default function CartModal({
   openState: boolean;
   setOpenState: (open: boolean) => void;
 }) {
-  const [confirmModalOpenState, setConfirmModalOpenState] = useState(false);
-  const [modalOpenState, setModalOpenState] = useState(false);
   const [startVisitConfirmOpen, setStartVisitConfirmOpen] = useState(false);
-  const [modalMenuOrder, setModalMenuOrder] = useState<CartState["menuOrders"][number] | null>(null);
   const [duringPurchase, setDuringPurchase] = useState(false);
   const [checkoutMenuOrderInfos, setCheckoutMenuOrderInfos] = useState<MenuOrderInfo[] | null>(null);
 
@@ -101,7 +97,6 @@ export default function CartModal({
 
         useCartStore.getState().clearMenuOrders();
         setCheckoutMenuOrderInfos(null);
-        setConfirmModalOpenState(true);
       });
     } finally {
       setDuringPurchase(false);
@@ -272,10 +267,6 @@ export default function CartModal({
           )}
         </BottomSheetContent>
       </Dialog>
-      <OrderModal
-        openState={confirmModalOpenState}
-        setOpenState={setConfirmModalOpenState}
-      />
       <Dialog open={startVisitConfirmOpen} onOpenChange={setStartVisitConfirmOpen}>
         <DialogContent className="w-[calc(100%-2rem)] max-w-sm rounded-2xl">
           <div className="space-y-3 text-center">
