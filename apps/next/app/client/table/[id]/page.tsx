@@ -80,7 +80,7 @@ async function getTableAccessFailureCopy(error: unknown) {
     };
   }
 
-  const body = await error.response.clone().json<{ error?: string }>().catch(() => null);
+  const body = (await error.response.clone().json().catch(() => null)) as { error?: string } | null;
   if (body?.error === "Table already in use") {
     return {
       message: TABLE_IN_USE_MESSAGE,
