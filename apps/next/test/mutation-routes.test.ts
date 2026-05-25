@@ -422,6 +422,105 @@ describe("implemented mutation route handlers", () => {
     expect(requests.some((request) => request.sql.startsWith("INSERT INTO \"orders\""))).toBe(false);
   });
 
+  it("DELETE /api/order vacates the table context when the last unpaid order is cancelled", async () => {
+    const { requests } = installD1FetchMock(({ sql, params }) => {
+      const realtime = handleRealtimeSql(sql);
+      if (realtime) return realtime;
+      if (sql === "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?") {
+        return d1Success(params[0] === "tableContexts" ? [{ name: params[0] }] : []);
+      }
+      if (sql === "PRAGMA table_info(\"payments\")") {
+        return tableInfo(paymentColumns);
+      }
+      if (sql === "PRAGMA table_info(\"menuOrders\")") {
+        return tableInfo(["id", "quantity", "status", "orderId", "menuId", "createdAt", "updatedAt", "deletedAt"]);
+      }
+      if (sql === "PRAGMA table_info(\"orders\")") {
+        return tableInfo(orderColumns);
+      }
+      if (sql === "PRAGMA table_info(\"tableContexts\")") {
+        return tableInfo(["id", "tableId", "createdAt", "updatedAt", "deletedAt"]);
+      }
+      if (sql === "SELECT * FROM orders WHERE id = ? AND deletedAt IS NULL LIMIT 1") {
+        return d1Success([{
+          id: "ord_pending0001",
+          tableContextId: "ctx_first000001",
+          clientOrderId: "client-order-first",
+          displayNumber: 1,
+          status: "ACTIVE",
+          expiresAt: Date.now() + 1000,
+          createdAt: 1,
+          updatedAt: 1,
+          deletedAt: null,
+        }]);
+      }
+      if (sql === "SELECT * FROM payments WHERE orderId = ? AND deletedAt IS NULL LIMIT 1") {
+        return d1Success([{
+          id: "pay_pending0001",
+          paid: 0,
+          amount: 11999,
+          status: "PENDING",
+          paymentCode: 1,
+          originalAmount: 12000,
+          expectedTransferAmount: 11999,
+          orderId: "ord_pending0001",
+          createdAt: 1,
+          updatedAt: 1,
+          deletedAt: null,
+        }]);
+      }
+      if (sql === "SELECT * FROM menuOrders WHERE orderId = ? AND deletedAt IS NULL") {
+        return d1Success([{
+          id: "mo_pending00001",
+          orderId: "ord_pending0001",
+          menuId: "menu_e2e_000001",
+          quantity: 1,
+          status: "PENDING",
+          createdAt: 1,
+          updatedAt: 1,
+          deletedAt: null,
+        }]);
+      }
+      if (sql === "UPDATE menus SET quantity = quantity + ?, updatedAt = ? WHERE id = ?") {
+        return d1Success([], { duration: 1, changes: 1 });
+      }
+      if (sql.startsWith("UPDATE \"menuOrders\"")) {
+        return d1Success([], { duration: 1, changes: 1 });
+      }
+      if (sql.startsWith("UPDATE \"payments\"")) {
+        return d1Success([], { duration: 1, changes: 1 });
+      }
+      if (sql.startsWith("UPDATE \"orders\"")) {
+        return d1Success([], { duration: 1, changes: 1 });
+      }
+      if (sql === "DELETE FROM paymentCodeLeases WHERE paymentId = ?") {
+        return d1Success([], { duration: 1, changes: 1 });
+      }
+      if (sql.startsWith("SELECT tc.tableId")) {
+        return d1Success([{ tableId: "table_e2e_00001" }]);
+      }
+      if (sql === "SELECT * FROM orders WHERE tableContextId = ? AND deletedAt IS NULL LIMIT 1") {
+        return d1Success([]);
+      }
+      if (sql.startsWith("UPDATE \"tableContexts\"")) {
+        return d1Success([], { duration: 1, changes: 1 });
+      }
+      throw new Error(`Unexpected SQL: ${sql}`);
+    });
+
+    const { DELETE } = await import("~/app/api/order/route");
+    const response = await DELETE(guardedJsonRequest(
+      "http://order.test/api/order",
+      "DELETE",
+      { orderId: "ord_pending0001" },
+    ));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual(expect.objectContaining({ result: "Order Deleted" }));
+    const tableContextUpdate = requests.find((request) => request.sql.startsWith("UPDATE \"tableContexts\""));
+    expect(tableContextUpdate?.params[2]).toBe("ctx_first000001");
+  });
+
   it("POST /api/admin/deposit stores a bank transaction and auto-matches only a single exact expected amount", async () => {
     const { requests } = installD1FetchMock(({ sql, params }) => {
       const realtime = handleRealtimeSql(sql);

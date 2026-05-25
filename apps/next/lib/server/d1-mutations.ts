@@ -347,6 +347,21 @@ async function closeTableContext(tableContextId: string, timestamp = now()) {
   await updateLegacyTableContextMirror(contextTable, values, "id = ?", [tableContextId]);
 }
 
+async function closeTableContextIfEmpty(tableId: string, tableContextId: string, timestamp = now()) {
+  const remainingOrders = await queryD1<OrderRow>(
+    "SELECT * FROM orders WHERE tableContextId = ? AND deletedAt IS NULL LIMIT 1",
+    [tableContextId],
+  );
+
+  if (remainingOrders.length > 0) {
+    return false;
+  }
+
+  await closeTableContext(tableContextId, timestamp);
+  await revokeTableSessions(tableId, tableContextId);
+  return true;
+}
+
 async function updateLegacyTableContextMirror(
   contextTable: string,
   values: Record<string, unknown>,
@@ -957,6 +972,9 @@ export async function cancelOrder(
   }
 
   const tableId = await getTableIdForOrder(orderId);
+  const tableVacated = tableId
+    ? await closeTableContextIfEmpty(tableId, order.tableContextId, timestamp)
+    : false;
   return await withDomainEvent(
     { result: "Order Deleted", status: 200 },
     {
@@ -964,7 +982,7 @@ export async function cancelOrder(
       scopes: [venueScope, ...(tableId ? [tableScope(tableId)] : [])],
       entityType: "order",
       entityId: orderId,
-      payload: { tableId, terminalPaymentStatus, terminalOrderStatus },
+      payload: { tableId, terminalPaymentStatus, terminalOrderStatus, tableContextId: order.tableContextId, tableVacated },
     },
   );
 }
