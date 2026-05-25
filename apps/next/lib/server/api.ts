@@ -10,6 +10,83 @@ const rateWindowMs = 60_000;
 const rateMaxRequests = 120;
 const rateBuckets = new Map<string, { count: number; resetAt: number }>();
 
+function firstHeaderValue(value: string | null) {
+  return value?.split(",")[0]?.trim() || null;
+}
+
+function normalizeHeaderValue(value: string | null) {
+  return value?.trim().replace(/^"|"$/g, "") || null;
+}
+
+function getForwardedHeaderValue(request: Request, key: "host" | "proto") {
+  const forwarded = firstHeaderValue(request.headers.get("forwarded"));
+  if (!forwarded) return null;
+
+  const prefix = `${key}=`;
+  const part = forwarded
+    .split(";")
+    .map((segment) => segment.trim())
+    .find((segment) => segment.toLowerCase().startsWith(prefix));
+
+  return normalizeHeaderValue(part?.slice(prefix.length) ?? null);
+}
+
+function getRequestAssociatedHosts(request: Request) {
+  const requestUrl = new URL(request.url);
+  return new Set(
+    [
+      requestUrl.host,
+      firstHeaderValue(request.headers.get("host")),
+      firstHeaderValue(request.headers.get("x-forwarded-host")),
+      getForwardedHeaderValue(request, "host"),
+    ].filter((host): host is string => !!host),
+  );
+}
+
+function originFromParts(protocol: string | null, host: string | null) {
+  const normalizedProtocol = normalizeHeaderValue(protocol)?.replace(/:$/, "");
+  if (!host || (normalizedProtocol !== "http" && normalizedProtocol !== "https")) {
+    return null;
+  }
+
+  try {
+    return new URL(`${normalizedProtocol}://${host}`).origin;
+  } catch {
+    return null;
+  }
+}
+
+function isSameRequestOrigin(request: Request, origin: string | null) {
+  if (!origin) return false;
+
+  let originUrl: URL;
+  try {
+    originUrl = new URL(origin);
+  } catch {
+    return false;
+  }
+
+  if (originUrl.protocol !== "http:" && originUrl.protocol !== "https:") {
+    return false;
+  }
+
+  const requestUrl = new URL(request.url);
+  const requestOrigin = requestUrl.origin;
+  if (origin === requestOrigin) {
+    return true;
+  }
+
+  const forwardedProto =
+    firstHeaderValue(request.headers.get("x-forwarded-proto")) ?? getForwardedHeaderValue(request, "proto");
+  const forwardedHost = firstHeaderValue(request.headers.get("x-forwarded-host")) ?? getForwardedHeaderValue(request, "host");
+  const forwardedOrigin = originFromParts(forwardedProto, forwardedHost);
+  if (forwardedOrigin && origin === forwardedOrigin) {
+    return true;
+  }
+
+  return getRequestAssociatedHosts(request).has(originUrl.host);
+}
+
 export function ok<T>(result: T, status = 200) {
   traceEvent("server", "api.response.ok", { status });
   return NextResponse.json({ result }, { status });
@@ -127,8 +204,7 @@ export function guardUnsafeRequest(
   }
 
   const origin = request.headers.get("origin");
-  const requestOrigin = new URL(request.url).origin;
-  if (!origin || origin !== requestOrigin) {
+  if (!isSameRequestOrigin(request, origin)) {
     traceEvent("server", "api.guard.block", { traceId, method: request.method, path, reason: "origin" });
     return fail("Origin required", 403);
   }
