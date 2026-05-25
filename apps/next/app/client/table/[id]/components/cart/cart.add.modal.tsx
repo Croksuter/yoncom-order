@@ -118,16 +118,16 @@ export default function CartAddModal({
         {/* Content Details */}
         <div className="flex flex-col gap-2 mb-6">
           <div className="flex justify-between items-start gap-4">
-            <h2 className="font-extrabold text-xl text-slate-800 dark:text-slate-100 leading-snug">
+            <DialogTitle className="font-extrabold text-xl text-slate-800 dark:text-slate-100 leading-snug">
               {menu.name}
-            </h2>
+            </DialogTitle>
             <span className="font-extrabold text-lg text-primary dark:text-brand-400 shrink-0">
               ₩ {menu.price.toLocaleString()}
             </span>
           </div>
-          <p className="text-xs text-slate-400 dark:text-slate-500 font-medium leading-relaxed">
+          <DialogDescription className="text-xs text-slate-400 dark:text-slate-500 font-medium leading-relaxed">
             {menu.description || "엄선된 신선한 재료로 준비한 홈런포차 대표 추천 메뉴입니다. 지금 주문해 보세요."}
-          </p>
+          </DialogDescription>
         </div>
 
         {/* Quantity Adjuster */}
