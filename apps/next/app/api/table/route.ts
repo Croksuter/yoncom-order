@@ -1,12 +1,15 @@
 import { getValidation } from "shared/types/requests/client/table";
 import { fail, ok, parseSearchParams, routeError } from "~/lib/server/api";
-import { getTablesWithRelations } from "~/lib/server/table-queries";
+import { requireTableSession } from "~/lib/server/table-session";
+import { getAuthorizedClientTable } from "~/lib/server/table-queries";
 
 export async function GET(request: Request) {
   try {
     const query = parseSearchParams(request, getValidation);
+    const tableSession = await requireTableSession(request, query.tableId);
+    if (tableSession.response) return tableSession.response;
 
-    const table = (await getTablesWithRelations(query.tableId))[0];
+    const table = await getAuthorizedClientTable(query.tableId, tableSession.session.tableContextId);
 
     if (!table) {
       return fail("Table Not Found", 409);

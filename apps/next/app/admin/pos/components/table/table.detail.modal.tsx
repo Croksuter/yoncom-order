@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import useTableStore from "~/stores/table.store";
 import * as AdminTableResponse from "shared/types/responses/admin/table";
 import { Input } from "~/components/ui/input";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 export default function TableDetailModal({
   table,
@@ -25,6 +25,12 @@ export default function TableDetailModal({
   const confirmFunction = inUse ? vacateTable : occupyTable;
   const [pendingAction, setPendingAction] = useState<"toggle" | "update" | null>(null);
   const isPending = pendingAction !== null;
+
+  const resetForm = useCallback(() => {
+    setTableName(table.name);
+    setTableSeats(table.seats);
+    setInvalid(false);
+  }, [table]);
 
   const handleConfirm = async () => {
     if (isPending) return;
@@ -64,8 +70,15 @@ export default function TableDetailModal({
 
   const handleCancel = () => {
     if (isPending) return;
+    resetForm();
     setOpenState(false);
   }
+
+  useEffect(() => {
+    if (openState) {
+      resetForm();
+    }
+  }, [openState, resetForm]);
 
   return (
     <Dialog open={openState} onOpenChange={handleCancel}>
@@ -82,7 +95,6 @@ export default function TableDetailModal({
             type="text"
             placeholder="테이블 이름을 입력하세요"
             value={tableName}
-            defaultValue={table.name}
             onChange={(e) => setTableName(e.target.value)}
           />
         </div>

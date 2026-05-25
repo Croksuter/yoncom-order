@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
@@ -28,6 +28,17 @@ export default function InventoryDetailModal({
   const [duringConfirm, setDuringConfirm] = useState(false);
   const [invalid, setInvalid] = useState(false);
   const isBusy = isUploading || duringConfirm;
+
+  const resetForm = useCallback(() => {
+    setMenuName(menu.name || "");
+    setMenuCategory(menu.menuCategoryId || "");
+    setMenuDescription(menu.description || "");
+    setMenuImage(menu.image || "");
+    setMenuPrice(menu.price || 0);
+    setMenuQuantity(menu.quantity || 0);
+    setMenuAvailable(menu.available || false);
+    setInvalid(false);
+  }, [menu]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (isUploading) return;
@@ -80,20 +91,15 @@ export default function InventoryDetailModal({
 
   const handleClose = () => {
     if (isBusy) return;
-    setInvalid(false);
+    resetForm();
     setOpenState(false);
   }
 
   useEffect(() => {
-    setMenuName(menu.name || "");
-    setMenuCategory(menu.menuCategoryId || "");
-    setMenuDescription(menu.description || "");
-    setMenuImage(menu.image || "");
-    setMenuPrice(menu.price || 0);
-    setMenuQuantity(menu.quantity || 0);
-    setMenuAvailable(menu.available || false);
-    setInvalid(false);
-  }, [menu]);
+    if (openState) {
+      resetForm();
+    }
+  }, [openState, resetForm]);
 
   return (
     <Dialog open={openState} onOpenChange={handleClose}>

@@ -20,6 +20,17 @@ type TableState = {
   error: boolean;
 
   load: (query: AdminTableRequest.Get) => Promise<AdminTableResponse.Get | null>;
+  clientStartTableSession: (
+    query: ClientTableRequest.Get,
+  ) => Promise<{
+    result: {
+      state: "INACTIVE" | "RESUMED";
+      table: Omit<ClientTableResponse.Get["result"], "tableContexts">;
+      tableId: string;
+      tableContextId: string | null;
+      expiresAt: number | null;
+    };
+  } | null>;
 
   createTable: (query: AdminTableRequest.Create) => Promise<AdminTableResponse.Create | null>;
   removeTable: (query: AdminTableRequest.Remove) => Promise<AdminTableResponse.Remove | null>;
@@ -67,6 +78,24 @@ const useTableStore = create<TableState>((set, get) => ({
           orders: tableContext.orders.sort((a, b) => b.createdAt - a.createdAt),
         })),
     })) }),
+  }),
+
+  clientStartTableSession: async (query: ClientTableRequest.Get) => await queryStore<
+    ClientTableRequest.Get,
+    {
+      result: {
+        state: "INACTIVE" | "RESUMED";
+        table: Omit<ClientTableResponse.Get["result"], "tableContexts">;
+        tableId: string;
+        tableContextId: string | null;
+        expiresAt: number | null;
+      };
+    }
+  >({
+    route: "table/session",
+    method: "post",
+    query,
+    setter: set,
   }),
 
   createTable: async (query: AdminTableRequest.Create) => await queryStore<AdminTableRequest.Create, AdminTableResponse.Create>({

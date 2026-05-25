@@ -2,22 +2,22 @@ import { z } from "zod";
 
 export const createValidation = z.object({
   menuCategoryOptions: z.object({
-    name: z.string().min(1),
-    description: z.string(),
-  }),
-});
+    name: z.string().trim().min(1).max(80),
+    description: z.string().max(500),
+  }).strict(),
+}).strict();
 export type Create = z.infer<typeof createValidation>;
 
 export const updateValidation = z.object({
   menuCategoryId: z.string().length(15),
   menuCategoryOptions: z.object({
-    name: z.string().min(1),
-    description: z.string(),
-  }),
-});
+    name: z.string().trim().min(1).max(80),
+    description: z.string().max(500),
+  }).strict(),
+}).strict();
 export type Update = z.infer<typeof updateValidation>;
 
 export const removeValidation = z.object({
   menuCategoryId: z.string().length(15),
-});
+}).strict();
 export type Remove = z.infer<typeof removeValidation>;

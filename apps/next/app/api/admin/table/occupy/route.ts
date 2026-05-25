@@ -1,21 +1,23 @@
 import { occupyValidation } from "shared/types/requests/admin/table";
-import { fail, ok, routeError } from "~/lib/server/api";
+import { fail, guardUnsafeRequest, mutationOk, parseJsonBody, routeError } from "~/lib/server/api";
 import { requireAdmin } from "~/lib/server/auth-session";
 import { occupyAdminTable } from "~/lib/server/d1-mutations";
 
 export async function PUT(request: Request) {
   const adminError = await requireAdmin();
   if (adminError) return adminError;
+  const guardError = guardUnsafeRequest(request, { csrf: true, idempotency: true });
+  if (guardError) return guardError;
 
   try {
-    const query = occupyValidation.parse(await request.json());
+    const query = await parseJsonBody(request, occupyValidation);
     const result = await occupyAdminTable(query.tableId);
 
     if (result.error) {
       return fail(result.error, result.status);
     }
 
-    return ok(result.result, result.status);
+    return mutationOk(result);
   } catch (error) {
     return routeError(error);
   }

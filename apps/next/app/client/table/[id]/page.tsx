@@ -1,6 +1,7 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { HTTPError } from "ky";
+import { use, useCallback, useEffect, useRef, useState } from "react";
 import useMenuStore from "~/stores/menu.store";
 import useTableStore from "~/stores/table.store";
 import Footer from "./components/footer";
@@ -12,20 +13,167 @@ import OrderModal from "./components/order/order.modal";
 import OrderPaymentPanel from "./components/order/order.payment.panel";
 import { Skeleton } from "~/components/ui/skeleton";
 import { isPaymentInstructionOrder } from "~/lib/order-status";
+import { useRealtimeSync } from "~/hooks/use-realtime-sync";
+import { api } from "~/lib/query";
+import type * as ClientTableResponse from "shared/types/responses/client/table";
+import { traceEvent } from "~/lib/verification-trace";
+import kyErrorHandler from "~/lib/ky-error-handler";
 
 type ClientTablePageProps = {
   params: Promise<{ id: string }>;
 };
+
+type TableSyncResponse = {
+  result: {
+    revision: number;
+    events: unknown[];
+    snapshot: {
+      table: ClientTableResponse.Get["result"];
+    } | null;
+    gap: boolean;
+  };
+};
+
+type TableSessionResponse = {
+  result: {
+    state: "INACTIVE" | "RESUMED";
+    table: Omit<ClientTableResponse.Get["result"], "tableContexts">;
+    tableId: string;
+    tableContextId: string | null;
+    expiresAt: number | null;
+  };
+};
+
+const TABLE_UNAVAILABLE_MESSAGE = "현재 이용할 수 없는 테이블입니다.";
+const TABLE_UNAVAILABLE_DESCRIPTION = "직원에게 테이블 활성화를 요청해주세요.";
+const TABLE_IN_USE_MESSAGE = "이미 사용 중인 테이블입니다.";
+const TABLE_IN_USE_DESCRIPTION = "직원에게 문의해주세요.";
+const tableAccessFailureStatuses = new Set([401, 403, 404, 409]);
+type TableAccessState = "UNKNOWN" | "INACTIVE" | "RESUMED" | "BLOCKED";
+
+function normalizeClientTable(table: ClientTableResponse.Get["result"]) {
+  return {
+    ...table,
+    tableContexts: table.tableContexts
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .map((tableContext) => ({
+        ...tableContext,
+        orders: tableContext.orders.sort((a, b) => b.createdAt - a.createdAt),
+      })),
+  };
+}
+
+function isTableAccessFailure(error: unknown) {
+  return error instanceof HTTPError && tableAccessFailureStatuses.has(error.response.status);
+}
+
+async function getTableAccessFailureCopy(error: unknown) {
+  if (!(error instanceof HTTPError)) {
+    return {
+      message: TABLE_UNAVAILABLE_MESSAGE,
+      description: TABLE_UNAVAILABLE_DESCRIPTION,
+    };
+  }
+
+  const body = await error.response.clone().json<{ error?: string }>().catch(() => null);
+  if (body?.error === "Table already in use") {
+    return {
+      message: TABLE_IN_USE_MESSAGE,
+      description: TABLE_IN_USE_DESCRIPTION,
+    };
+  }
+  if (body?.error === "Table Not Found") {
+    return {
+      message: "존재하지 않는 테이블입니다.",
+      description: "테이블 주소를 다시 확인해주세요.",
+    };
+  }
+
+  return {
+    message: TABLE_UNAVAILABLE_MESSAGE,
+    description: TABLE_UNAVAILABLE_DESCRIPTION,
+  };
+}
 
 export default function ClientTablePage({ params }: ClientTablePageProps) {
   const { id } = use(params);
   const { clientTable } = useTableStore();
   const { clientMenuCategories } = useMenuStore();
   const [loading, setLoading] = useState(true);
+  const [tableAccessMessage, setTableAccessMessage] = useState<string | null>(null);
+  const [tableAccessDescription, setTableAccessDescription] = useState<string | null>(null);
+  const [tableAccessState, setTableAccessState] = useState<TableAccessState>("UNKNOWN");
   const [activeTab, setActiveTab] = useState<"menu" | "orders">("menu");
   const isValidTableId = id.length === 15;
   const activeUnpaidOrder = clientTable?.tableContexts[0]?.orders.find(isPaymentInstructionOrder);
   const [isVerified, setIsVerified] = useState(false);
+  const tableScope =
+    isValidTableId && clientTable?.id === id && tableAccessState === "RESUMED" && !tableAccessMessage
+      ? `table:${id}`
+      : null;
+  const revisionRef = useRef(0);
+  const setTracedActiveTab = useCallback((tab: "menu" | "orders") => {
+    traceEvent("client", "ui.panel.state", {
+      panel: "client.table.activeTab",
+      from: activeTab,
+      to: tab,
+    });
+    setActiveTab(tab);
+  }, [activeTab]);
+
+  const refreshClientTable = useCallback(async () => {
+    if (isValidTableId) {
+      await useTableStore.getState().clientGetTable({ tableId: id });
+    }
+  }, [id, isValidTableId]);
+
+  const markTableUnavailable = useCallback((copy?: { message: string; description: string }) => {
+    revisionRef.current = 0;
+    setTableAccessState("BLOCKED");
+    setTableAccessMessage(copy?.message ?? TABLE_UNAVAILABLE_MESSAGE);
+    setTableAccessDescription(copy?.description ?? TABLE_UNAVAILABLE_DESCRIPTION);
+    useTableStore.setState({ clientTable: null, isLoaded: false, error: true });
+  }, []);
+
+  const syncClientTable = useCallback(async (afterRevision = revisionRef.current) => {
+    if (!isValidTableId) return;
+
+    try {
+      const response = await api.get("sync/table", {
+        searchParams: { tableId: id, afterRevision },
+      }).json<TableSyncResponse>();
+      revisionRef.current = response.result.revision;
+
+      if (response.result.snapshot?.table) {
+        setTableAccessState("RESUMED");
+        setTableAccessMessage(null);
+        useTableStore.setState({
+          clientTable: normalizeClientTable(response.result.snapshot.table),
+          isLoaded: true,
+          error: false,
+        });
+        return;
+      }
+
+      if (response.result.events.length > 0 || response.result.gap) {
+        await refreshClientTable();
+      }
+    } catch (error) {
+      if (isTableAccessFailure(error)) {
+        markTableUnavailable(await getTableAccessFailureCopy(error));
+      }
+      void kyErrorHandler(error);
+    }
+  }, [id, isValidTableId, markTableUnavailable, refreshClientTable]);
+
+  const syncClientTableFromRealtime = useCallback(() => {
+    if (tableAccessState !== "RESUMED") {
+      return;
+    }
+    void syncClientTable();
+  }, [syncClientTable, tableAccessState]);
+
+  useRealtimeSync(tableScope, syncClientTableFromRealtime);
 
   useEffect(() => {
     if (activeUnpaidOrder) {
@@ -37,8 +185,17 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
   }, [activeUnpaidOrder]);
 
   useEffect(() => {
+    if (tableAccessState === "INACTIVE" && clientTable?.tableContexts.some((context) => context.deletedAt === null)) {
+      setTableAccessState("RESUMED");
+    }
+  }, [clientTable, tableAccessState]);
+
+  useEffect(() => {
     const fetchTableData = async () => {
       setLoading(true);
+      setTableAccessState("UNKNOWN");
+      setTableAccessMessage(null);
+      setTableAccessDescription(null);
       useTableStore.setState({ clientTable: null });
 
       if (!isValidTableId) {
@@ -47,16 +204,41 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
       }
 
       try {
-        await useTableStore.getState().clientGetTable({ tableId: id });
+        const session = await api.post("table/session", {
+          json: { tableId: id },
+        }).json<TableSessionResponse>();
+
+        if (session.result.state === "INACTIVE") {
+          revisionRef.current = 0;
+          setTableAccessState("INACTIVE");
+          setTableAccessMessage(null);
+          setTableAccessDescription(null);
+          useTableStore.setState({
+            clientTable: {
+              ...session.result.table,
+              tableContexts: [],
+            },
+            isLoaded: true,
+            error: false,
+          });
+          return;
+        }
+
+        setTableAccessState("RESUMED");
+        revisionRef.current = 0;
+        await syncClientTable(0);
       } catch (error) {
-        console.error("Failed to load table:", error);
+        if (isTableAccessFailure(error)) {
+          markTableUnavailable(await getTableAccessFailureCopy(error));
+        }
+        void kyErrorHandler(error);
       } finally {
         setLoading(false);
       }
     };
 
     void fetchTableData();
-  }, [id, isValidTableId]);
+  }, [id, isValidTableId, markTableUnavailable, syncClientTable]);
 
   useEffect(() => {
     if (!clientTable) {
@@ -130,7 +312,7 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
           <>
             <Header />
             <div className="w-full max-w-[600px] flex-1 overflow-hidden px-4 fc relative pt-16">
-              {activeTab === "menu" ? (
+              {activeTab === "menu" || tableAccessState === "INACTIVE" ? (
                 <div className="flex-1 fc overflow-hidden w-full">
                   <ShopIntro tableName={clientTable.name} tableSeats={clientTable.seats} />
                   <Menus menuCategories={clientMenuCategories} />
@@ -138,7 +320,11 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
               ) : (
                 <OrderHistoryPanel />
               )}
-              <Footer activeTab={activeTab} setActiveTab={setActiveTab} />
+              <Footer
+                activeTab={activeTab}
+                setActiveTab={setTracedActiveTab}
+                canViewOrders={tableAccessState !== "INACTIVE"}
+              />
             </div>
 
             {/* Locked Verification Modal */}
@@ -154,12 +340,13 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
       ) : (
         <div className="p-6 text-center">
           <h1 className="text-xl font-bold">
-            {isValidTableId ? "존재하지 않는 테이블입니다." : "올바르지 않은 테이블 주소입니다."}
+            {isValidTableId ? tableAccessMessage ?? "존재하지 않는 테이블입니다." : "올바르지 않은 테이블 주소입니다."}
           </h1>
-          <p className="mt-2 text-sm text-slate-500">tableId: {id}</p>
+          <p className="mt-2 text-sm text-slate-500">
+            {isValidTableId && tableAccessMessage ? tableAccessDescription : `tableId: ${id}`}
+          </p>
         </div>
       )}
     </main>
   );
 }
-

@@ -1,9 +1,8 @@
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
-import { Dialog, DialogDescription, DialogHeader, DialogTitle, BottomSheetContent } from "~/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle, BottomSheetContent } from "~/components/ui/dialog";
 import useCartStore, { CartState } from "~/stores/cart.store";
 import useMenuStore from "~/stores/menu.store";
-import OrderModal from "../order/order.modal";
 import useTableStore from "~/stores/table.store";
 import { toast } from "~/hooks/use-toast";
 import { useValidateOrder } from "~/hooks/validate-order";
@@ -25,9 +24,7 @@ export default function CartModal({
   openState: boolean;
   setOpenState: (open: boolean) => void;
 }) {
-  const [confirmModalOpenState, setConfirmModalOpenState] = useState(false);
-  const [modalOpenState, setModalOpenState] = useState(false);
-  const [modalMenuOrder, setModalMenuOrder] = useState<CartState["menuOrders"][number] | null>(null);
+  const [startVisitConfirmOpen, setStartVisitConfirmOpen] = useState(false);
   const [duringPurchase, setDuringPurchase] = useState(false);
   const [checkoutMenuOrderInfos, setCheckoutMenuOrderInfos] = useState<MenuOrderInfo[] | null>(null);
 
@@ -52,8 +49,9 @@ export default function CartModal({
 
   const noMenuOrder = visibleMenuOrderInfos.length === 0;
   const invalidMenuOrder = visibleMenuOrderInfos.length === 0 || visibleMenuOrderInfos.some((menuOrderInfo) => menuOrderInfo === null)
+  const isInactiveTable = clientTable?.tableContexts.length === 0;
 
-  const handleConfirm = async () => {
+  const submitOrder = async (startNewTableSession: boolean) => {
     if (duringPurchase) return;
     setDuringPurchase(true);
     setCheckoutMenuOrderInfos(menuOrderInfos);
@@ -72,7 +70,7 @@ export default function CartModal({
           return;
         }
 
-        const res = await purchaseMenuOrders();
+        const res = await purchaseMenuOrders({ startNewTableSession });
         if (res === null) {
           restoreCartModal();
           return;
@@ -99,7 +97,6 @@ export default function CartModal({
 
         useCartStore.getState().clearMenuOrders();
         setCheckoutMenuOrderInfos(null);
-        setConfirmModalOpenState(true);
       });
     } finally {
       setDuringPurchase(false);
@@ -107,6 +104,16 @@ export default function CartModal({
         setCheckoutMenuOrderInfos(null);
       }
     }
+  }
+
+  const handleConfirm = async () => {
+    if (isInactiveTable) {
+      setOpenState(false);
+      setStartVisitConfirmOpen(true);
+      return;
+    }
+
+    await submitOrder(false);
   }
 
   const handleClose = () => {
@@ -260,11 +267,41 @@ export default function CartModal({
           )}
         </BottomSheetContent>
       </Dialog>
-      <OrderModal
-        openState={confirmModalOpenState}
-        setOpenState={setConfirmModalOpenState}
-      />
+      <Dialog open={startVisitConfirmOpen} onOpenChange={setStartVisitConfirmOpen}>
+        <DialogContent className="w-[calc(100%-2rem)] max-w-sm rounded-2xl">
+          <div className="space-y-3 text-center">
+            <DialogTitle className="text-xl font-extrabold text-slate-800 dark:text-slate-100">
+              새 손님 주문을 시작할까요?
+            </DialogTitle>
+            <DialogDescription className="text-sm leading-relaxed">
+              이전 손님의 주문 내역과 분리된 새 주문으로 시작합니다.
+            </DialogDescription>
+          </div>
+          <div className="flex gap-3 pt-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setStartVisitConfirmOpen(false);
+                setOpenState(true);
+              }}
+              disabled={duringPurchase}
+              className="flex-1 h-12 rounded-xl font-bold"
+            >
+              더 확인하기
+            </Button>
+            <Button
+              onClick={() => {
+                setStartVisitConfirmOpen(false);
+                void submitOrder(true);
+              }}
+              disabled={duringPurchase}
+              className="flex-[2] h-12 rounded-xl bg-primary hover:bg-brand-600 text-white font-extrabold"
+            >
+              시작하기
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
-

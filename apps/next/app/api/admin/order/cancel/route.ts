@@ -1,14 +1,16 @@
 import { removeValidation } from "shared/types/requests/admin/order";
-import { fail, ok, routeError } from "~/lib/server/api";
+import { fail, guardUnsafeRequest, mutationOk, parseJsonBody, routeError } from "~/lib/server/api";
 import { requireAdminUser } from "~/lib/server/auth-session";
 import { cancelOrder } from "~/lib/server/d1-mutations";
 
 export async function PUT(request: Request) {
   const admin = await requireAdminUser();
   if (admin.response) return admin.response;
+  const guardError = guardUnsafeRequest(request, { csrf: true, idempotency: true });
+  if (guardError) return guardError;
 
   try {
-    const query = removeValidation.parse(await request.json());
+    const query = await parseJsonBody(request, removeValidation);
     const result = await cancelOrder(query.orderId, {
       allowPaid: true,
       adminUserId: admin.user?.id ?? null,
@@ -19,7 +21,7 @@ export async function PUT(request: Request) {
       return fail(result.error, result.status);
     }
 
-    return ok(result.result, result.status);
+    return mutationOk(result);
   } catch (error) {
     return routeError(error);
   }

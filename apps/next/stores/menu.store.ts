@@ -8,7 +8,8 @@ import * as AdminMenuCategoryRequest from "types/requests/admin/menuCategory";
 import * as AdminMenuCategoryResponse from "types/responses/admin/menuCategory";
 import * as AdminImageRequest from "types/requests/admin/image";
 import * as AdminImageResponse from "types/responses/admin/image";
-import queryStore, { api } from '~/lib/query';
+import kyErrorHandler from '~/lib/ky-error-handler';
+import queryStore, { api, mutationHeaders } from '~/lib/query';
 import { toast } from '~/hooks/use-toast';
 import { useLoadingStore } from '~/stores/loading.store';
 
@@ -118,12 +119,16 @@ const useMenuStore = create<MenuState>((set, get) => ({
 
       const response = await api.put('admin/image', {
         body: formData,
+        headers: mutationHeaders({}),
       }).json<{ result: { filename: string } }>();
 
       if (response.result?.filename) {
         return response.result;
       }
 
+      return null;
+    } catch (error) {
+      void kyErrorHandler(error);
       return null;
     } finally {
       endMutation();

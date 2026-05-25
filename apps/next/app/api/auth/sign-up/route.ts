@@ -4,11 +4,14 @@ import { generateId, Scrypt } from "lucia";
 import { users } from "db/schema";
 import { signUpValidation } from "shared/types/requests/client/auth";
 import { getDb } from "~/lib/server/db";
-import { routeError } from "~/lib/server/api";
+import { guardUnsafeRequest, parseJsonBody, routeError } from "~/lib/server/api";
 
 export async function POST(request: Request) {
+  const guardError = guardUnsafeRequest(request, { csrf: false, idempotency: false });
+  if (guardError) return guardError;
+
   try {
-    const { email, password, name } = signUpValidation.parse(await request.json());
+    const { email, password, name } = await parseJsonBody(request, signUpValidation);
     const existingUser = await getDb().query.users.findFirst({
       where: eq(users.email, email),
     });

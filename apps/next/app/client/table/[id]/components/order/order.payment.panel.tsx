@@ -34,6 +34,24 @@ export default function OrderPaymentPanel({
   const paymentCode = order.payment.paymentCode ?? null;
   const expiresAt = typeof order.payment.expiresAt === "number" ? order.payment.expiresAt : null;
 
+  const clearTableContextIfLastOrder = () => {
+    const activeContext = clientTable?.tableContexts[0];
+    if (!clientTable || !activeContext || activeContext.orders.filter((candidate) => candidate.deletedAt === null).length > 1) {
+      return false;
+    }
+
+    useTableStore.setState({
+      clientTable: {
+        ...clientTable,
+        tableContexts: [],
+      },
+      isLoaded: true,
+      error: false,
+    });
+    void useMenuStore.getState().clientLoad({});
+    return true;
+  };
+
   // Handle countdown timer & auto-cancellation
   useEffect(() => {
     if (!expiresAt) return;
@@ -91,6 +109,10 @@ export default function OrderPaymentPanel({
       await useTableStore.getState().clientCancelOrder({
         orderId: order.id,
       });
+      if (clearTableContextIfLastOrder()) {
+        return;
+      }
+
       if (clientTable?.id) {
         await useTableStore.getState().clientGetTable({ tableId: clientTable.id });
       }
@@ -123,6 +145,10 @@ export default function OrderPaymentPanel({
           title: "주문이 취소되었습니다.",
           description: "메뉴 탐색 화면으로 돌아갑니다.",
         });
+
+        if (clearTableContextIfLastOrder()) {
+          return;
+        }
 
         if (clientTable?.id) {
           await useTableStore.getState().clientGetTable({ tableId: clientTable.id });

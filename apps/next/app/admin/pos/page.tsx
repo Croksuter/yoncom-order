@@ -5,9 +5,19 @@ import Inventories from "./components/inventory/inventories";
 import Orders from "./components/order/orders";
 import Tables from "./components/table/tables";
 import { ChevronLeft, ChevronRight, Package } from "lucide-react";
+import { traceEvent } from "~/lib/verification-trace";
 
 export default function AdminPosPage() {
   const [isInventoriesOpen, setIsInventoriesOpen] = useState(true);
+  const toggleInventories = () => {
+    const nextOpen = !isInventoriesOpen;
+    traceEvent("client", "ui.panel.state", {
+      panel: "admin.pos.inventory",
+      from: isInventoriesOpen,
+      to: nextOpen,
+    });
+    setIsInventoriesOpen(nextOpen);
+  };
 
   return (
     <main className="flex min-h-screen w-screen flex-col bg-slate-50 dark:bg-slate-950 p-2 lg:h-screen lg:flex-row lg:overflow-hidden relative transition-colors duration-300">
@@ -25,7 +35,7 @@ export default function AdminPosPage() {
           
           {/* 재고 현황 토글 버튼 (PC 환경 우측 하단 고정) */}
           <button
-            onClick={() => setIsInventoriesOpen(!isInventoriesOpen)}
+            onClick={toggleInventories}
             className="absolute bottom-6 right-6 hidden lg:flex items-center space-x-2 bg-brand-500 hover:bg-brand-600 text-white px-4 py-2.5 rounded-full shadow-lg shadow-brand-500/20 active:scale-95 transition-all z-50 border border-brand-400/20"
           >
             {isInventoriesOpen ? (
@@ -54,7 +64,7 @@ export default function AdminPosPage() {
       
       {/* 모바일 화면용 하단 간이 토글 버튼 */}
       <button
-        onClick={() => setIsInventoriesOpen(!isInventoriesOpen)}
+        onClick={toggleInventories}
         className="lg:hidden fixed bottom-4 right-4 flex items-center space-x-2 bg-brand-500 hover:bg-brand-600 text-white px-4 py-2.5 rounded-full shadow-lg shadow-brand-500/20 active:scale-95 transition-all z-50 border border-brand-400/20"
       >
         <Package className="h-4 w-4" />
@@ -65,4 +75,3 @@ export default function AdminPosPage() {
     </main>
   );
 }
-

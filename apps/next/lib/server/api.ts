@@ -1,21 +1,208 @@
 import { NextResponse } from "next/server";
-import { ZodError, type ZodSchema } from "zod";
+import { z, ZodError } from "zod";
+import { csrfCookieName } from "~/lib/server/auth-session";
+import { getTraceHeaderName, summarizePath, traceEvent } from "~/lib/verification-trace";
+
+const unsafeMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+const maxJsonBodyBytes = 32 * 1024;
+const idempotencyKeyPattern = /^[A-Za-z0-9._:-]{8,128}$/;
+const rateWindowMs = 60_000;
+const rateMaxRequests = 120;
+const rateBuckets = new Map<string, { count: number; resetAt: number }>();
 
 export function ok<T>(result: T, status = 200) {
+  traceEvent("server", "api.response.ok", { status });
   return NextResponse.json({ result }, { status });
 }
 
+export function mutationOk<T extends {
+  result?: unknown;
+  status: number;
+  mutationId?: string;
+  revision?: number;
+  affectedScopes?: string[];
+}>(mutation: T) {
+  traceEvent("server", "api.response.mutation", {
+    status: mutation.status,
+    mutationId: mutation.mutationId,
+    revision: mutation.revision,
+    affectedScopes: mutation.affectedScopes,
+  });
+  return NextResponse.json(
+    {
+      result: mutation.result,
+      mutationId: mutation.mutationId,
+      revision: mutation.revision,
+      affectedScopes: mutation.affectedScopes,
+    },
+    { status: mutation.status },
+  );
+}
+
 export function fail(error: string, status = 500) {
+  traceEvent("server", "api.response.fail", { status, error });
   return NextResponse.json({ error }, { status });
 }
 
-export function parseSearchParams<T>(request: Request, schema: ZodSchema<T>) {
+export function parseSearchParams<TSchema extends z.ZodTypeAny>(
+  request: Request,
+  schema: TSchema,
+): z.infer<TSchema> {
   const url = new URL(request.url);
   const values = Object.fromEntries(url.searchParams.entries());
+  traceEvent("server", "api.request.search", {
+    traceId: request.headers.get(getTraceHeaderName()),
+    method: request.method,
+    path: summarizePath(request.url),
+    queryKeys: Object.keys(values).sort(),
+  });
   return schema.parse(values);
 }
 
+export function getRequestCookie(request: Request, name: string) {
+  const cookie = request.headers.get("cookie") ?? "";
+  return cookie
+    .split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(`${name}=`))
+    ?.slice(name.length + 1);
+}
+
+export async function parseJsonBody<TSchema extends z.ZodTypeAny>(
+  request: Request,
+  schema: TSchema,
+): Promise<z.infer<TSchema>> {
+  const text = await request.text();
+  traceEvent("server", "api.request.json", {
+    traceId: request.headers.get(getTraceHeaderName()),
+    method: request.method,
+    path: summarizePath(request.url),
+    bodyBytes: text.length,
+  });
+  if (text.length > maxJsonBodyBytes) {
+    throw new ApiRequestError("Request body too large", 413);
+  }
+
+  const body = text ? JSON.parse(text) : null;
+  return schema.parse(body);
+}
+
+export class ApiRequestError extends Error {
+  constructor(
+    message: string,
+    readonly status = 400,
+  ) {
+    super(message);
+  }
+}
+
+export function guardUnsafeRequest(
+  request: Request,
+  options: {
+    csrf?: boolean;
+    idempotency?: boolean;
+    json?: boolean;
+    rateLimitKey?: string;
+  } = {},
+) {
+  if (!unsafeMethods.has(request.method)) {
+    return null;
+  }
+
+  const traceId = request.headers.get(getTraceHeaderName());
+  const path = summarizePath(request.url);
+  traceEvent("server", "api.guard.start", {
+    traceId,
+    method: request.method,
+    path,
+    requiresCsrf: !!options.csrf,
+    requiresIdempotency: !!options.idempotency,
+    requiresJson: options.json !== false,
+  });
+
+  const rateError = applyRateLimit(request, options.rateLimitKey);
+  if (rateError) {
+    traceEvent("server", "api.guard.block", { traceId, method: request.method, path, reason: "rate-limit" });
+    return rateError;
+  }
+
+  const origin = request.headers.get("origin");
+  const requestOrigin = new URL(request.url).origin;
+  if (!origin || origin !== requestOrigin) {
+    traceEvent("server", "api.guard.block", { traceId, method: request.method, path, reason: "origin" });
+    return fail("Origin required", 403);
+  }
+
+  if (options.json !== false) {
+    const contentType = request.headers.get("content-type") ?? "";
+    if (!contentType.toLowerCase().includes("application/json")) {
+      traceEvent("server", "api.guard.block", { traceId, method: request.method, path, reason: "content-type" });
+      return fail("JSON body required", 415);
+    }
+  }
+
+  if (options.csrf) {
+    const csrfCookie = getRequestCookie(request, csrfCookieName);
+    const csrfHeader = request.headers.get("x-csrf-token");
+    if (!csrfCookie || !csrfHeader || csrfCookie !== csrfHeader) {
+      traceEvent("server", "api.guard.block", { traceId, method: request.method, path, reason: "csrf" });
+      return fail("CSRF token required", 403);
+    }
+  }
+
+  if (options.idempotency) {
+    const idempotencyKey = request.headers.get("idempotency-key");
+    if (!idempotencyKey || !idempotencyKeyPattern.test(idempotencyKey)) {
+      traceEvent("server", "api.guard.block", { traceId, method: request.method, path, reason: "idempotency-key" });
+      return fail("Idempotency-Key required", 400);
+    }
+  }
+
+  traceEvent("server", "api.guard.pass", {
+    traceId,
+    method: request.method,
+    path,
+    idempotencyKey: request.headers.get("idempotency-key"),
+  });
+  return null;
+}
+
+export function getIdempotencyKey(request: Request) {
+  return request.headers.get("idempotency-key");
+}
+
+function applyRateLimit(request: Request, overrideKey?: string) {
+  const key = overrideKey ?? request.headers.get("x-forwarded-for") ?? "local";
+  const now = Date.now();
+  const bucket = rateBuckets.get(key);
+
+  if (!bucket || bucket.resetAt <= now) {
+    rateBuckets.set(key, { count: 1, resetAt: now + rateWindowMs });
+    return null;
+  }
+
+  bucket.count += 1;
+  if (bucket.count > rateMaxRequests) {
+    return fail("Too many requests", 429);
+  }
+
+  return null;
+}
+
 export function routeError(error: unknown) {
+  const errorName = error instanceof Error ? error.name : "Unknown";
+  const message = error instanceof Error ? error.message : "Unknown route handler error";
+  traceEvent("server", "api.route.error", {
+    errorName,
+    message: message
+      .replace(/accounts\/[^/]+/g, "accounts/[redacted]")
+      .replace(/database\/[^/]+/g, "database/[redacted]"),
+  });
+
+  if (error instanceof ApiRequestError) {
+    return fail(error.message, error.status);
+  }
+
   if (error instanceof ZodError) {
     return fail("Invalid request", 400);
   }

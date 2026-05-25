@@ -212,6 +212,16 @@ export async function getTablesWithRelations(tableId?: string) {
   }));
 }
 
+export async function getAuthorizedClientTable(tableId: string, tableContextId: string) {
+  const table = (await getTablesWithRelations(tableId))[0];
+  if (!table) return null;
+
+  return {
+    ...table,
+    tableContexts: table.tableContexts.filter((context) => context.id === tableContextId),
+  };
+}
+
 export async function getCustomerOrderResponse(tableId: string, orderId?: string) {
   const table = (await getTablesWithRelations(tableId))[0];
 

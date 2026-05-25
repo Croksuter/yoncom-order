@@ -1,4 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 
 type ContractCase = {
   label: string;
@@ -9,7 +12,6 @@ type ContractCase = {
 
 const unavailableFeatureContracts: ContractCase[] = [
   { label: "GET /api/admin/payout", importPath: "~/app/api/admin/payout/route", method: "GET" },
-  { label: "PUT /api/admin/image", importPath: "~/app/api/admin/image/route", method: "PUT" },
   {
     label: "GET /api/admin/menu/[menuId]",
     importPath: "~/app/api/admin/menu/[menuId]/route",
@@ -26,6 +28,7 @@ describe("disabled optional API contracts", () => {
     vi.resetModules();
     vi.clearAllMocks();
     vi.doMock("~/lib/server/auth-session", () => ({
+      csrfCookieName: "yoncom_csrf",
       requireAdmin: vi.fn(async () => null),
     }));
   });
@@ -41,5 +44,57 @@ describe("disabled optional API contracts", () => {
     expect(response.status).toBe(501);
     expect(body.error).toBe("FEATURE_UNAVAILABLE");
     expect(typeof body.feature).toBe("string");
+  });
+});
+
+describe("admin image upload contract", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.clearAllMocks();
+    vi.doMock("~/lib/server/auth-session", () => ({
+      csrfCookieName: "yoncom_csrf",
+      requireAdmin: vi.fn(async () => null),
+    }));
+  });
+
+  it("stores an uploaded image and serves it through /image/[filename]", async () => {
+    const uploadDir = await mkdtemp(path.join(tmpdir(), "yoncom-image-test-"));
+    vi.stubEnv("YONCOM_IMAGE_UPLOAD_DIR", uploadDir);
+
+    try {
+      const formData = new FormData();
+      formData.set("file", new File([new Uint8Array([137, 80, 78, 71])], "menu.png", { type: "image/png" }));
+
+      const { PUT } = await import("~/app/api/admin/image/route");
+      const uploadResponse = await PUT(new Request("http://order.test/api/admin/image", {
+        method: "PUT",
+        headers: {
+          origin: "http://order.test",
+          cookie: "yoncom_csrf=csrf-token",
+          "x-csrf-token": "csrf-token",
+          "idempotency-key": "test-idempotency-key",
+        },
+        body: formData,
+      }));
+
+      expect(uploadResponse.status).toBe(200);
+      const uploadBody = await uploadResponse.json();
+      expect(uploadBody.result.filename).toMatch(/^\/image\/.+\.png$/);
+
+      const storedFilename = uploadBody.result.filename.replace("/image/", "");
+      await expect(readFile(path.join(uploadDir, storedFilename))).resolves.toEqual(Buffer.from([137, 80, 78, 71]));
+
+      const { GET } = await import("~/app/image/[filename]/route");
+      const readResponse = await GET(new Request(`http://order.test/image/${storedFilename}`), {
+        params: Promise.resolve({ filename: storedFilename }),
+      });
+
+      expect(readResponse.status).toBe(200);
+      expect(readResponse.headers.get("content-type")).toBe("image/png");
+      expect(Array.from(new Uint8Array(await readResponse.arrayBuffer()))).toEqual([137, 80, 78, 71]);
+    } finally {
+      vi.unstubAllEnvs();
+      await rm(uploadDir, { recursive: true, force: true });
+    }
   });
 });

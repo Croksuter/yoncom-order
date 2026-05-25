@@ -36,6 +36,24 @@ export default function OrderModal({
 
   const isMatch = amountInput.trim() !== "" && parseInt(amountInput.trim(), 10) === expectedTransferAmount;
 
+  const clearTableContextIfLastOrder = () => {
+    const activeContext = clientTable?.tableContexts[0];
+    if (!clientTable || !activeContext || activeContext.orders.filter((candidate) => candidate.deletedAt === null).length > 1) {
+      return false;
+    }
+
+    useTableStore.setState({
+      clientTable: {
+        ...clientTable,
+        tableContexts: [],
+      },
+      isLoaded: true,
+      error: false,
+    });
+    void useMenuStore.getState().clientLoad({});
+    return true;
+  };
+
   const handleCancelOrder = async () => {
     if (isBusy || !order) return;
     setIsBusy(true);
@@ -51,6 +69,11 @@ export default function OrderModal({
             description: "직원에게 문의해 주세요.",
             variant: "destructive",
           });
+          return;
+        }
+
+        if (clearTableContextIfLastOrder()) {
+          setOpenState(false);
           return;
         }
 
