@@ -1,11 +1,9 @@
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import * as AdminTableResponse from "shared/types/responses/admin/table";
 import TableSetModal from "./table.set.modal";
 import { dateDiffString } from "~/lib/date";
 import useMenuStore from "~/stores/menu.store";
-import { TimerIcon } from "lucide-react";
-import { Table, TableBody, TableCell, TableRow } from "~/components/ui/table";
+import { Clock, Plus } from "lucide-react";
 import TableDetailModal from "./table.detail.modal";
 import { getMenuOrderStatusIcon, isKitchenOrder, isUnresolvedPaymentOrder } from "~/lib/order-status";
 
@@ -50,63 +48,82 @@ export default function TableInstance({
 
   return (
     <>
-      <Card className={
-        `rounded-2xl aspect-square active:brightness-95 hover:cursor-pointer 
-        ${inUse
-          ? "bg-[#D9D9D9]"
-          : "bg-white drop-shadow-lg"
-        }`
-      } style={{
-        boxShadow: inUse ? "inset 2px 2px 8px rgba(0,0,0,0.2)" : "none",
-      }} onClick={() => setModalOpen(true)}>
+      {inUse ? (
+        /* Occupied Table (Stitch Design) */
+        <div 
+          className="aspect-square bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl relative overflow-hidden shadow-sm hover:shadow-md transition-all active:scale-[0.98] cursor-pointer flex flex-col group"
+          onClick={() => setModalOpen(true)}
+        >
+          <div className="h-1.5 bg-brand-500 w-full flex-shrink-0 group-hover:bg-brand-600 transition-colors"></div>
+          <div className="p-3.5 flex-1 flex flex-col">
+            <div className="flex justify-between items-start flex-shrink-0">
+              <div>
+                <h4 className="font-extrabold text-base text-slate-800 dark:text-slate-100 leading-none group-hover:text-brand-500 dark:group-hover:text-brand-400 transition-colors">
+                  {table.name}
+                </h4>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold mt-1">
+                  {table.seats}인석
+                </p>
+              </div>
+              <span className="bg-brand-50 dark:bg-brand-950/20 text-brand-600 dark:text-brand-400 text-[9px] font-extrabold px-1.5 py-0.5 rounded-full uppercase tracking-wider">
+                Occupied
+              </span>
+            </div>
 
-        { /* CardHeader: 테이블이 미사용 중일때 표시 */}
-        <CardHeader className={`${inUse ? `hidden` : `justify-center items-center full p-0`}`}>
-          <CardTitle className="font-extrabold text-xl">{table.name}</CardTitle>
-          <CardDescription className="text-sm text-neutral-500 !m-0">
-            {table.seats}인석
-          </CardDescription>
-        </CardHeader>
+            {/* Menu orders scrollable list */}
+            <div className="flex-1 my-2 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] space-y-1 py-1 border-y border-slate-50 dark:border-slate-800/40">
+              {menuOrders.map(({ menuOrder, order }) => (
+                <div 
+                  key={menuOrder.id} 
+                  className="flex justify-between items-center text-[10px] font-semibold text-slate-600 dark:text-slate-300"
+                >
+                  <span className="flex items-center gap-1 truncate max-w-[100px]">
+                    <span className="scale-75 opacity-70 flex-shrink-0">{getMenuOrderStatusIcon(menuOrder, order)}</span>
+                    <span className="truncate">{menuId2menu(menuOrder.menuId)?.name}</span>
+                  </span>
+                  <span className="text-slate-400 dark:text-slate-500 font-extrabold flex-shrink-0">x{menuOrder.quantity}</span>
+                </div>
+              ))}
+            </div>
 
-        { /* CardContent: 테이블이 사용 중일때 표시 */
-          inUse && (
-            <CardContent className={`${!inUse ? `hidden` : `full p-0 fc`}`}>
-              <div className="w-full h-fit fc justify-between px-3 my-2 *:-mt-1">
-                <span className="fr justify-between block text-lg font-bold">
-                  <span>{table.name}</span>
-                  {isOnOrder && <TimerIcon className="mt-1"/>}
-                </span>
-                <span className="block font-normal text-neutral-500">{
+            {/* Bottom Section */}
+            <div className="mt-auto pt-2 border-t border-slate-100 dark:border-slate-850 flex justify-between items-center flex-shrink-0">
+              <span className="text-xs font-black text-slate-800 dark:text-slate-100">
+                {amount.toLocaleString()}원
+              </span>
+              <div className="flex items-center gap-1 text-slate-400 dark:text-slate-500 text-[10px] font-bold">
+                <Clock className="h-3 w-3 text-brand-500 animate-pulse" />
+                <span>{
                   dateDiffString(now, activeTableContext.createdAt).startsWith("-")
                     ? "00:00"
                     : dateDiffString(now, activeTableContext.createdAt)
-                }
-                </span>
+                }</span>
               </div>
-              <div className="w-full flex-1 overflow-y-auto fc bg-[#F2F2F2]">
-                <Table>
-                  <TableBody>
-                    {menuOrders.map(({ menuOrder, order }) => (
-                      <TableRow key={menuOrder.id} className="*:py-1">
-                        <TableCell>{getMenuOrderStatusIcon(menuOrder, order)} {menuId2menu(menuOrder.menuId)?.name}</TableCell>
-                        <TableCell className="font-bold">{menuOrder.quantity}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-              <div className="w-full h-fit fr font-bold justify-between px-3 my-2">
-                <span>{table.seats}인석</span>
-                <span>{amount.toLocaleString()} 원</span>
-              </div>
-            </CardContent>
-          )}
-      </Card>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* Available Table (Stitch Design) */
+        <div 
+          className="aspect-square bg-slate-50/40 dark:bg-slate-900/10 border border-dashed border-slate-200 dark:border-slate-800/80 rounded-2xl flex flex-col items-center justify-center text-center group hover:border-brand-500/50 hover:bg-brand-50/5 dark:hover:bg-brand-950/10 transition-all cursor-pointer p-4 active:scale-[0.98]"
+          onClick={() => setModalOpen(true)}
+        >
+          <h4 className="font-extrabold text-base text-slate-400 dark:text-slate-600 group-hover:text-brand-500 dark:group-hover:text-brand-400 transition-colors leading-none">
+            {table.name}
+          </h4>
+          <p className="text-[10px] text-slate-400/80 dark:text-slate-650 font-bold mt-1">
+            {table.seats}인석
+          </p>
+          <div className="mt-3.5 w-9 h-9 rounded-full bg-white dark:bg-slate-800 shadow-sm flex items-center justify-center border border-slate-200 dark:border-slate-700/60 group-hover:scale-110 group-hover:bg-brand-500 group-hover:border-brand-500 group-hover:text-white transition-all duration-300">
+            <Plus className="h-4.5 w-4.5 text-slate-400 dark:text-slate-500 group-hover:text-white transition-colors" />
+          </div>
+        </div>
+      )}
       <TableDetailModal
         table={table}
         openState={modalOpen}
         setOpenState={setModalOpen}
       />
     </>
-  )
+  );
 }
