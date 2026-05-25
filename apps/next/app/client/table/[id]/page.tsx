@@ -1,7 +1,7 @@
 "use client";
 
 import { HTTPError } from "ky";
-import { use, useCallback, useEffect, useRef, useState } from "react";
+import { use, useCallback, useEffect, useRef, useState, type CSSProperties, type UIEventHandler } from "react";
 import useMenuStore from "~/stores/menu.store";
 import useTableStore from "~/stores/table.store";
 import Footer from "./components/footer";
@@ -49,6 +49,11 @@ const TABLE_UNAVAILABLE_DESCRIPTION = "직원에게 테이블 활성화를 요�
 const TABLE_IN_USE_MESSAGE = "이미 사용 중인 테이블입니다.";
 const TABLE_IN_USE_DESCRIPTION = "직원에게 문의해주세요.";
 const tableAccessFailureStatuses = new Set([401, 403, 404, 409]);
+const expandedHeaderHeight = 196;
+const collapsedHeaderHeight = 60;
+const headerCollapseDistance = expandedHeaderHeight - collapsedHeaderHeight;
+const collapsedHeaderOffset = headerCollapseDistance;
+const clientFooterReservedHeight = 88;
 type TableAccessState = "UNKNOWN" | "INACTIVE" | "RESUMED" | "BLOCKED";
 
 function normalizeClientTable(table: ClientTableResponse.Get["result"]) {
@@ -75,7 +80,7 @@ async function getTableAccessFailureCopy(error: unknown) {
     };
   }
 
-  const body = await error.response.clone().json<{ error?: string }>().catch(() => null);
+  const body = (await error.response.clone().json().catch(() => null)) as { error?: string } | null;
   if (body?.error === "Table already in use") {
     return {
       message: TABLE_IN_USE_MESSAGE,
@@ -104,6 +109,7 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
   const [tableAccessDescription, setTableAccessDescription] = useState<string | null>(null);
   const [tableAccessState, setTableAccessState] = useState<TableAccessState>("UNKNOWN");
   const [activeTab, setActiveTab] = useState<"menu" | "orders">("menu");
+  const [scrollY, setScrollY] = useState(0);
   const isValidTableId = id.length === 15;
   const activeUnpaidOrder = clientTable?.tableContexts[0]?.orders.find(isPaymentInstructionOrder);
   const [isVerified, setIsVerified] = useState(false);
@@ -120,6 +126,21 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
     });
     setActiveTab(tab);
   }, [activeTab]);
+
+  useEffect(() => {
+    setScrollY(activeTab === "orders" ? collapsedHeaderOffset : 0);
+  }, [activeTab]);
+
+  const handleContentScroll: UIEventHandler<HTMLDivElement> = useCallback((event) => {
+    const nextScrollY = event.currentTarget.scrollTop > 0 ? collapsedHeaderOffset : 0;
+    setScrollY((prev) => (prev === nextScrollY ? prev : nextScrollY));
+  }, []);
+
+  const clientLayoutStyle = {
+    paddingTop: `${scrollY > 0 ? collapsedHeaderHeight : expandedHeaderHeight}px`,
+    "--client-header-height": `${scrollY > 0 ? collapsedHeaderHeight : expandedHeaderHeight}px`,
+    "--client-footer-height": `${clientFooterReservedHeight}px`,
+  } as CSSProperties;
 
   const refreshClientTable = useCallback(async () => {
     if (isValidTableId) {
@@ -304,21 +325,28 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
   }
 
   return (
-    <main className="h-screen w-screen items-center justify-center overflow-hidden fc">
+    <main className="h-[100dvh] w-screen items-center justify-center overflow-hidden fc">
       {clientTable && clientMenuCategories ? (
         activeUnpaidOrder && isVerified ? (
           <OrderPaymentPanel order={activeUnpaidOrder} />
         ) : (
           <>
-            <Header />
-            <div className="w-full max-w-[600px] flex-1 overflow-hidden px-4 fc relative pt-16">
+            <Header scrollY={scrollY} />
+            <div
+              className="w-full max-w-[600px] flex-1 min-h-0 overflow-hidden px-4 fc relative transition-all duration-75 ease-out"
+              style={clientLayoutStyle}
+            >
               {activeTab === "menu" || tableAccessState === "INACTIVE" ? (
-                <div className="flex-1 fc overflow-hidden w-full">
-                  <ShopIntro tableName={clientTable.name} tableSeats={clientTable.seats} />
-                  <Menus menuCategories={clientMenuCategories} />
+                <div className="flex-1 min-h-0 fc overflow-hidden w-full">
+                  {/* <ShopIntro tableName={clientTable.name} tableSeats={clientTable.seats} /> */}
+                  <Menus
+                    menuCategories={clientMenuCategories}
+                    isHeaderCollapsed={scrollY > 0}
+                    onContentScroll={handleContentScroll}
+                  />
                 </div>
               ) : (
-                <OrderHistoryPanel />
+                <OrderHistoryPanel onContentScroll={handleContentScroll} />
               )}
               <Footer
                 activeTab={activeTab}
