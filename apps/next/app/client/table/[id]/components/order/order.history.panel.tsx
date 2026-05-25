@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type UIEventHandler } from "react";
 import useMenuStore from "~/stores/menu.store";
 import useTableStore from "~/stores/table.store";
 import OrderDetailModal from "./order.detail.modal";
@@ -8,7 +8,11 @@ import { getOrderStatusLabel } from "~/lib/order-status";
 import { History, ArrowRight } from "lucide-react";
 import * as ClientTableResponse from "shared/types/responses/client/table";
 
-export default function OrderHistoryPanel() {
+export default function OrderHistoryPanel({
+  onContentScroll,
+}: {
+  onContentScroll?: UIEventHandler<HTMLDivElement>;
+}) {
   const [orderDetailModalOpenState, setOrderDetailModalOpenState] = useState(false);
   const [orderDetail, setOrderDetail] = useState<ClientTableResponse.Get["result"]["tableContexts"][number]["orders"][number] | null>(null);
 
@@ -40,7 +44,7 @@ export default function OrderHistoryPanel() {
   });
 
   return (
-    <div className="flex-1 w-full overflow-y-auto no-scrollbar pb-24 pt-4 px-1">
+    <div className="flex-1 w-full overflow-y-auto no-scrollbar pb-24 pt-4 px-1" onScroll={onContentScroll}>
       {orderHistories.length === 0 ? (
         <div className="fc items-center justify-center py-20 text-center space-y-4">
           <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-full text-slate-400 dark:text-slate-500">

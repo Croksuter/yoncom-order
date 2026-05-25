@@ -1,7 +1,7 @@
 "use client";
 
 import { HTTPError } from "ky";
-import { use, useCallback, useEffect, useRef, useState } from "react";
+import { use, useCallback, useEffect, useRef, useState, type UIEventHandler } from "react";
 import useMenuStore from "~/stores/menu.store";
 import useTableStore from "~/stores/table.store";
 import Footer from "./components/footer";
@@ -49,6 +49,8 @@ const TABLE_UNAVAILABLE_DESCRIPTION = "직원에게 테이블 활성화를 요�
 const TABLE_IN_USE_MESSAGE = "이미 사용 중인 테이블입니다.";
 const TABLE_IN_USE_DESCRIPTION = "직원에게 문의해주세요.";
 const tableAccessFailureStatuses = new Set([401, 403, 404, 409]);
+const headerCollapseDistance = 136;
+const collapsedHeaderOffset = headerCollapseDistance;
 type TableAccessState = "UNKNOWN" | "INACTIVE" | "RESUMED" | "BLOCKED";
 
 function normalizeClientTable(table: ClientTableResponse.Get["result"]) {
@@ -126,80 +128,14 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
     setScrollY(0);
   }, [activeTab]);
 
-  useEffect(() => {
-    let lastTouchY = 0;
+  const handleContentScroll: UIEventHandler<HTMLDivElement> = useCallback((event) => {
+    const nextScrollY = event.currentTarget.scrollTop > 0 ? collapsedHeaderOffset : 0;
+    setScrollY((prev) => (prev === nextScrollY ? prev : nextScrollY));
+  }, []);
 
-    const handleWheel = (e: WheelEvent) => {
-      const scrollContainer = document.querySelector(".overflow-y-auto") as HTMLElement;
-      if (!scrollContainer) return;
-
-      const delta = e.deltaY;
-      const scrollTop = scrollContainer.scrollTop;
-
-      if (delta > 0) {
-        if (scrollY < 136) {
-          setScrollY((prev) => Math.min(136, prev + delta * 0.4));
-          scrollContainer.scrollTop = 0;
-          if (e.cancelable) e.preventDefault();
-        }
-      } else if (delta < 0) {
-        if (scrollTop <= 0) {
-          setScrollY((prev) => Math.max(0, prev + delta * 0.4));
-          if (e.cancelable) e.preventDefault();
-        }
-      }
-    };
-
-    const handleTouchStart = (e: TouchEvent) => {
-      lastTouchY = e.touches[0].clientY;
-    };
-
-    const handleTouchMove = (e: TouchEvent) => {
-      const scrollContainer = document.querySelector(".overflow-y-auto") as HTMLElement;
-      if (!scrollContainer) return;
-
-      const currentY = e.touches[0].clientY;
-      const deltaY = lastTouchY - currentY;
-      lastTouchY = currentY;
-
-      const scrollTop = scrollContainer.scrollTop;
-
-      if (deltaY > 0) {
-        if (scrollY < 136) {
-          setScrollY((prev) => Math.min(136, prev + deltaY));
-          scrollContainer.scrollTop = 0;
-          if (e.cancelable) e.preventDefault();
-        }
-      } else if (deltaY < 0) {
-        if (scrollTop <= 0) {
-          setScrollY((prev) => Math.max(0, prev + deltaY));
-          if (e.cancelable) e.preventDefault();
-        }
-      }
-    };
-
-    const handleScroll = (e: Event) => {
-      const target = e.target as HTMLElement;
-      if (target && target.classList.contains("overflow-y-auto")) {
-        const scrollTop = target.scrollTop;
-        if (scrollTop > 0 && scrollY < 136) {
-          setScrollY(136);
-        }
-      }
-    };
-
-    window.addEventListener("wheel", handleWheel, { passive: false });
-    window.addEventListener("touchstart", handleTouchStart, { passive: true });
-    window.addEventListener("touchmove", handleTouchMove, { passive: false });
-    window.addEventListener("scroll", handleScroll, true);
-
-    return () => {
-      window.removeEventListener("wheel", handleWheel);
-      window.removeEventListener("touchstart", handleTouchStart);
-      window.removeEventListener("touchmove", handleTouchMove);
-      window.removeEventListener("scroll", handleScroll, true);
-    };
-  }, [scrollY]);
+  const resetHeaderScroll = useCallback(() => {
+    setScrollY(0);
+  }, []);
 
   const refreshClientTable = useCallback(async () => {
     if (isValidTableId) {
@@ -384,7 +320,7 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
   }
 
   return (
-    <main className="h-screen w-screen items-center justify-center overflow-hidden fc">
+    <main className="h-[100dvh] w-screen items-center justify-center overflow-hidden fc">
       {clientTable && clientMenuCategories ? (
         activeUnpaidOrder && isVerified ? (
           <OrderPaymentPanel order={activeUnpaidOrder} />
@@ -400,10 +336,14 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
               {activeTab === "menu" || tableAccessState === "INACTIVE" ? (
                 <div className="flex-1 fc overflow-hidden w-full">
                   {/* <ShopIntro tableName={clientTable.name} tableSeats={clientTable.seats} /> */}
-                  <Menus menuCategories={clientMenuCategories} />
+                  <Menus
+                    menuCategories={clientMenuCategories}
+                    onContentScroll={handleContentScroll}
+                    onCategoryChange={resetHeaderScroll}
+                  />
                 </div>
               ) : (
-                <OrderHistoryPanel />
+                <OrderHistoryPanel onContentScroll={handleContentScroll} />
               )}
               <Footer
                 activeTab={activeTab}
