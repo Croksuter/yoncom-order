@@ -1,14 +1,15 @@
+"use client";
+
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card"
-import { Button } from "~/components/ui/button";
 import { dateDiffString } from "~/lib/date";
-import { CheckCircle2Icon } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 
 export default function MenuInstance({ 
   order,
   onClick,
 }: { 
   order: {
+    id: string;
     menuId: string;
     menuName: string;
     menuPrice: number;
@@ -22,6 +23,7 @@ export default function MenuInstance({
   const [now, setNow] = useState(0);
 
   useEffect(() => {
+    setNow(Date.now());
     const interval = setInterval(() => {
       setNow(Date.now());
     }, 1000);
@@ -31,39 +33,57 @@ export default function MenuInstance({
     };
   }, []);
 
+  const elapsedMs = now - order.timestamp;
+  const elapsedSec = Math.floor(elapsedMs / 1000);
+
+  // Time-based warning colors: normal (slate), delayed > 5m (amber), critical > 10m (rose)
+  let timerClass = "text-slate-400 dark:text-slate-500 font-semibold";
+  if (elapsedSec >= 600) {
+    timerClass = "text-rose-500 font-bold animate-pulse flex items-center gap-1";
+  } else if (elapsedSec >= 300) {
+    timerClass = "text-amber-500 font-bold flex items-center gap-1";
+  }
+
+  const formattedTime = dateDiffString(now, order.timestamp).startsWith("-") 
+    ? "00:00" 
+    : dateDiffString(now, order.timestamp);
+
   return (
-    <>
-      <Card className="rounded-xl my-3 hover:cursor-pointer" onClick={onClick}>
-        <CardHeader className="flex flex-wrap justify-between gap-2 rounded-t-xl px-3 py-2" style={{
-            background: "linear-gradient(to right, #323232, #FFFFFF)",
-          }}>
-          <CardTitle className="whitespace-nowrap text-white">{order.tableName}</CardTitle>
-          <div className="shrink-0 !p-0">{
-            dateDiffString(now, order.timestamp).startsWith("-") 
-              ? "00:00" 
-              : dateDiffString(now, order.timestamp)
-          }</div>
-        </CardHeader>
-        <CardContent className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-          <ul className="min-w-0 flex-1">
-            <li className="my-1 text-lg [word-break:keep-all]">{order.menuName} <b>x{order.quantity}</b>
-            </li>
-          </ul>
-          <Button
-            type="button"
-            size="sm"
-            className="shrink-0 bg-emerald-600 text-white hover:bg-emerald-700"
-            aria-label={`${order.tableName} ${order.menuName} 준비 완료`}
-            onClick={(event) => {
-              event.stopPropagation();
-              onClick();
-            }}
-          >
-            <CheckCircle2Icon />
-            준비 완료
-          </Button>
-        </CardContent>
-      </Card>
-    </>
-  )
+    <article 
+      onClick={onClick}
+      className="bg-white dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800/80 rounded-2xl p-4 flex flex-col gap-3 shadow-sm hover:shadow-md transition-all duration-200 relative group overflow-hidden cursor-pointer active:scale-[0.99] select-none"
+    >
+      {/* Premium accent strip on hover */}
+      <div className="absolute top-0 left-0 w-full h-[3px] bg-brand-500 scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
+
+      <div className="flex justify-between items-start">
+        <div className="flex flex-col">
+          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 tracking-tight group-hover:text-brand-500 transition-colors">
+            {order.tableName}
+          </h3>
+          <span className={`text-xs mt-0.5 ${timerClass}`}>
+            {formattedTime}
+          </span>
+        </div>
+        
+        {/* Quantity display */}
+        <span className="text-brand-500 dark:text-brand-400 text-2xl font-black tracking-tight self-center">
+          x{order.quantity}
+        </span>
+      </div>
+
+      <div className="flex justify-end mt-1">
+        <button 
+          onClick={(event) => {
+            event.stopPropagation();
+            onClick();
+          }}
+          className="bg-brand-500 hover:bg-brand-600 text-white font-extrabold text-xs py-2 px-3.5 rounded-full flex items-center gap-1.5 shadow-sm shadow-brand-500/10 hover:shadow active:scale-95 transition-all duration-150"
+        >
+          <CheckCircle2 className="h-3.5 w-3.5" />
+          준비 완료
+        </button>
+      </div>
+    </article>
+  );
 }
