@@ -77,7 +77,7 @@ export default function Inventories() {
                         <span className="truncate block w-full">{menu.name}</span>
                       </td>
                       <td className="px-4 py-3.5 text-center">
-                        <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[10px] font-bold px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-750">
+                        <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-xs font-bold px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-750">
                           {menuCategories.find((category) => category.id === menu.menuCategoryId)?.name ?? "기타"}
                         </span>
                       </td>

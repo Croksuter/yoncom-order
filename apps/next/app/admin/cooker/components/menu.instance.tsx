@@ -58,10 +58,10 @@ export default function MenuInstance({
 
       <div className="flex justify-between items-start gap-2">
         <div className="flex flex-col min-w-0 flex-1">
-          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 tracking-tight group-hover:text-brand-500 transition-colors truncate w-full max-w-full block">
+          <h3 className="text-base font-bold text-slate-800 dark:text-slate-200 tracking-tight group-hover:text-brand-500 transition-colors truncate w-full max-w-full block">
             {order.tableName}
           </h3>
-          <span className={`text-xs mt-0.5 ${timerClass} truncate block w-full`}>
+          <span className={`text-sm mt-0.5 ${timerClass} truncate block w-full`}>
             {formattedTime}
           </span>
         </div>

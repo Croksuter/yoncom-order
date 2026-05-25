@@ -61,11 +61,11 @@ export default function TableInstance({
                 <h4 className="font-extrabold text-base text-slate-800 dark:text-slate-100 leading-none group-hover:text-brand-500 dark:group-hover:text-brand-400 transition-colors truncate max-w-full">
                   {table.name}
                 </h4>
-                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold mt-1 truncate">
+                <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-1 truncate">
                   {table.seats}인석
                 </p>
               </div>
-              <span className="bg-brand-50 dark:bg-brand-950/20 text-brand-600 dark:text-brand-400 text-[9px] font-extrabold px-1.5 py-0.5 rounded-full uppercase tracking-wider flex-shrink-0">
+              <span className="bg-brand-50 dark:bg-brand-950/20 text-brand-600 dark:text-brand-400 text-[11px] font-extrabold px-1.5 py-0.5 rounded-full uppercase tracking-wider flex-shrink-0">
                 Occupied
               </span>
             </div>
@@ -75,7 +75,7 @@ export default function TableInstance({
               {menuOrders.map(({ menuOrder, order }) => (
                 <div 
                   key={menuOrder.id} 
-                  className="flex justify-between items-center text-[10px] font-semibold text-slate-600 dark:text-slate-300"
+                  className="flex justify-between items-center text-xs font-semibold text-slate-650 dark:text-slate-350"
                 >
                   <span className="flex items-center gap-1 truncate max-w-[100px]">
                     <span className="scale-75 opacity-70 flex-shrink-0">{getMenuOrderStatusIcon(menuOrder, order)}</span>
@@ -91,7 +91,7 @@ export default function TableInstance({
               <span className="text-xs font-black text-slate-800 dark:text-slate-100">
                 {amount.toLocaleString()}원
               </span>
-              <div className="flex items-center gap-1 text-slate-400 dark:text-slate-500 text-[10px] font-bold">
+              <div className="flex items-center gap-1 text-slate-400 dark:text-slate-500 text-xs font-bold">
                 <Clock className="h-3 w-3 text-brand-500 animate-pulse" />
                 <span>{
                   dateDiffString(now, activeTableContext.createdAt).startsWith("-")
@@ -111,7 +111,7 @@ export default function TableInstance({
           <h4 className="font-extrabold text-base text-slate-400 dark:text-slate-600 group-hover:text-brand-500 dark:group-hover:text-brand-400 transition-colors leading-none truncate w-full max-w-full px-2">
             {table.name}
           </h4>
-          <p className="text-[10px] text-slate-400/80 dark:text-slate-650 font-bold mt-1 truncate w-full max-w-full px-2">
+          <p className="text-xs text-slate-400/80 dark:text-slate-650 font-bold mt-1 truncate w-full max-w-full px-2">
             {table.seats}인석
           </p>
           <div className="mt-3.5 w-9 h-9 rounded-full bg-white dark:bg-slate-800 shadow-sm flex items-center justify-center border border-slate-200 dark:border-slate-700/60 group-hover:scale-110 group-hover:bg-brand-500 group-hover:border-brand-500 group-hover:text-white transition-all duration-300">

@@ -57,16 +57,16 @@ export default function OrderInstance({
     >
       <div className="flex justify-between items-start gap-2">
         <div className="fc min-w-0 flex-1">
-          <span className="font-extrabold text-sm text-slate-800 dark:text-slate-100 group-hover:text-brand-500 dark:group-hover:text-brand-400 transition-colors truncate block">
+          <span className="font-extrabold text-base text-slate-800 dark:text-slate-100 group-hover:text-brand-500 dark:group-hover:text-brand-400 transition-colors truncate block">
             {table?.name ?? "테이블"}
           </span>
-          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold mt-0.5 truncate">
+          <span className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-0.5 truncate">
             {dateDiffString(now, order.createdAt).startsWith("-") 
               ? "00:00" 
               : dateDiffString(now, order.createdAt)}
           </span>
         </div>
-        <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md border ${badgeClass}`}>
+        <span className={`text-xs font-extrabold px-2 py-0.5 rounded-md border ${badgeClass}`}>
           {statusLabel}
         </span>
       </div>
@@ -78,7 +78,7 @@ export default function OrderInstance({
           return (
             <div 
               key={menuOrder.menuId} 
-              className="flex justify-between items-center text-xs font-semibold text-slate-650 dark:text-slate-350"
+              className="flex justify-between items-center text-sm font-semibold text-slate-650 dark:text-slate-350"
             >
               <span className="flex items-center gap-1.5">
                 <span className="scale-90 opacity-80">{getMenuOrderStatusIcon(menuOrder, order)}</span>

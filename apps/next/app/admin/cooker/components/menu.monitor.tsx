@@ -88,7 +88,7 @@ export default function MenuMonitor({
           src={menu.image || getMenuFallbackImage(menu.name)}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/40 to-transparent flex items-end p-4">
-          <h2 className="text-base font-bold text-white tracking-tight drop-shadow-sm truncate">
+          <h2 className="text-lg font-bold text-white tracking-tight drop-shadow-sm truncate">
             {menu.name}
           </h2>
         </div>
@@ -115,7 +115,7 @@ export default function MenuMonitor({
         {menuOrders.length === 0 && (
           <div className="flex-1 flex flex-col items-center justify-center text-center py-10 bg-white/40 dark:bg-slate-900/30 border border-dashed border-slate-200/50 dark:border-slate-800/50 rounded-xl p-4 select-none">
             <span className="text-3xl filter grayscale opacity-60">🍳</span>
-            <p className="text-xs font-bold text-slate-400 dark:text-slate-500 mt-2">대기 주문 없음</p>
+            <p className="text-sm font-bold text-slate-400 dark:text-slate-500 mt-2">대기 주문 없음</p>
           </div>
         )}
       </div>
