@@ -4,7 +4,25 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import * as ClientMenuResponse from "shared/types/responses/client/menu";
 import MenuInstance from "./menu.instance";
 import useMenuStore from "~/stores/menu.store";
-import { useCallback, useEffect, useRef, useState, type UIEventHandler } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type MouseEventHandler,
+  type PointerEventHandler,
+  type UIEventHandler,
+} from "react";
+
+type SwipeStart = {
+  x: number;
+  y: number;
+};
+
+type SlideDirection = "next" | "previous";
+
+const swipeThresholdPx = 48;
+const swipeAxisRatio = 1.25;
 
 export default function Menus({
   menuCategories,
@@ -21,6 +39,9 @@ export default function Menus({
   const categoryTabsRef = useRef<HTMLDivElement | null>(null);
   const scrollContainersRef = useRef(new Map<string, HTMLDivElement>());
   const suppressNextScrollSyncRef = useRef(false);
+  const swipeStartRef = useRef<SwipeStart | null>(null);
+  const suppressClickAfterSwipeRef = useRef(false);
+  const [slideDirection, setSlideDirection] = useState<SlideDirection>("next");
   const selectedCategoryId = activeCategoryId || firstCategoryId;
   const menuContentMinHeight =
     categoryTabsHeight > 0
@@ -71,15 +92,68 @@ export default function Menus({
   }, [categoryResetScrollTop]);
 
   const handleCategoryChange = useCallback((categoryId: string) => {
+    const currentIndex = menuCategories.findIndex((category) => category.id === selectedCategoryId);
+    const nextIndex = menuCategories.findIndex((category) => category.id === categoryId);
+    if (currentIndex !== -1 && nextIndex !== -1 && currentIndex !== nextIndex) {
+      setSlideDirection(nextIndex > currentIndex ? "next" : "previous");
+    }
     setActiveCategoryId(categoryId);
     resetCategoryScroll(categoryId);
     void useMenuStore.getState().clientLoad({});
-  }, [resetCategoryScroll]);
+  }, [menuCategories, resetCategoryScroll, selectedCategoryId]);
+
+  const swipeToCategory = useCallback((offset: -1 | 1) => {
+    const currentIndex = menuCategories.findIndex((category) => category.id === selectedCategoryId);
+    const nextCategory = menuCategories[currentIndex + offset];
+    if (!nextCategory) return false;
+
+    handleCategoryChange(nextCategory.id);
+    return true;
+  }, [handleCategoryChange, menuCategories, selectedCategoryId]);
 
   const handleMenuContentScroll: UIEventHandler<HTMLDivElement> = useCallback((event) => {
     if (suppressNextScrollSyncRef.current) return;
     onContentScroll?.(event);
   }, [onContentScroll]);
+
+  const handleSwipePointerDown: PointerEventHandler<HTMLDivElement> = useCallback((event) => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    swipeStartRef.current = { x: event.clientX, y: event.clientY };
+  }, []);
+
+  const clearSwipeStart = useCallback(() => {
+    swipeStartRef.current = null;
+  }, []);
+
+  const handleSwipePointerUp: PointerEventHandler<HTMLDivElement> = useCallback((event) => {
+    const swipeStart = swipeStartRef.current;
+    swipeStartRef.current = null;
+    if (!swipeStart) return;
+
+    const deltaX = event.clientX - swipeStart.x;
+    const deltaY = event.clientY - swipeStart.y;
+    const absX = Math.abs(deltaX);
+    const absY = Math.abs(deltaY);
+    if (absX < swipeThresholdPx || absX < absY * swipeAxisRatio) return;
+
+    suppressClickAfterSwipeRef.current = true;
+    window.setTimeout(() => {
+      suppressClickAfterSwipeRef.current = false;
+    }, 0);
+    swipeToCategory(deltaX < 0 ? 1 : -1);
+  }, [swipeToCategory]);
+
+  const handleSwipeClickCapture: MouseEventHandler<HTMLDivElement> = useCallback((event) => {
+    if (!suppressClickAfterSwipeRef.current) return;
+    event.preventDefault();
+    event.stopPropagation();
+    suppressClickAfterSwipeRef.current = false;
+  }, []);
+
+  const slideAnimationClass =
+    slideDirection === "next"
+      ? "data-[state=active]:animate-in data-[state=active]:fade-in-0 data-[state=active]:slide-in-from-right-4"
+      : "data-[state=active]:animate-in data-[state=active]:fade-in-0 data-[state=active]:slide-in-from-left-4";
 
   return (
     <Tabs
@@ -106,10 +180,15 @@ export default function Menus({
 
         return (
           <TabsContent
-            className="flex-1 min-h-0 overflow-y-auto no-scrollbar pt-4 pb-20 space-y-3"
+            className={`flex-1 min-h-0 overflow-y-auto no-scrollbar pt-4 pb-20 space-y-3 data-[state=active]:duration-200 data-[state=active]:ease-out ${slideAnimationClass}`}
             key={menuCategory.id}
             value={menuCategory.id}
             onScroll={handleMenuContentScroll}
+            onPointerDown={handleSwipePointerDown}
+            onPointerUp={handleSwipePointerUp}
+            onPointerCancel={clearSwipeStart}
+            onPointerLeave={clearSwipeStart}
+            onClickCapture={handleSwipeClickCapture}
             ref={(container) => {
               if (container) {
                 scrollContainersRef.current.set(menuCategory.id, container);
@@ -117,6 +196,7 @@ export default function Menus({
                 scrollContainersRef.current.delete(menuCategory.id);
               }
             }}
+            style={{ touchAction: "pan-y" }}
           >
             <div
               className="grid grid-cols-1 content-start gap-3"
