@@ -107,7 +107,10 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
   const isValidTableId = id.length === 15;
   const activeUnpaidOrder = clientTable?.tableContexts[0]?.orders.find(isPaymentInstructionOrder);
   const [isVerified, setIsVerified] = useState(false);
-  const tableScope = isValidTableId && clientTable?.id === id && !tableAccessMessage ? `table:${id}` : null;
+  const tableScope =
+    isValidTableId && clientTable?.id === id && tableAccessState === "RESUMED" && !tableAccessMessage
+      ? `table:${id}`
+      : null;
   const revisionRef = useRef(0);
   const setTracedActiveTab = useCallback((tab: "menu" | "orders") => {
     traceEvent("client", "ui.panel.state", {
@@ -164,8 +167,11 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
   }, [id, isValidTableId, markTableUnavailable, refreshClientTable]);
 
   const syncClientTableFromRealtime = useCallback(() => {
+    if (tableAccessState !== "RESUMED") {
+      return;
+    }
     void syncClientTable();
-  }, [syncClientTable]);
+  }, [syncClientTable, tableAccessState]);
 
   useRealtimeSync(tableScope, syncClientTableFromRealtime);
 
