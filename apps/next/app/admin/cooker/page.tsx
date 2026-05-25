@@ -15,7 +15,10 @@ export default function AdminCookerPage() {
 
   const [menuAddModalOpen, setMenuAddModalOpen] = useState(false);
   const [menuRemoveModalOpen, setMenuRemoveModalOpen] = useState(false);
+  
+  // State for monitoring menus, initialized empty for SSR safety
   const [monitoringMenus, setMonitoringMenus] = useState<string[]>([]);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   const pendingMenuIds = useMemo(() => {
     const menuIds = new Set<string>();
@@ -37,16 +40,40 @@ export default function AdminCookerPage() {
     return [...menuIds].filter((menuId) => menus.some((menu) => menu.id === menuId));
   }, [menus, tables]);
 
+  // Load selection from localStorage or initialize with pending orders on mount
   useEffect(() => {
-    if (monitoringMenus.length === 0 && pendingMenuIds.length > 0) {
-      setMonitoringMenus(pendingMenuIds);
+    if (typeof window === "undefined") return;
+
+    const saved = localStorage.getItem("cooker_monitoring_menus");
+    if (saved) {
+      try {
+        setMonitoringMenus(JSON.parse(saved));
+        setIsInitialized(true);
+        return;
+      } catch (e) {
+        // fallback
+      }
     }
-  }, [monitoringMenus.length, pendingMenuIds]);
+
+    // Default initialization only if not initialized yet and pending orders are loaded
+    if (!isInitialized && pendingMenuIds.length > 0) {
+      setMonitoringMenus(pendingMenuIds);
+      localStorage.setItem("cooker_monitoring_menus", JSON.stringify(pendingMenuIds));
+      setIsInitialized(true);
+    }
+  }, [pendingMenuIds.length > 0, isInitialized]);
+
+  // Persistent updater helper
+  const updateMonitoringMenus = (newMenus: string[]) => {
+    setMonitoringMenus(newMenus);
+    localStorage.setItem("cooker_monitoring_menus", JSON.stringify(newMenus));
+    setIsInitialized(true); // Ensure marked as initialized
+  };
 
   return (
     <div className="flex-1 overflow-y-auto p-6 bg-slate-50 dark:bg-slate-950 transition-colors duration-300 flex flex-col gap-6 h-full animate-fade-in">
       {/* Monitoring Control Bar (Stitch Design) */}
-      <div className="flex h-fit w-full flex-wrap justify-between items-center gap-3 bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800/80 p-5 rounded-2xl shadow-sm flex-shrink-0">
+      <div className="flex h-fit w-full flex-wrap justify-between items-center gap-3 bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800/80 p-5 rounded-2xl shadow-sm flex-shrink-0 animate-fade-in">
         <div className="flex flex-col text-left">
           <h4 className="font-extrabold text-base text-slate-800 dark:text-slate-200">모니터링 대상 메뉴 관리</h4>
           <p className="text-xs text-slate-400 dark:text-slate-500 font-semibold mt-0.5">화면에 실시간으로 모니터링할 메뉴를 추가하거나 제거할 수 있습니다.</p>
@@ -90,13 +117,13 @@ export default function AdminCookerPage() {
         openState={menuAddModalOpen}
         setOpenState={setMenuAddModalOpen}
         monitoringMenus={monitoringMenus}
-        setMonitoringMenus={setMonitoringMenus}
+        setMonitoringMenus={updateMonitoringMenus}
       />
       <MenuRemoveModal
         openState={menuRemoveModalOpen}
         setOpenState={setMenuRemoveModalOpen}
         monitoringMenus={monitoringMenus}
-        setMonitoringMenus={setMonitoringMenus}
+        setMonitoringMenus={updateMonitoringMenus}
       />
     </div>
   );

@@ -35,10 +35,22 @@ export default function MenuMonitor({
   const [menuOrderId, setMenuOrderId] = useState("");
   const [tableName, setTableName] = useState("");
 
-  const { menus } = useMenuStore();
-  const { tables } = useTableStore();
+  const menu = menus.find((menu) => menu.id === menuId);
 
-  const menu = menus.find((menu) => menu.id === menuId)!;
+  if (!menu) {
+    return (
+      <div className="flex flex-col min-w-[320px] max-w-[360px] bg-slate-100/50 dark:bg-slate-900/40 border border-slate-200/50 dark:border-slate-800/60 rounded-2xl p-4 gap-4 h-[calc(100vh-280px)] animate-pulse shrink-0">
+        <div className="h-32 w-full bg-slate-200 dark:bg-slate-800 rounded-xl"></div>
+        <div className="flex-1 space-y-3 py-1">
+          <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded"></div>
+          <div className="space-y-2">
+            <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-5/6"></div>
+            <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-2/3"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const menuOrders = tables
     .flatMap((table) => ({
@@ -65,7 +77,7 @@ export default function MenuMonitor({
     );
 
   return (
-    <section className="flex flex-col min-w-[320px] max-w-[360px] bg-slate-100/80 dark:bg-slate-900/60 border border-slate-200/50 dark:border-slate-800/60 rounded-2xl p-4 gap-4 h-[calc(100vh-280px)] overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 flex-shrink-0">
+    <section className="flex flex-col min-w-[320px] max-w-[360px] bg-slate-100/80 dark:bg-slate-900/60 border border-slate-200/50 dark:border-slate-800/60 rounded-2xl p-4 gap-4 h-[calc(100vh-240px)] overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 flex-shrink-0">
       {/* Menu Column Blurred Image Header */}
       <div className="relative h-32 w-full rounded-xl overflow-hidden shadow-inner shrink-0 group flex-shrink-0 select-none">
         <img

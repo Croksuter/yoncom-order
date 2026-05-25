@@ -4,10 +4,10 @@ import { useEffect, useState } from "react";
 import { dateDiffString } from "~/lib/date";
 import { CheckCircle2 } from "lucide-react";
 
-export default function MenuInstance({ 
+export default function MenuInstance({
   order,
   onClick,
-}: { 
+}: {
   order: {
     id: string;
     menuId: string;
@@ -44,12 +44,12 @@ export default function MenuInstance({
     timerClass = "text-amber-500 font-bold flex items-center gap-1";
   }
 
-  const formattedTime = dateDiffString(now, order.timestamp).startsWith("-") 
-    ? "00:00" 
+  const formattedTime = dateDiffString(now, order.timestamp).startsWith("-")
+    ? "00:00"
     : dateDiffString(now, order.timestamp);
 
   return (
-    <article 
+    <article
       onClick={onClick}
       className="bg-white dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800/80 rounded-2xl p-4 flex flex-col gap-3 shadow-sm hover:shadow-md transition-all duration-200 relative group overflow-hidden cursor-pointer active:scale-[0.99] select-none"
     >
@@ -61,19 +61,19 @@ export default function MenuInstance({
           <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 tracking-tight group-hover:text-brand-500 transition-colors">
             {order.tableName}
           </h3>
-          <span className={`text-xs mt-0.5 ${timerClass}`}>
+          <span className={`text-lg mt-0.5 ${timerClass}`}>
             {formattedTime}
           </span>
         </div>
-        
+
         {/* Quantity display */}
         <span className="text-brand-500 dark:text-brand-400 text-2xl font-black tracking-tight self-center">
           x{order.quantity}
         </span>
       </div>
 
-      <div className="flex justify-end mt-1">
-        <button 
+      {/* <div className="flex justify-end mt-1">
+        <button
           onClick={(event) => {
             event.stopPropagation();
             onClick();
@@ -83,7 +83,7 @@ export default function MenuInstance({
           <CheckCircle2 className="h-3.5 w-3.5" />
           준비 완료
         </button>
-      </div>
+      </div> */}
     </article>
   );
 }
