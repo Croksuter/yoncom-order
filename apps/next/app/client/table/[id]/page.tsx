@@ -1,7 +1,7 @@
 "use client";
 
 import { HTTPError } from "ky";
-import { use, useCallback, useEffect, useRef, useState, type UIEventHandler } from "react";
+import { use, useCallback, useEffect, useRef, useState, type CSSProperties, type UIEventHandler } from "react";
 import useMenuStore from "~/stores/menu.store";
 import useTableStore from "~/stores/table.store";
 import Footer from "./components/footer";
@@ -49,8 +49,11 @@ const TABLE_UNAVAILABLE_DESCRIPTION = "직원에게 테이블 활성화를 요�
 const TABLE_IN_USE_MESSAGE = "이미 사용 중인 테이블입니다.";
 const TABLE_IN_USE_DESCRIPTION = "직원에게 문의해주세요.";
 const tableAccessFailureStatuses = new Set([401, 403, 404, 409]);
-const headerCollapseDistance = 136;
+const expandedHeaderHeight = 196;
+const collapsedHeaderHeight = 60;
+const headerCollapseDistance = expandedHeaderHeight - collapsedHeaderHeight;
 const collapsedHeaderOffset = headerCollapseDistance;
+const clientFooterReservedHeight = 88;
 type TableAccessState = "UNKNOWN" | "INACTIVE" | "RESUMED" | "BLOCKED";
 
 function normalizeClientTable(table: ClientTableResponse.Get["result"]) {
@@ -125,7 +128,7 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
   }, [activeTab]);
 
   useEffect(() => {
-    setScrollY(0);
+    setScrollY(activeTab === "orders" ? collapsedHeaderOffset : 0);
   }, [activeTab]);
 
   const handleContentScroll: UIEventHandler<HTMLDivElement> = useCallback((event) => {
@@ -133,9 +136,11 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
     setScrollY((prev) => (prev === nextScrollY ? prev : nextScrollY));
   }, []);
 
-  const resetHeaderScroll = useCallback(() => {
-    setScrollY(0);
-  }, []);
+  const clientLayoutStyle = {
+    paddingTop: `${scrollY > 0 ? collapsedHeaderHeight : expandedHeaderHeight}px`,
+    "--client-header-height": `${scrollY > 0 ? collapsedHeaderHeight : expandedHeaderHeight}px`,
+    "--client-footer-height": `${clientFooterReservedHeight}px`,
+  } as CSSProperties;
 
   const refreshClientTable = useCallback(async () => {
     if (isValidTableId) {
@@ -328,18 +333,15 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
           <>
             <Header scrollY={scrollY} />
             <div
-              className="w-full max-w-[600px] flex-1 overflow-hidden px-4 fc relative transition-all duration-75 ease-out"
-              style={{
-                paddingTop: `${Math.max(60, 196 - scrollY)}px`
-              }}
+              className="w-full max-w-[600px] flex-1 min-h-0 overflow-hidden px-4 fc relative transition-all duration-75 ease-out"
+              style={clientLayoutStyle}
             >
               {activeTab === "menu" || tableAccessState === "INACTIVE" ? (
-                <div className="flex-1 fc overflow-hidden w-full">
+                <div className="flex-1 min-h-0 fc overflow-hidden w-full">
                   {/* <ShopIntro tableName={clientTable.name} tableSeats={clientTable.seats} /> */}
                   <Menus
                     menuCategories={clientMenuCategories}
                     onContentScroll={handleContentScroll}
-                    onCategoryChange={resetHeaderScroll}
                   />
                 </div>
               ) : (
