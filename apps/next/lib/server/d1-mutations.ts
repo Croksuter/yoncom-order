@@ -74,6 +74,7 @@ type MutationResult = {
   result?: unknown;
   error?: string;
   status: number;
+  tableContextId?: string;
   mutationId?: string;
   revision?: number;
   affectedScopes?: string[];
@@ -305,6 +306,16 @@ export async function findActiveTableContext(tableId: string) {
   return contexts[0] ?? null;
 }
 
+export async function findActiveTableContextById(tableId: string, tableContextId: string) {
+  const contextTable = await getTableContextTableName();
+  const contexts = await queryD1<TableContextRow>(
+    `SELECT * FROM ${quoteIdentifier(contextTable)} WHERE id = ? AND tableId = ? AND deletedAt IS NULL LIMIT 1`,
+    [tableContextId, tableId],
+  );
+
+  return contexts[0] ?? null;
+}
+
 export async function createTableContext(tableId: string) {
   const timestamp = now();
   const contextTable = await getTableContextTableName();
@@ -327,6 +338,13 @@ async function mirrorLegacyTableContext(contextTable: string, context: TableCont
   }
 
   await insertD1Row("tableContext", context);
+}
+
+async function closeTableContext(tableContextId: string, timestamp = now()) {
+  const contextTable = await getTableContextTableName();
+  const values = { deletedAt: timestamp, updatedAt: timestamp };
+  await updateD1Rows(contextTable, values, "id = ?", [tableContextId]);
+  await updateLegacyTableContextMirror(contextTable, values, "id = ?", [tableContextId]);
 }
 
 async function updateLegacyTableContextMirror(
@@ -427,7 +445,7 @@ async function getExistingOrderByClientOrderId(clientOrderId: string) {
   }
 
   const payment = await getPaymentForOrder(order.id);
-  return payment ? buildCreateOrderResult(order, payment) : null;
+  return payment ? { result: buildCreateOrderResult(order, payment), tableContextId: order.tableContextId } : null;
 }
 
 async function getNextDisplayNumber() {
@@ -570,8 +588,31 @@ async function markPaymentPaidById(
 
 export async function createClientOrder(
   tableId: string,
+  tableContextId: string,
   clientOrderId: string,
   menuOrders: MenuOrderInput[],
+): Promise<MutationResult> {
+  return await createClientOrderInternal(tableId, clientOrderId, menuOrders, {
+    kind: "existing",
+    tableContextId,
+  });
+}
+
+export async function createClientOrderForNewTableSession(
+  tableId: string,
+  clientOrderId: string,
+  menuOrders: MenuOrderInput[],
+): Promise<MutationResult> {
+  return await createClientOrderInternal(tableId, clientOrderId, menuOrders, {
+    kind: "new-session",
+  });
+}
+
+async function createClientOrderInternal(
+  tableId: string,
+  clientOrderId: string,
+  menuOrders: MenuOrderInput[],
+  mode: { kind: "existing"; tableContextId: string } | { kind: "new-session" },
 ): Promise<MutationResult> {
   const requestedMenuOrders = aggregateMenuOrders(menuOrders);
 
@@ -583,7 +624,7 @@ export async function createClientOrder(
 
   const existingOrder = await getExistingOrderByClientOrderId(clientOrderId);
   if (existingOrder) {
-    return { result: existingOrder, status: 200 };
+    return { result: existingOrder.result, tableContextId: existingOrder.tableContextId, status: 200 };
   }
 
   const table = (await queryD1<TableRow>(
@@ -595,16 +636,25 @@ export async function createClientOrder(
     return { error: "Table Not Found", status: 409 };
   }
 
-  const tableContext = (await findActiveTableContext(tableId)) ?? (await createTableContext(tableId));
-  const paymentJoin = await paymentJoinSql("o", "p");
-  const activeOrders = await queryD1<{ id: string; paid: boolean | number | null; status?: string | null; paymentStatus?: string | null }>(
-    `SELECT o.id, o.status, p.paid, p.status AS paymentStatus FROM orders o LEFT JOIN payments p ON ${paymentJoin} AND p.deletedAt IS NULL WHERE o.tableContextId = ? AND o.deletedAt IS NULL AND COALESCE(o.status, ?) NOT IN (?, ?)`,
-    [tableContext.id, orderStatus.ACTIVE, orderStatus.CANCELLED, orderStatus.EXPIRED],
-  );
+  let tableContext: TableContextRow | null = null;
+  if (mode.kind === "existing") {
+    tableContext = await findActiveTableContextById(tableId, mode.tableContextId);
+    if (!tableContext) {
+      return { error: "Invalid table session", status: 403 };
+    }
 
-  const inactivePaymentStatuses: string[] = [paymentStatus.CANCELLED, paymentStatus.EXPIRED];
-  if (activeOrders.some((order) => order.paid !== true && order.paid !== 1 && !inactivePaymentStatuses.includes(String(order.paymentStatus)))) {
-    return { error: "Unpaid Order Exists", status: 409 };
+    const paymentJoin = await paymentJoinSql("o", "p");
+    const activeOrders = await queryD1<{ id: string; paid: boolean | number | null; status?: string | null; paymentStatus?: string | null }>(
+      `SELECT o.id, o.status, p.paid, p.status AS paymentStatus FROM orders o LEFT JOIN payments p ON ${paymentJoin} AND p.deletedAt IS NULL WHERE o.tableContextId = ? AND o.deletedAt IS NULL AND COALESCE(o.status, ?) NOT IN (?, ?)`,
+      [tableContext.id, orderStatus.ACTIVE, orderStatus.CANCELLED, orderStatus.EXPIRED],
+    );
+
+    const inactivePaymentStatuses: string[] = [paymentStatus.CANCELLED, paymentStatus.EXPIRED];
+    if (activeOrders.some((order) => order.paid !== true && order.paid !== 1 && !inactivePaymentStatuses.includes(String(order.paymentStatus)))) {
+      return { error: "Unpaid Order Exists", status: 409 };
+    }
+  } else if (await findActiveTableContext(tableId)) {
+    return { error: "Table already in use", status: 403 };
   }
 
   const menuIds = requestedMenuOrders.map((menuOrder) => menuOrder.menuId);
@@ -642,6 +692,7 @@ export async function createClientOrder(
   }
 
   const deducted: MenuOrderInput[] = [];
+  let createdTableContext: TableContextRow | null = null;
 
   try {
     for (const menuOrder of requestedMenuOrders) {
@@ -657,6 +708,22 @@ export async function createClientOrder(
       }
 
       deducted.push(menuOrder);
+    }
+
+    if (mode.kind === "new-session") {
+      if (await findActiveTableContext(tableId)) {
+        await restoreStock(deducted, timestamp);
+        await releasePaymentCodeLease(paymentId);
+        return { error: "Table already in use", status: 403 };
+      }
+      createdTableContext = await createTableContext(tableId);
+      tableContext = createdTableContext;
+    }
+
+    if (!tableContext) {
+      await restoreStock(deducted, timestamp);
+      await releasePaymentCodeLease(paymentId);
+      return { error: "Invalid table session", status: 403 };
     }
 
     const displayNumber = await getNextDisplayNumber();
@@ -715,6 +782,7 @@ export async function createClientOrder(
       return await withDomainEvent({
         result: buildCreateOrderResult({ id: orderId, displayNumber }, payment),
         status: 200,
+        tableContextId: tableContext.id,
       }, {
         type: "order.created",
         scopes: [venueScope, tableScope(tableId)],
@@ -725,6 +793,9 @@ export async function createClientOrder(
   } catch (error) {
     await restoreStock(deducted, timestamp);
     await releasePaymentCodeLease(paymentId);
+    if (createdTableContext) {
+      await closeTableContext(createdTableContext.id, timestamp);
+    }
     throw error;
   }
 }

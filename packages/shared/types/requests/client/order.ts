@@ -9,6 +9,7 @@ export const createValidation = z.object({
       quantity: z.number().int().min(1).max(99),
     }).strict(),
   ).min(1).max(50),
+  startNewTableSession: z.boolean().optional(),
 }).strict();
 export type Create = z.infer<typeof createValidation>;
 

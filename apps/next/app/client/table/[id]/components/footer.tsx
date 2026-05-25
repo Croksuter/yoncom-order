@@ -12,9 +12,11 @@ import { Utensils, ShoppingCart, Receipt, Clock, AlertCircle } from "lucide-reac
 export default function Footer({
   activeTab,
   setActiveTab,
+  canViewOrders = true,
 }: {
   activeTab: "menu" | "orders";
   setActiveTab: (tab: "menu" | "orders") => void;
+  canViewOrders?: boolean;
 }) {
   const [purchaseModalOpen, setPurchaseModalOpen] = useState(false);
   const [orderModalOpen, setOrderModalOpen] = useState(false);
@@ -115,24 +117,25 @@ export default function Footer({
           </button>
         )}
 
-        {/* Orders (Tab Selector) */}
-        <button
-          onClick={() => setActiveTab("orders")}
-          className={`flex flex-col items-center justify-center font-bold text-xs gap-1 transition-all duration-200 active:scale-95 w-16 cursor-pointer ${
-            activeTab === "orders"
-              ? "text-primary font-extrabold"
-              : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
-          }`}
-        >
-          <div className={`p-2 rounded-xl transition-all duration-250 ${
-            activeTab === "orders"
-              ? "bg-brand-100 dark:bg-brand-900/30 text-primary"
-              : "hover:bg-slate-100 dark:hover:bg-slate-800"
-          }`}>
-            <Receipt className="h-5 w-5" />
-          </div>
-          <span className="font-semibold">주문내역</span>
-        </button>
+        {canViewOrders && (
+          <button
+            onClick={() => setActiveTab("orders")}
+            className={`flex flex-col items-center justify-center font-bold text-xs gap-1 transition-all duration-200 active:scale-95 w-16 cursor-pointer ${
+              activeTab === "orders"
+                ? "text-primary font-extrabold"
+                : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+            }`}
+          >
+            <div className={`p-2 rounded-xl transition-all duration-250 ${
+              activeTab === "orders"
+                ? "bg-brand-100 dark:bg-brand-900/30 text-primary"
+                : "hover:bg-slate-100 dark:hover:bg-slate-800"
+            }`}>
+              <Receipt className="h-5 w-5" />
+            </div>
+            <span className="font-semibold">주문내역</span>
+          </button>
+        )}
       </nav>
 
       <OrderModal
@@ -150,4 +153,3 @@ export default function Footer({
     </>
   );
 }
-

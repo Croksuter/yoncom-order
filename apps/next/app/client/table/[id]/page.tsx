@@ -34,9 +34,22 @@ type TableSyncResponse = {
   };
 };
 
+type TableSessionResponse = {
+  result: {
+    state: "INACTIVE" | "RESUMED";
+    table: Omit<ClientTableResponse.Get["result"], "tableContexts">;
+    tableId: string;
+    tableContextId: string | null;
+    expiresAt: number | null;
+  };
+};
+
 const TABLE_UNAVAILABLE_MESSAGE = "현재 이용할 수 없는 테이블입니다.";
 const TABLE_UNAVAILABLE_DESCRIPTION = "직원에게 테이블 활성화를 요청해주세요.";
+const TABLE_IN_USE_MESSAGE = "이미 사용 중인 테이블입니다.";
+const TABLE_IN_USE_DESCRIPTION = "직원에게 문의해주세요.";
 const tableAccessFailureStatuses = new Set([401, 403, 404, 409]);
+type TableAccessState = "UNKNOWN" | "INACTIVE" | "RESUMED" | "BLOCKED";
 
 function normalizeClientTable(table: ClientTableResponse.Get["result"]) {
   return {
@@ -54,12 +67,42 @@ function isTableAccessFailure(error: unknown) {
   return error instanceof HTTPError && tableAccessFailureStatuses.has(error.response.status);
 }
 
+async function getTableAccessFailureCopy(error: unknown) {
+  if (!(error instanceof HTTPError)) {
+    return {
+      message: TABLE_UNAVAILABLE_MESSAGE,
+      description: TABLE_UNAVAILABLE_DESCRIPTION,
+    };
+  }
+
+  const body = await error.response.clone().json<{ error?: string }>().catch(() => null);
+  if (body?.error === "Table already in use") {
+    return {
+      message: TABLE_IN_USE_MESSAGE,
+      description: TABLE_IN_USE_DESCRIPTION,
+    };
+  }
+  if (body?.error === "Table Not Found") {
+    return {
+      message: "존재하지 않는 테이블입니다.",
+      description: "테이블 주소를 다시 확인해주세요.",
+    };
+  }
+
+  return {
+    message: TABLE_UNAVAILABLE_MESSAGE,
+    description: TABLE_UNAVAILABLE_DESCRIPTION,
+  };
+}
+
 export default function ClientTablePage({ params }: ClientTablePageProps) {
   const { id } = use(params);
   const { clientTable } = useTableStore();
   const { clientMenuCategories } = useMenuStore();
   const [loading, setLoading] = useState(true);
   const [tableAccessMessage, setTableAccessMessage] = useState<string | null>(null);
+  const [tableAccessDescription, setTableAccessDescription] = useState<string | null>(null);
+  const [tableAccessState, setTableAccessState] = useState<TableAccessState>("UNKNOWN");
   const [activeTab, setActiveTab] = useState<"menu" | "orders">("menu");
   const isValidTableId = id.length === 15;
   const activeUnpaidOrder = clientTable?.tableContexts[0]?.orders.find(isPaymentInstructionOrder);
@@ -81,9 +124,11 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
     }
   }, [id, isValidTableId]);
 
-  const markTableUnavailable = useCallback(() => {
+  const markTableUnavailable = useCallback((copy?: { message: string; description: string }) => {
     revisionRef.current = 0;
-    setTableAccessMessage(TABLE_UNAVAILABLE_MESSAGE);
+    setTableAccessState("BLOCKED");
+    setTableAccessMessage(copy?.message ?? TABLE_UNAVAILABLE_MESSAGE);
+    setTableAccessDescription(copy?.description ?? TABLE_UNAVAILABLE_DESCRIPTION);
     useTableStore.setState({ clientTable: null, isLoaded: false, error: true });
   }, []);
 
@@ -97,6 +142,7 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
       revisionRef.current = response.result.revision;
 
       if (response.result.snapshot?.table) {
+        setTableAccessState("RESUMED");
         setTableAccessMessage(null);
         useTableStore.setState({
           clientTable: normalizeClientTable(response.result.snapshot.table),
@@ -111,7 +157,7 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
       }
     } catch (error) {
       if (isTableAccessFailure(error)) {
-        markTableUnavailable();
+        markTableUnavailable(await getTableAccessFailureCopy(error));
       }
       void kyErrorHandler(error);
     }
@@ -133,9 +179,17 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
   }, [activeUnpaidOrder]);
 
   useEffect(() => {
+    if (tableAccessState === "INACTIVE" && clientTable?.tableContexts.some((context) => context.deletedAt === null)) {
+      setTableAccessState("RESUMED");
+    }
+  }, [clientTable, tableAccessState]);
+
+  useEffect(() => {
     const fetchTableData = async () => {
       setLoading(true);
+      setTableAccessState("UNKNOWN");
       setTableAccessMessage(null);
+      setTableAccessDescription(null);
       useTableStore.setState({ clientTable: null });
 
       if (!isValidTableId) {
@@ -144,17 +198,32 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
       }
 
       try {
-        const session = await useTableStore.getState().clientStartTableSession({ tableId: id });
-        if (!session) {
-          markTableUnavailable();
+        const session = await api.post("table/session", {
+          json: { tableId: id },
+        }).json<TableSessionResponse>();
+
+        if (session.result.state === "INACTIVE") {
+          revisionRef.current = 0;
+          setTableAccessState("INACTIVE");
+          setTableAccessMessage(null);
+          setTableAccessDescription(null);
+          useTableStore.setState({
+            clientTable: {
+              ...session.result.table,
+              tableContexts: [],
+            },
+            isLoaded: true,
+            error: false,
+          });
           return;
         }
 
+        setTableAccessState("RESUMED");
         revisionRef.current = 0;
         await syncClientTable(0);
       } catch (error) {
         if (isTableAccessFailure(error)) {
-          markTableUnavailable();
+          markTableUnavailable(await getTableAccessFailureCopy(error));
         }
         void kyErrorHandler(error);
       } finally {
@@ -237,7 +306,7 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
           <>
             <Header />
             <div className="w-full max-w-[600px] flex-1 overflow-hidden px-4 fc relative pt-16">
-              {activeTab === "menu" ? (
+              {activeTab === "menu" || tableAccessState === "INACTIVE" ? (
                 <div className="flex-1 fc overflow-hidden w-full">
                   <ShopIntro tableName={clientTable.name} tableSeats={clientTable.seats} />
                   <Menus menuCategories={clientMenuCategories} />
@@ -245,7 +314,11 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
               ) : (
                 <OrderHistoryPanel />
               )}
-              <Footer activeTab={activeTab} setActiveTab={setTracedActiveTab} />
+              <Footer
+                activeTab={activeTab}
+                setActiveTab={setTracedActiveTab}
+                canViewOrders={tableAccessState !== "INACTIVE"}
+              />
             </div>
 
             {/* Locked Verification Modal */}
@@ -264,7 +337,7 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
             {isValidTableId ? tableAccessMessage ?? "존재하지 않는 테이블입니다." : "올바르지 않은 테이블 주소입니다."}
           </h1>
           <p className="mt-2 text-sm text-slate-500">
-            {isValidTableId && tableAccessMessage ? TABLE_UNAVAILABLE_DESCRIPTION : `tableId: ${id}`}
+            {isValidTableId && tableAccessMessage ? tableAccessDescription : `tableId: ${id}`}
           </p>
         </div>
       )}

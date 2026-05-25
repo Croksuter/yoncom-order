@@ -27,6 +27,7 @@ function getUserFacingErrorMessage(error?: string) {
     "Active table session not available": "현재 비활성화된 테이블입니다. 직원에게 테이블 활성화를 요청해주세요.",
     "Table session required": "테이블 접속 세션이 필요합니다. 테이블 페이지를 다시 열어주세요.",
     "Invalid table session": "테이블 접속 세션이 만료되었습니다. 직원에게 테이블 활성화를 요청해주세요.",
+    "Table already in use": "이미 사용 중인 테이블입니다. 직원에게 문의해주세요.",
     "Image Not Found": "이미지를 찾을 수 없습니다.",
     FEATURE_UNAVAILABLE: "현재 운영 화면에서 사용하지 않는 기능입니다.",
     Unauthorized: "로그인이 필요합니다.",

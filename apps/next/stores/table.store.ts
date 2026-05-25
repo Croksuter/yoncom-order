@@ -22,7 +22,15 @@ type TableState = {
   load: (query: AdminTableRequest.Get) => Promise<AdminTableResponse.Get | null>;
   clientStartTableSession: (
     query: ClientTableRequest.Get,
-  ) => Promise<{ result: { tableId: string; tableContextId: string; expiresAt: number } } | null>;
+  ) => Promise<{
+    result: {
+      state: "INACTIVE" | "RESUMED";
+      table: Omit<ClientTableResponse.Get["result"], "tableContexts">;
+      tableId: string;
+      tableContextId: string | null;
+      expiresAt: number | null;
+    };
+  } | null>;
 
   createTable: (query: AdminTableRequest.Create) => Promise<AdminTableResponse.Create | null>;
   removeTable: (query: AdminTableRequest.Remove) => Promise<AdminTableResponse.Remove | null>;
@@ -74,7 +82,15 @@ const useTableStore = create<TableState>((set, get) => ({
 
   clientStartTableSession: async (query: ClientTableRequest.Get) => await queryStore<
     ClientTableRequest.Get,
-    { result: { tableId: string; tableContextId: string; expiresAt: number } }
+    {
+      result: {
+        state: "INACTIVE" | "RESUMED";
+        table: Omit<ClientTableResponse.Get["result"], "tableContexts">;
+        tableId: string;
+        tableContextId: string | null;
+        expiresAt: number | null;
+      };
+    }
   >({
     route: "table/session",
     method: "post",

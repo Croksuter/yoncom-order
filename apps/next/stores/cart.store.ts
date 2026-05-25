@@ -15,7 +15,7 @@ export type CartState = {
   removeMenuOrder: (menuId: string) => void;
   updateMenuOrder: (menuOrderId: string, menuOrder: MenuOrderQuery) => void;
 
-  purchaseMenuOrders: () => Promise<ClientOrderResponse.Create | null>;
+  purchaseMenuOrders: (options?: { startNewTableSession?: boolean }) => Promise<ClientOrderResponse.Create | null>;
   clearMenuOrders: () => void;
 }
 
@@ -49,7 +49,7 @@ const useCartStore = create<CartState>((set, get) => ({
     }))
   },
 
-  purchaseMenuOrders: async () => {
+  purchaseMenuOrders: async (options) => {
     const table = useTableStore.getState().clientTable;
     const nonZeroMenuOrders = get().menuOrders.filter((menuOrder) => menuOrder.quantity > 0);
     const clientOrderId = get().clientOrderId ?? crypto.randomUUID();
@@ -74,6 +74,7 @@ const useCartStore = create<CartState>((set, get) => ({
         tableId: table.id,
         clientOrderId,
         menuOrders: nonZeroMenuOrders,
+        startNewTableSession: options?.startNewTableSession,
       },
       onSuccess: () => {
         toast({

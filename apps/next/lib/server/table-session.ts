@@ -1,5 +1,5 @@
 import { generateId } from "lucia";
-import { NextResponse } from "next/server";
+import { type NextResponse } from "next/server";
 import { csrfCookieName } from "~/lib/server/auth-session";
 import { fail, getRequestCookie } from "~/lib/server/api";
 import { executeD1, queryD1 } from "~/lib/server/db";
@@ -7,12 +7,22 @@ import { executeD1, queryD1 } from "~/lib/server/db";
 export const tableSessionCookieName = "yoncom_table_session";
 const tableSessionMaxAgeSeconds = 60 * 60 * 12;
 
+type TableRow = {
+  id: string;
+  key: number;
+  name: string;
+  seats: number;
+  createdAt: number | string;
+  updatedAt: number | string;
+  deletedAt: number | string | null;
+};
+
 type ActiveTableContext = {
   tableId: string;
   tableContextId: string;
 };
 
-type TableSessionRow = {
+export type TableSessionRow = {
   id: string;
   tableId: string;
   tableContextId: string;
@@ -21,83 +31,147 @@ type TableSessionRow = {
   revokedAt: number | null;
 };
 
-export async function issueTableSession(tableId: string) {
+export type IssuedTableSession = {
+  tableId: string;
+  tableContextId: string;
+  expiresAt: number;
+  sessionId: string;
+  csrfToken: string;
+};
+
+async function getActiveTableContext(tableId: string) {
   const [context] = await queryD1<ActiveTableContext>(
-    `SELECT t.id AS tableId, tc.id AS tableContextId
-     FROM tables t
-     INNER JOIN tableContexts tc ON tc.tableId = t.id
-     WHERE t.id = ? AND t.deletedAt IS NULL AND tc.deletedAt IS NULL
-     ORDER BY tc.createdAt DESC
+    `SELECT tableId, id AS tableContextId
+     FROM tableContexts
+     WHERE tableId = ? AND deletedAt IS NULL
+     ORDER BY createdAt DESC
      LIMIT 1`,
     [tableId],
   );
 
-  if (!context) {
-    return { error: "Active table session not available", status: 409 as const };
+  return context ?? null;
+}
+
+async function getTable(tableId: string) {
+  const [table] = await queryD1<TableRow>(
+    "SELECT * FROM tables WHERE id = ? AND deletedAt IS NULL LIMIT 1",
+    [tableId],
+  );
+  return table ?? null;
+}
+
+export async function getValidTableSession(request: Request, tableId: string) {
+  const sessionId = getRequestCookie(request, tableSessionCookieName);
+  if (!sessionId) {
+    return null;
   }
 
-  const now = Date.now();
+  const [session] = await queryD1<TableSessionRow>(
+    `SELECT ts.*
+     FROM tableSessions ts
+     INNER JOIN tableContexts tc ON tc.id = ts.tableContextId AND tc.deletedAt IS NULL
+     WHERE ts.id = ? AND ts.tableId = ? AND ts.revokedAt IS NULL AND ts.expiresAt > ?
+     LIMIT 1`,
+    [sessionId, tableId, Date.now()],
+  );
+
+  return session ?? null;
+}
+
+export async function createTableSession(tableId: string, tableContextId: string): Promise<IssuedTableSession> {
+  const timestamp = Date.now();
   const sessionId = generateId(40);
   const csrfToken = generateId(40);
+  const expiresAt = timestamp + tableSessionMaxAgeSeconds * 1000;
+
   await executeD1(
     `INSERT INTO tableSessions
       (id, tableId, tableContextId, csrfToken, expiresAt, revokedAt, createdAt, updatedAt)
      VALUES (?, ?, ?, ?, ?, NULL, ?, ?)`,
-    [
-      sessionId,
-      context.tableId,
-      context.tableContextId,
-      csrfToken,
-      now + tableSessionMaxAgeSeconds * 1000,
-      now,
-      now,
-    ],
+    [sessionId, tableId, tableContextId, csrfToken, expiresAt, timestamp, timestamp],
   );
 
-  const response = NextResponse.json({
-    result: {
-      tableId: context.tableId,
-      tableContextId: context.tableContextId,
-      expiresAt: now + tableSessionMaxAgeSeconds * 1000,
-    },
-  });
-  response.cookies.set(tableSessionCookieName, sessionId, {
+  return { tableId, tableContextId, expiresAt, sessionId, csrfToken };
+}
+
+export function attachTableSessionCookies(response: NextResponse, session: IssuedTableSession) {
+  response.cookies.set(tableSessionCookieName, session.sessionId, {
     httpOnly: true,
     maxAge: tableSessionMaxAgeSeconds,
     path: "/",
     sameSite: "lax",
   });
-  response.cookies.set(csrfCookieName, csrfToken, {
+  response.cookies.set(csrfCookieName, session.csrfToken, {
     httpOnly: false,
     maxAge: tableSessionMaxAgeSeconds,
     path: "/",
     sameSite: "lax",
   });
-
-  return { response };
+  return response;
 }
 
-export async function requireTableSession(request: Request, tableId: string) {
-  const sessionId = getRequestCookie(request, tableSessionCookieName);
-  if (!sessionId) {
+export async function resolveTableSessionAccess(request: Request, tableId: string) {
+  const table = await getTable(tableId);
+  if (!table) {
+    return { response: fail("Table Not Found", 404) };
+  }
+
+  const session = await getValidTableSession(request, tableId);
+  if (session) {
     return {
-      session: null,
-      response: fail("Table session required", 401),
+      response: Response.json({
+        result: {
+          state: "RESUMED" as const,
+          table: {
+            id: table.id,
+            key: table.key,
+            name: table.name,
+            seats: table.seats,
+            createdAt: Number(table.createdAt),
+            updatedAt: Number(table.updatedAt),
+            deletedAt: table.deletedAt === null ? null : Number(table.deletedAt),
+          },
+          tableId: session.tableId,
+          tableContextId: session.tableContextId,
+          expiresAt: session.expiresAt,
+        },
+      }),
+      session,
     };
   }
 
-  const [session] = await queryD1<TableSessionRow>(
-    `SELECT *
-     FROM tableSessions
-     WHERE id = ? AND tableId = ? AND revokedAt IS NULL AND expiresAt > ?
-     LIMIT 1`,
-    [sessionId, tableId, Date.now()],
-  );
+  const context = await getActiveTableContext(tableId);
+  if (!context) {
+    return {
+      response: Response.json({
+        result: {
+          state: "INACTIVE" as const,
+          table: {
+            id: table.id,
+            key: table.key,
+            name: table.name,
+            seats: table.seats,
+            createdAt: Number(table.createdAt),
+            updatedAt: Number(table.updatedAt),
+            deletedAt: table.deletedAt === null ? null : Number(table.deletedAt),
+          },
+          tableId: table.id,
+          tableContextId: null,
+          expiresAt: null,
+        },
+      }),
+    };
+  }
 
+  return { response: fail("Table already in use", 403) };
+}
+
+export async function requireTableSession(request: Request, tableId: string) {
+  const session = await getValidTableSession(request, tableId);
   if (!session) {
     return {
       session: null,
-      response: fail("Invalid table session", 403),
+      response: fail("Table session required", 401),
     };
   }
 

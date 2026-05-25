@@ -89,6 +89,22 @@ describe("implemented mutation route handlers", () => {
       requireAdminUser: vi.fn(async () => ({ user: { id: "user_admin0000", role: "ADMIN" }, response: null })),
     }));
     vi.doMock("~/lib/server/table-session", () => ({
+      getValidTableSession: vi.fn(async () => ({
+        id: "session_123456789",
+        tableId: "table_e2e_00001",
+        tableContextId: "ctx_12345678901",
+        csrfToken: "csrf-token",
+        expiresAt: Date.now() + 1000,
+        revokedAt: null,
+      })),
+      createTableSession: vi.fn(async () => ({
+        tableId: "table_e2e_00001",
+        tableContextId: "ctx_12345678901",
+        expiresAt: Date.now() + 1000,
+        sessionId: "session_123456789",
+        csrfToken: "csrf-token",
+      })),
+      attachTableSessionCookies: vi.fn((response) => response),
       requireTableSession: vi.fn(async () => ({
         session: { tableContextId: "ctx_12345678901" },
         response: null,
@@ -114,6 +130,9 @@ describe("implemented mutation route handlers", () => {
       }
       if (sql === "PRAGMA table_info(\"orders\")") {
         return tableInfo(orderColumns);
+      }
+      if (sql === "PRAGMA table_info(\"payments\")") {
+        return tableInfo(paymentColumns);
       }
       if (sql === "PRAGMA table_info(\"tableContexts\")") {
         return tableInfo(["id", "tableId", "createdAt", "updatedAt", "deletedAt"]);
@@ -143,8 +162,8 @@ describe("implemented mutation route handlers", () => {
           },
         ]);
       }
-      if (sql === "SELECT * FROM \"tableContexts\" WHERE tableId = ? AND deletedAt IS NULL LIMIT 1") {
-        return d1Success([]);
+      if (sql === "SELECT * FROM \"tableContexts\" WHERE id = ? AND tableId = ? AND deletedAt IS NULL LIMIT 1") {
+        return d1Success([{ id: "ctx_12345678901", tableId: "table_e2e_00001", createdAt: 1, updatedAt: 1, deletedAt: null }]);
       }
       if (sql.startsWith("INSERT INTO \"tableContexts\"")) {
         return d1Success([], { duration: 1, changes: 1 });
@@ -218,6 +237,189 @@ describe("implemented mutation route handlers", () => {
     expect(paymentInsert?.params).toContain(23999);
     expect(paymentInsert?.params).toContain(24000);
     expect(paymentInsert?.params).toContain(1);
+  });
+
+  it("POST /api/order starts a new table session for the first inactive-table order", async () => {
+    vi.resetModules();
+    vi.doMock("~/lib/server/auth-session", () => ({
+      csrfCookieName: "yoncom_csrf",
+      requireAdmin: vi.fn(async () => null),
+      requireAdminUser: vi.fn(async () => ({ user: { id: "user_admin0000", role: "ADMIN" }, response: null })),
+    }));
+    vi.doUnmock("~/lib/server/table-session");
+    stubCloudflareEnv();
+
+    const { requests } = installD1FetchMock(({ sql, params }) => {
+      const realtime = handleRealtimeSql(sql);
+      if (realtime) return realtime;
+      if (sql === "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?") {
+        return d1Success(params[0] === "tableContexts" || params[0] === "paymentCodeLeases" ? [{ name: params[0] }] : []);
+      }
+      if (sql === "PRAGMA table_info(\"payments\")") {
+        return tableInfo(paymentColumns);
+      }
+      if (sql === "PRAGMA table_info(\"orders\")") {
+        return tableInfo(orderColumns);
+      }
+      if (sql === "PRAGMA table_info(\"tableContexts\")") {
+        return tableInfo(["id", "tableId", "createdAt", "updatedAt", "deletedAt"]);
+      }
+      if (sql === "PRAGMA table_info(\"menuOrders\")") {
+        return tableInfo(["id", "quantity", "status", "orderId", "menuId", "createdAt", "updatedAt", "deletedAt"]);
+      }
+      if (sql.startsWith("SELECT * FROM payments WHERE deletedAt IS NULL AND paid = 0 AND expiresAt")) {
+        return d1Success([]);
+      }
+      if (sql === "DELETE FROM paymentCodeLeases WHERE expiresAt <= ?") {
+        return d1Success([], { duration: 1, changes: 0 });
+      }
+      if (sql === "SELECT * FROM orders WHERE clientOrderId = ? AND deletedAt IS NULL LIMIT 1") {
+        return d1Success([]);
+      }
+      if (sql === "SELECT * FROM tables WHERE id = ? AND deletedAt IS NULL LIMIT 1") {
+        return d1Success([
+          {
+            id: "table_e2e_00001",
+            key: 7,
+            name: "E2E Table",
+            seats: 2,
+            createdAt: 1,
+            updatedAt: 1,
+            deletedAt: null,
+          },
+        ]);
+      }
+      if (sql === "SELECT * FROM \"tableContexts\" WHERE tableId = ? AND deletedAt IS NULL LIMIT 1") {
+        return d1Success([]);
+      }
+      if (sql.startsWith("SELECT * FROM menus WHERE id IN")) {
+        return d1Success([
+          {
+            id: "menu_e2e_000001",
+            name: "Test Menu",
+            price: 12000,
+            quantity: 5,
+            available: 1,
+            menuCategoryId: "cat_e2e_000000",
+            createdAt: 1,
+            updatedAt: 1,
+            deletedAt: null,
+          },
+        ]);
+      }
+      if (sql === "SELECT * FROM payments WHERE deletedAt IS NULL AND paid = 0 AND COALESCE(status, ?) IN (?, ?)") {
+        return d1Success([]);
+      }
+      if (sql === "INSERT OR IGNORE INTO paymentCodeLeases (code, paymentId, expiresAt, createdAt) VALUES (?, ?, ?, ?)") {
+        return d1Success([], { duration: 1, changes: 1 });
+      }
+      if (sql === "UPDATE menus SET quantity = quantity - ?, updatedAt = ? WHERE id = ? AND deletedAt IS NULL AND available = 1 AND quantity >= ?") {
+        return d1Success([], { duration: 1, changes: 1 });
+      }
+      if (sql.startsWith("INSERT INTO \"tableContexts\"")) {
+        return d1Success([], { duration: 1, changes: 1 });
+      }
+      if (sql === "SELECT COALESCE(MAX(displayNumber), 0) + 1 AS nextDisplayNumber FROM orders") {
+        return d1Success([{ nextDisplayNumber: 1 }]);
+      }
+      if (sql.startsWith("INSERT INTO \"orders\"")) {
+        return d1Success([], { duration: 1, changes: 1 });
+      }
+      if (sql.startsWith("INSERT INTO \"menuOrders\"")) {
+        return d1Success([], { duration: 1, changes: 1 });
+      }
+      if (sql.startsWith("INSERT INTO \"payments\"")) {
+        return d1Success([], { duration: 1, changes: 1 });
+      }
+      if (sql.startsWith("INSERT INTO tableSessions")) {
+        return d1Success([], { duration: 1, changes: 1 });
+      }
+      throw new Error(`Unexpected SQL: ${sql}`);
+    });
+
+    const { POST } = await import("~/app/api/order/route");
+    const response = await POST(guardedJsonRequest(
+      "http://order.test/api/order",
+      "POST",
+      {
+        tableId: "table_e2e_00001",
+        clientOrderId: "client-order-self-start",
+        menuOrders: [{ menuId: "menu_e2e_000001", quantity: 2 }],
+        startNewTableSession: true,
+      },
+    ));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual(expect.objectContaining({
+      result: expect.objectContaining({ displayNumber: 1 }),
+    }));
+    expect(response.headers.get("set-cookie")).toContain("yoncom_table_session=");
+    expect(requests.some((request) => request.sql.startsWith("INSERT INTO \"tableContexts\""))).toBe(true);
+    expect(requests.some((request) => request.sql.startsWith("INSERT INTO tableSessions"))).toBe(true);
+  });
+
+  it("POST /api/order rejects self-start when the table is already active without this client session", async () => {
+    vi.resetModules();
+    vi.doMock("~/lib/server/auth-session", () => ({
+      csrfCookieName: "yoncom_csrf",
+      requireAdmin: vi.fn(async () => null),
+      requireAdminUser: vi.fn(async () => ({ user: { id: "user_admin0000", role: "ADMIN" }, response: null })),
+    }));
+    vi.doUnmock("~/lib/server/table-session");
+    stubCloudflareEnv();
+
+    const { requests } = installD1FetchMock(({ sql, params }) => {
+      const realtime = handleRealtimeSql(sql);
+      if (realtime) return realtime;
+      if (sql === "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?") {
+        return d1Success(params[0] === "tableContexts" ? [{ name: params[0] }] : []);
+      }
+      if (sql === "PRAGMA table_info(\"orders\")") {
+        return tableInfo(orderColumns);
+      }
+      if (sql === "PRAGMA table_info(\"payments\")") {
+        return tableInfo(paymentColumns);
+      }
+      if (sql.startsWith("SELECT * FROM payments WHERE deletedAt IS NULL AND paid = 0 AND expiresAt")) {
+        return d1Success([]);
+      }
+      if (sql === "SELECT * FROM orders WHERE clientOrderId = ? AND deletedAt IS NULL LIMIT 1") {
+        return d1Success([]);
+      }
+      if (sql === "SELECT * FROM tables WHERE id = ? AND deletedAt IS NULL LIMIT 1") {
+        return d1Success([
+          {
+            id: "table_e2e_00001",
+            key: 7,
+            name: "E2E Table",
+            seats: 2,
+            createdAt: 1,
+            updatedAt: 1,
+            deletedAt: null,
+          },
+        ]);
+      }
+      if (sql === "SELECT * FROM \"tableContexts\" WHERE tableId = ? AND deletedAt IS NULL LIMIT 1") {
+        return d1Success([{ id: "ctx_existing000", tableId: "table_e2e_00001", createdAt: 1, updatedAt: 1, deletedAt: null }]);
+      }
+      throw new Error(`Unexpected SQL: ${sql}`);
+    });
+
+    const { POST } = await import("~/app/api/order/route");
+    const response = await POST(guardedJsonRequest(
+      "http://order.test/api/order",
+      "POST",
+      {
+        tableId: "table_e2e_00001",
+        clientOrderId: "client-order-blocked",
+        menuOrders: [{ menuId: "menu_e2e_000001", quantity: 1 }],
+        startNewTableSession: true,
+      },
+    ));
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({ error: "Table already in use" });
+    expect(requests.some((request) => request.sql.startsWith("INSERT INTO \"orders\""))).toBe(false);
   });
 
   it("POST /api/admin/deposit stores a bank transaction and auto-matches only a single exact expected amount", async () => {
