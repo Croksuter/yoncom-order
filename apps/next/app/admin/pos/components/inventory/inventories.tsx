@@ -25,17 +25,17 @@ export default function Inventories() {
             재고 현황
           </h3>
           <div className="flex gap-2">
-            <Button 
+            <Button
               size="sm"
-              className="bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs h-8 px-3 rounded-xl transition-all shadow-sm shadow-brand-500/10 shrink-0" 
+              className="bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs h-8 px-3 rounded-xl transition-all shadow-sm shadow-brand-500/10 shrink-0"
               onClick={() => setCreateMenuModalOpen(true)}
             >
               메뉴 추가
             </Button>
-            <Button 
+            <Button
               size="sm"
-              variant="outline" 
-              className="border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 font-bold text-xs h-8 px-3 rounded-xl transition-all shrink-0" 
+              variant="outline"
+              className="border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 font-bold text-xs h-8 px-3 rounded-xl transition-all shrink-0"
               onClick={() => setRemoveMenuModalOpen(true)}
             >
               메뉴 제거
@@ -60,7 +60,7 @@ export default function Inventories() {
                 .map((menu) => {
                   const isLowStock = menu.quantity <= 15 && menu.quantity > 0;
                   const isOutOfStock = menu.quantity === 0 || menu.available === false;
-                  
+
                   return (
                     <tr
                       key={menu.id}
@@ -73,8 +73,8 @@ export default function Inventories() {
                         opacity: isOutOfStock ? 0.35 : 1,
                       }}
                     >
-                      <td className="px-4 py-3.5 text-start text-xs font-bold text-slate-700 dark:text-slate-200">
-                        {menu.name}
+                      <td className="px-4 py-3.5 text-start text-xs font-bold text-slate-700 dark:text-slate-200 max-w-[120px]">
+                        <span className="truncate block w-full">{menu.name}</span>
                       </td>
                       <td className="px-4 py-3.5 text-center">
                         <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[10px] font-bold px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-750">
@@ -83,10 +83,10 @@ export default function Inventories() {
                       </td>
                       <td className="px-4 py-3.5 text-end">
                         <span className={`text-xs font-black ${
-                          isOutOfStock 
-                            ? "text-rose-500 dark:text-rose-400" 
-                            : isLowStock 
-                              ? "text-amber-500 dark:text-amber-400 font-extrabold" 
+                          isOutOfStock
+                            ? "text-rose-500 dark:text-rose-400"
+                            : isLowStock
+                              ? "text-amber-500 dark:text-amber-400 font-extrabold"
                               : "text-slate-800 dark:text-slate-200"
                         }`}>
                           {menu.quantity === 0 ? "품절" : menu.quantity}

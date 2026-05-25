@@ -55,12 +55,12 @@ export default function OrderInstance({
       className={`bg-slate-50/60 dark:bg-slate-900/60 hover:bg-white dark:hover:bg-slate-900 border border-slate-200/50 dark:border-slate-800/80 ${borderClass} ${hoverClass} p-3.5 rounded-2xl transition-all duration-300 cursor-pointer flex flex-col gap-3 group`}
       onClick={onClick}
     >
-      <div className="flex justify-between items-start">
-        <div className="fc">
-          <span className="font-extrabold text-sm text-slate-800 dark:text-slate-100 group-hover:text-brand-500 dark:group-hover:text-brand-400 transition-colors">
+      <div className="flex justify-between items-start gap-2">
+        <div className="fc min-w-0 flex-1">
+          <span className="font-extrabold text-sm text-slate-800 dark:text-slate-100 group-hover:text-brand-500 dark:group-hover:text-brand-400 transition-colors truncate block">
             {table?.name ?? "테이블"}
           </span>
-          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold mt-0.5">
+          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold mt-0.5 truncate">
             {dateDiffString(now, order.createdAt).startsWith("-") 
               ? "00:00" 
               : dateDiffString(now, order.createdAt)}

@@ -22,14 +22,16 @@ export default function AdminCookerPage() {
 
   const pendingMenuIds = useMemo(() => {
     const menuIds = new Set<string>();
+    const tablesList = tables ?? [];
+    const menusList = menus ?? [];
 
-    for (const table of tables) {
-      for (const order of table.tableContexts[0]?.orders ?? []) {
+    for (const table of tablesList) {
+      for (const order of table.tableContexts?.[0]?.orders ?? []) {
         if (!isKitchenOrder(order)) {
           continue;
         }
 
-        for (const menuOrder of order.menuOrders) {
+        for (const menuOrder of order.menuOrders ?? []) {
           if (menuOrder.deletedAt === null && menuOrder.status === "PENDING") {
             menuIds.add(menuOrder.menuId);
           }
@@ -37,7 +39,7 @@ export default function AdminCookerPage() {
       }
     }
 
-    return [...menuIds].filter((menuId) => menus.some((menu) => menu.id === menuId));
+    return [...menuIds].filter((menuId) => menusList.some((menu) => menu.id === menuId));
   }, [menus, tables]);
 
   // Load selection from localStorage or initialize with pending orders on mount

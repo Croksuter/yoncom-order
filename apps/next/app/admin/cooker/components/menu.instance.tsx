@@ -56,12 +56,12 @@ export default function MenuInstance({
       {/* Premium accent strip on hover */}
       <div className="absolute top-0 left-0 w-full h-[3px] bg-brand-500 scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
 
-      <div className="flex justify-between items-start">
-        <div className="flex flex-col">
-          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 tracking-tight group-hover:text-brand-500 transition-colors">
+      <div className="flex justify-between items-start gap-2">
+        <div className="flex flex-col min-w-0 flex-1">
+          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 tracking-tight group-hover:text-brand-500 transition-colors truncate w-full max-w-full block">
             {order.tableName}
           </h3>
-          <span className={`text-lg mt-0.5 ${timerClass}`}>
+          <span className={`text-xs mt-0.5 ${timerClass} truncate block w-full`}>
             {formattedTime}
           </span>
         </div>

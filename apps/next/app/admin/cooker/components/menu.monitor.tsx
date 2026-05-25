@@ -34,6 +34,8 @@ export default function MenuMonitor({
   const [menuName, setMenuName] = useState("");
   const [menuOrderId, setMenuOrderId] = useState("");
   const [tableName, setTableName] = useState("");
+  const { menus } = useMenuStore();
+  const { tables } = useTableStore();
 
   const menu = menus.find((menu) => menu.id === menuId);
 
