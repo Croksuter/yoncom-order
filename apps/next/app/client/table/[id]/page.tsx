@@ -127,19 +127,79 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
   }, [activeTab]);
 
   useEffect(() => {
-    const handleScroll = (e: Event) => {
-      const target = e.target as HTMLElement;
-      if (target && typeof target.scrollTop === "number") {
-        if (target.classList.contains("overflow-y-auto")) {
-          setScrollY(target.scrollTop);
+    let lastTouchY = 0;
+
+    const handleWheel = (e: WheelEvent) => {
+      const scrollContainer = document.querySelector(".overflow-y-auto") as HTMLElement;
+      if (!scrollContainer) return;
+
+      const delta = e.deltaY;
+      const scrollTop = scrollContainer.scrollTop;
+
+      if (delta > 0) {
+        if (scrollY < 136) {
+          setScrollY((prev) => Math.min(136, prev + delta * 0.4));
+          scrollContainer.scrollTop = 0;
+          if (e.cancelable) e.preventDefault();
+        }
+      } else if (delta < 0) {
+        if (scrollTop <= 0) {
+          setScrollY((prev) => Math.max(0, prev + delta * 0.4));
+          if (e.cancelable) e.preventDefault();
         }
       }
     };
+
+    const handleTouchStart = (e: TouchEvent) => {
+      lastTouchY = e.touches[0].clientY;
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      const scrollContainer = document.querySelector(".overflow-y-auto") as HTMLElement;
+      if (!scrollContainer) return;
+
+      const currentY = e.touches[0].clientY;
+      const deltaY = lastTouchY - currentY;
+      lastTouchY = currentY;
+
+      const scrollTop = scrollContainer.scrollTop;
+
+      if (deltaY > 0) {
+        if (scrollY < 136) {
+          setScrollY((prev) => Math.min(136, prev + deltaY));
+          scrollContainer.scrollTop = 0;
+          if (e.cancelable) e.preventDefault();
+        }
+      } else if (deltaY < 0) {
+        if (scrollTop <= 0) {
+          setScrollY((prev) => Math.max(0, prev + deltaY));
+          if (e.cancelable) e.preventDefault();
+        }
+      }
+    };
+
+    const handleScroll = (e: Event) => {
+      const target = e.target as HTMLElement;
+      if (target && target.classList.contains("overflow-y-auto")) {
+        const scrollTop = target.scrollTop;
+        if (scrollTop > 0 && scrollY < 136) {
+          setScrollY(136);
+        }
+      }
+    };
+
+    window.addEventListener("wheel", handleWheel, { passive: false });
+    window.addEventListener("touchstart", handleTouchStart, { passive: true });
+    window.addEventListener("touchmove", handleTouchMove, { passive: false });
     window.addEventListener("scroll", handleScroll, true);
+
     return () => {
+      window.removeEventListener("wheel", handleWheel);
+      window.removeEventListener("touchstart", handleTouchStart);
+      window.removeEventListener("touchmove", handleTouchMove);
       window.removeEventListener("scroll", handleScroll, true);
     };
-  }, []);
+  }, [scrollY]);
 
   const refreshClientTable = useCallback(async () => {
     if (isValidTableId) {
@@ -339,7 +399,7 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
             >
               {activeTab === "menu" || tableAccessState === "INACTIVE" ? (
                 <div className="flex-1 fc overflow-hidden w-full">
-                  <ShopIntro tableName={clientTable.name} tableSeats={clientTable.seats} />
+                  {/* <ShopIntro tableName={clientTable.name} tableSeats={clientTable.seats} /> */}
                   <Menus menuCategories={clientMenuCategories} />
                 </div>
               ) : (
