@@ -58,14 +58,14 @@ export default function TableInstance({
           <div className="p-3.5 flex-1 flex flex-col">
             <div className="flex justify-between items-start flex-shrink-0 gap-2">
               <div className="min-w-0 flex-1">
-                <h4 className="font-extrabold text-base text-slate-800 dark:text-slate-100 leading-none group-hover:text-brand-500 dark:group-hover:text-brand-400 transition-colors truncate max-w-full">
+                <h4 className="font-black text-lg text-slate-800 dark:text-slate-100 leading-none group-hover:text-brand-500 dark:group-hover:text-brand-400 transition-colors truncate max-w-full">
                   {table.name}
                 </h4>
-                <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-1 truncate">
+                <p className="text-xs text-slate-400/80 dark:text-slate-500 font-extrabold mt-1.5 truncate">
                   {table.seats}인석
                 </p>
               </div>
-              <span className="bg-brand-50 dark:bg-brand-950/20 text-brand-600 dark:text-brand-400 text-[11px] font-extrabold px-1.5 py-0.5 rounded-full uppercase tracking-wider flex-shrink-0">
+              <span className="bg-brand-50 dark:bg-brand-950/20 text-brand-600 dark:text-brand-400 text-xs font-black px-2 py-0.5 rounded-full uppercase tracking-wider flex-shrink-0">
                 Occupied
               </span>
             </div>
@@ -88,7 +88,7 @@ export default function TableInstance({
 
             {/* Bottom Section */}
             <div className="mt-auto pt-2 border-t border-slate-100 dark:border-slate-850 flex justify-between items-center flex-shrink-0">
-              <span className="text-xs font-black text-slate-800 dark:text-slate-100">
+              <span className="text-sm font-black text-slate-800 dark:text-slate-100">
                 {amount.toLocaleString()}원
               </span>
               <div className="flex items-center gap-1 text-slate-400 dark:text-slate-500 text-xs font-bold">
@@ -108,10 +108,10 @@ export default function TableInstance({
           className="aspect-square bg-slate-50/40 dark:bg-slate-900/10 border border-dashed border-slate-200 dark:border-slate-800/80 rounded-2xl flex flex-col items-center justify-center text-center group hover:border-brand-500/50 hover:bg-brand-50/5 dark:hover:bg-brand-950/10 transition-all cursor-pointer p-4 active:scale-[0.98] min-w-0 w-full"
           onClick={() => setModalOpen(true)}
         >
-          <h4 className="font-extrabold text-base text-slate-400 dark:text-slate-600 group-hover:text-brand-500 dark:group-hover:text-brand-400 transition-colors leading-none truncate w-full max-w-full px-2">
+          <h4 className="font-black text-lg text-slate-400 dark:text-slate-600 group-hover:text-brand-500 dark:group-hover:text-brand-400 transition-colors leading-none truncate w-full max-w-full px-2">
             {table.name}
           </h4>
-          <p className="text-xs text-slate-400/80 dark:text-slate-650 font-bold mt-1 truncate w-full max-w-full px-2">
+          <p className="text-xs text-slate-400/85 dark:text-slate-650 font-extrabold mt-1.5 truncate w-full max-w-full px-2">
             {table.seats}인석
           </p>
           <div className="mt-3.5 w-9 h-9 rounded-full bg-white dark:bg-slate-800 shadow-sm flex items-center justify-center border border-slate-200 dark:border-slate-700/60 group-hover:scale-110 group-hover:bg-brand-500 group-hover:border-brand-500 group-hover:text-white transition-all duration-300">

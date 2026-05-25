@@ -35,7 +35,7 @@ export default function AdminPosPage() {
       <div className={`min-h-[24rem] w-full items-center justify-center fc lg:h-full lg:min-h-0 transition-all duration-300 ${
         isInventoriesOpen ? "lg:w-1/2" : "lg:w-3/4"
       }`}>
-        <div className="w-full h-full p-2 relative">
+        <div className="w-full h-full relative">
           <Tables />
           
           {/* 재고 현황 토글 버튼 (PC 환경 우측 하단 고정) */}

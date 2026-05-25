@@ -33,15 +33,7 @@ export default function Orders() {
     .sort((a, b) => a.order.createdAt - b.order.createdAt);
   const reviewTransactions = bankTransactions.filter((transaction) => transaction.status !== "IGNORED");
 
-  // 매출 계산 (PAID 상태의 결제 금액 합산)
-  const confirmedOrders = tables
-    .filter((table) => table.tableContexts[0]?.deletedAt === null)
-    .flatMap((table) => table.tableContexts[0].orders)
-    .filter((order) => order.payment.status === "PAID");
 
-  const totalRevenue = confirmedOrders.reduce((acc, order) => {
-    return acc + (order.payment.expectedTransferAmount ?? order.payment.amount);
-  }, 0);
 
   const candidateReasonLabel = (reason: string) => {
     if (reason === "EXPECTED_AMOUNT") return "입금금액 일치";
@@ -50,18 +42,53 @@ export default function Orders() {
     return reason;
   };
 
+  // 파이프라인 상태별 오더 수 집계
+  const activeOrdersForStats = orderRows
+    .filter(({ order }) => order.deletedAt === null && order.status !== "CANCELLED" && order.status !== "EXPIRED")
+    .map((row) => row.order);
+
+  const pendingPaymentOrdersCount = activeOrdersForStats.filter(
+    (order) => !isKitchenOrder(order) && order.payment.status !== "REFUND_PENDING"
+  ).length;
+
+  const cookingOrdersCount = activeOrdersForStats.filter(
+    (order) => isKitchenOrder(order) && order.menuOrders.some((mo) => mo.status === "PENDING")
+  ).length;
+
+  const readyOrdersCount = activeOrdersForStats.filter(
+    (order) => isKitchenOrder(order) && order.menuOrders.some((mo) => mo.status === "READY")
+  ).length;
+
+  const refundPendingOrdersCount = refundPendingOrders.length;
+
   return (
     <div className="full p-2 h-full">
       <div className="full bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 shadow-md rounded-3xl flex flex-col overflow-hidden">
         {/* Header Block */}
-        <div className="p-4 bg-slate-50/50 dark:bg-slate-800/30 border-b border-slate-200/60 dark:border-slate-800/60 flex justify-between items-center flex-shrink-0">
-          <div className="flex items-center gap-2">
-            <h3 className="font-extrabold text-base text-slate-800 dark:text-white">
-              주문 대기열
+        <div className="h-[76px] bg-slate-50/50 dark:bg-slate-800/30 border-b border-slate-200/60 dark:border-slate-800/60 flex justify-between items-center px-4 shrink-0">
+          <div className="flex flex-col gap-1">
+            <h3 className="font-extrabold text-base text-slate-800 dark:text-white leading-none">
+              주문 대기열 <span className="text-slate-400 dark:text-slate-500 font-bold text-sm">({inProgressOrders.length + refundPendingOrdersCount})</span>
             </h3>
-            <span className="bg-brand-500/10 dark:bg-brand-500/20 text-brand-600 dark:text-brand-400 font-bold text-xs px-2.5 py-0.5 rounded-full">
-              {inProgressOrders.length} Active
-            </span>
+            {/* Status indicators */}
+            <div className="flex gap-3 text-xs font-black text-slate-500 dark:text-slate-400 mt-1">
+              <span className="flex items-center gap-1.5" title="입금대기">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                <span>{pendingPaymentOrdersCount}</span>
+              </span>
+              <span className="flex items-center gap-1.5" title="조리 중">
+                <span className="w-2.5 h-2.5 rounded-full bg-brand-500"></span>
+                <span>{cookingOrdersCount}</span>
+              </span>
+              <span className="flex items-center gap-1.5" title="조리완료">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                <span>{readyOrdersCount}</span>
+              </span>
+              <span className="flex items-center gap-1.5" title="환불대기">
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+                <span>{refundPendingOrdersCount}</span>
+              </span>
+            </div>
           </div>
           <Button 
             variant="outline" 
@@ -232,19 +259,7 @@ export default function Orders() {
                   </div>
                 </div>
 
-                {/* Complete Button Block */}
-                <div className="pt-1 border-t border-dashed border-slate-100 dark:border-slate-800">
-                  <Button
-                    size="sm"
-                    className="w-full bg-rose-600 hover:bg-rose-700 text-white rounded-xl h-8 px-3 font-extrabold text-xs transition-all shadow-sm shadow-rose-600/10"
-                    onClick={(e) => {
-                      e.stopPropagation(); // prevent modal opening
-                      useTableStore.getState().adminRefundOrder({ orderId: order.id });
-                    }}
-                  >
-                    환불 완료 처리
-                  </Button>
-                </div>
+
               </div>
             ))}
 

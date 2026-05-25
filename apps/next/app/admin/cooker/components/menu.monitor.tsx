@@ -88,7 +88,7 @@ export default function MenuMonitor({
           src={menu.image || getMenuFallbackImage(menu.name)}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/40 to-transparent flex items-end p-4">
-          <h2 className="text-lg font-bold text-white tracking-tight drop-shadow-sm truncate">
+          <h2 className="text-xl font-black text-white tracking-tight drop-shadow-sm truncate">
             {menu.name}
           </h2>
         </div>

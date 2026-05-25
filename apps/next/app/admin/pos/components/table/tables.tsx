@@ -24,20 +24,20 @@ export default function Tables() {
       <div className="full p-2 h-full">
         <div className="full bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 shadow-md rounded-3xl flex flex-col overflow-hidden">
           {/* Header Section */}
-          <div className="p-4 bg-slate-50/50 dark:bg-slate-800/30 border-b border-slate-200/60 dark:border-slate-800/60 flex flex-wrap justify-between items-center gap-3 flex-shrink-0">
+          <div className="h-[76px] bg-slate-50/50 dark:bg-slate-800/30 border-b border-slate-200/60 dark:border-slate-800/60 flex justify-between items-center px-4 shrink-0">
             <div className="flex flex-col gap-1">
               <h3 className="font-extrabold text-base text-slate-800 dark:text-white">
                 테이블 현황 <span className="text-slate-400 dark:text-slate-500 font-bold text-sm">({occupiedTableCount}/{activeTables.length})</span>
               </h3>
               {/* Status Indicators from Stitch */}
-              <div className="flex gap-3 text-[10px] font-bold text-slate-500 dark:text-slate-400">
-                <span className="flex items-center gap-1.5">
+              <div className="flex gap-3 text-xs font-black text-slate-500 dark:text-slate-400 mt-1">
+                <span className="flex items-center gap-1.5" title="사용 중 (Occupied)">
                   <span className="w-2.5 h-2.5 rounded-full bg-brand-500"></span>
-                  <span>사용 중 (Occupied)</span>
+                  <span>{occupiedTableCount}</span>
                 </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700"></span>
-                  <span>비어있음 (Available)</span>
+                <span className="flex items-center gap-1.5" title="비어있음 (Available)">
+                  <span className="w-2.5 h-2.5 rounded-full bg-slate-200 dark:bg-slate-850 border border-slate-300 dark:border-slate-750"></span>
+                  <span>{activeTables.length - occupiedTableCount}</span>
                 </span>
               </div>
             </div>

@@ -40,10 +40,14 @@ export default function OrderInstance({
     borderClass = "border-l-4 border-l-rose-500 dark:border-l-rose-500";
     badgeClass = "bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 border-rose-100 dark:border-rose-900/30";
     hoverClass = "hover:border-rose-400/50 dark:hover:border-rose-500/30 hover:shadow-[0_8px_20px_rgba(244,63,94,0.08)]";
-  } else if (statusLabel.includes("입금 대기") || statusLabel.includes("확인 필요") || statusLabel.includes("조리 중") || statusLabel.includes("조리 대기")) {
+  } else if (statusLabel.includes("입금 대기") || statusLabel.includes("확인 필요")) {
     borderClass = "border-l-4 border-l-amber-500 dark:border-l-amber-500";
     badgeClass = "bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-900/30";
     hoverClass = "hover:border-amber-400/50 dark:hover:border-amber-500/30 hover:shadow-[0_8px_20px_rgba(245,158,11,0.08)]";
+  } else if (statusLabel.includes("조리 중") || statusLabel.includes("조리 대기")) {
+    borderClass = "border-l-4 border-l-brand-500 dark:border-l-brand-500";
+    badgeClass = "bg-brand-50 dark:bg-brand-950/20 text-brand-600 dark:text-brand-400 border-brand-100 dark:border-brand-900/30";
+    hoverClass = "hover:border-brand-400/50 dark:hover:border-brand-500/30 hover:shadow-[0_8px_20px_rgba(99,102,241,0.08)]";
   } else if (statusLabel.includes("조리 완료") || statusLabel.includes("준비 완료") || statusLabel.includes("수령 완료") || statusLabel.includes("결제 완료")) {
     borderClass = "border-l-4 border-l-emerald-500 dark:border-l-emerald-500";
     badgeClass = "bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/30";
@@ -57,7 +61,7 @@ export default function OrderInstance({
     >
       <div className="flex justify-between items-start gap-2">
         <div className="fc min-w-0 flex-1">
-          <span className="font-extrabold text-base text-slate-800 dark:text-slate-100 group-hover:text-brand-500 dark:group-hover:text-brand-400 transition-colors truncate block">
+          <span className="font-black text-lg text-slate-800 dark:text-slate-100 group-hover:text-brand-500 dark:group-hover:text-brand-400 transition-colors truncate block">
             {table?.name ?? "테이블"}
           </span>
           <span className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-0.5 truncate">
@@ -84,7 +88,7 @@ export default function OrderInstance({
                 <span className="scale-90 opacity-80">{getMenuOrderStatusIcon(menuOrder, order)}</span>
                 <span className="truncate max-w-[140px]">{menu?.name}</span>
               </span>
-              <span className="text-slate-400 dark:text-slate-500 font-extrabold">x{menuOrder.quantity}</span>
+              <span className="text-slate-800 dark:text-slate-200 font-black">x{menuOrder.quantity}</span>
             </div>
           );
         })}

@@ -57,17 +57,17 @@ export default function MenuInstance({
       <div className="absolute top-0 left-0 w-full h-[3px] bg-brand-500 scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
 
       <div className="flex justify-between items-start gap-2">
-        <div className="flex flex-col min-w-0 flex-1">
-          <h3 className="text-base font-bold text-slate-800 dark:text-slate-200 tracking-tight group-hover:text-brand-500 transition-colors truncate w-full max-w-full block">
+        <div className="flex flex-col min-w-0 flex-1 justify-center">
+          <h3 className="text-lg font-black text-slate-800 dark:text-slate-200 tracking-tight group-hover:text-brand-500 transition-colors truncate w-full max-w-full block">
             {order.tableName}
           </h3>
-          <span className={`text-sm mt-0.5 ${timerClass} truncate block w-full`}>
+          <span className={`text-base mt-1 ${timerClass} truncate block w-full`}>
             {formattedTime}
           </span>
         </div>
 
         {/* Quantity display */}
-        <span className="text-brand-500 dark:text-brand-400 text-2xl font-black tracking-tight self-center">
+        <span className="text-brand-500 dark:text-brand-400 text-3xl font-black tracking-tight self-center">
           x{order.quantity}
         </span>
       </div>

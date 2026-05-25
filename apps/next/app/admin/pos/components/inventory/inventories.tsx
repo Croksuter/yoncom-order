@@ -16,14 +16,45 @@ export default function Inventories() {
   const [createMenuModalOpen, setCreateMenuModalOpen] = useState(false);
   const [removeMenuModalOpen, setRemoveMenuModalOpen] = useState(false);
 
+  const activeMenus = menus.filter((menu) => menu?.deletedAt === null);
+
+  const dangerCount = activeMenus.filter(
+    (menu) => menu.quantity === 0 || menu.available === false
+  ).length;
+
+  const cautionCount = activeMenus.filter(
+    (menu) => menu.quantity <= 15 && menu.quantity > 0 && menu.available !== false
+  ).length;
+
+  const goodCount = activeMenus.filter(
+    (menu) => menu.quantity > 15 && menu.available !== false
+  ).length;
+
   return (
     <div className="full p-2 h-full">
       <div className="full bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 shadow-md rounded-3xl flex flex-col overflow-hidden">
         {/* Header Block */}
-        <div className="p-4 bg-slate-50/50 dark:bg-slate-800/30 border-b border-slate-200/60 dark:border-slate-800/60 flex justify-between items-center flex-shrink-0">
-          <h3 className="font-extrabold text-base text-slate-800 dark:text-white">
-            재고 현황
-          </h3>
+        <div className="h-[76px] bg-slate-50/50 dark:bg-slate-800/30 border-b border-slate-200/60 dark:border-slate-800/60 flex justify-between items-center px-4 shrink-0">
+          <div className="flex flex-col gap-1">
+            <h3 className="font-extrabold text-base text-slate-800 dark:text-white leading-none">
+              재고 현황
+            </h3>
+            {/* Status indicators */}
+            <div className="flex gap-3 text-xs font-black text-slate-500 dark:text-slate-400 mt-1">
+              <span className="flex items-center gap-1.5" title="좋음">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                <span>{goodCount}</span>
+              </span>
+              <span className="flex items-center gap-1.5" title="주의">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                <span>{cautionCount}</span>
+              </span>
+              <span className="flex items-center gap-1.5" title="위험 (품절/비활성화)">
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+                <span>{dangerCount}</span>
+              </span>
+            </div>
+          </div>
           <div className="flex gap-2">
             <Button
               size="sm"
@@ -87,7 +118,7 @@ export default function Inventories() {
                             ? "text-rose-500 dark:text-rose-400"
                             : isLowStock
                               ? "text-amber-500 dark:text-amber-400 font-extrabold"
-                              : "text-slate-800 dark:text-slate-200"
+                              : "text-emerald-500 dark:text-emerald-400"
                         }`}>
                           {menu.quantity === 0 ? "품절" : menu.quantity}
                         </span>

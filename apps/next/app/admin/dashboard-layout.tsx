@@ -4,6 +4,7 @@ import { useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import useTableStore from "~/stores/table.store";
+import useMenuStore from "~/stores/menu.store";
 import { 
   Package, 
   LayoutDashboard, 
@@ -19,17 +20,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname();
 
   const { tables, bankTransactions } = useTableStore();
+  const { menus } = useMenuStore();
   const tablesList = tables ?? [];
   const bankTransactionsList = bankTransactions ?? [];
 
-  // 1. 누적 매출 (PAID 상태의 결제 금액 합산)
+  // 1. 누적 매출 (PAID 상태의 결제 금액 합산 - 정가 기준)
   const confirmedOrders = tablesList
     .filter((table) => table.tableContexts?.[0]?.deletedAt === null)
     .flatMap((table) => table.tableContexts?.[0]?.orders ?? [])
     .filter((order) => order.payment?.status === "PAID");
 
   const totalRevenue = confirmedOrders.reduce((acc, order) => {
-    return acc + (order.payment?.expectedTransferAmount ?? order.payment?.amount ?? 0);
+    const originalOrderPrice = order.menuOrders.reduce((sum, menuOrder) => {
+      const menu = menus.find((m) => m.id === menuOrder.menuId);
+      return sum + (menu?.price ?? 0) * menuOrder.quantity;
+    }, 0);
+    return acc + originalOrderPrice;
   }, 0);
 
   // 2. 입금 대기 건수
