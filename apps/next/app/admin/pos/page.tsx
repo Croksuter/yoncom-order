@@ -15,7 +15,8 @@ import {
   Grid3X3, 
   BarChart3, 
   UtensilsCrossed, 
-  AlertCircle 
+  AlertCircle,
+  ChefHat
 } from "lucide-react";
 
 export default function AdminPosPage() {
@@ -80,11 +81,20 @@ export default function AdminPosPage() {
             {/* Sidebar Navigation */}
             <nav className="flex flex-col gap-1.5">
               <a 
-                href="#" 
+                href="/admin/pos" 
                 className="flex items-center gap-3.5 px-4 py-3 bg-brand-50 dark:bg-brand-950/20 text-brand-600 dark:text-brand-400 font-bold rounded-2xl border border-brand-100 dark:border-brand-900/30 transition-all duration-200"
               >
                 <LayoutDashboard className="h-5 w-5 flex-shrink-0" />
                 {!isSidebarCollapsed && <span className="text-sm truncate">Dashboard</span>}
+              </a>
+
+              {/* Real Kitchen Tab */}
+              <a 
+                href="/admin/cooker" 
+                className="flex items-center gap-3.5 px-4 py-3 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-800 dark:hover:text-slate-200 font-medium rounded-2xl transition-all duration-200"
+              >
+                <ChefHat className="h-5 w-5 flex-shrink-0" />
+                {!isSidebarCollapsed && <span className="text-sm truncate">Kitchen</span>}
               </a>
 
               {[
