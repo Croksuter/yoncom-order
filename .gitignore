@@ -15,3 +15,6 @@ wrangler.toml
 .idea
 .env
 .env.local
+
+next.env.d.ts
+*.log
