@@ -104,6 +104,7 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
   const [tableAccessDescription, setTableAccessDescription] = useState<string | null>(null);
   const [tableAccessState, setTableAccessState] = useState<TableAccessState>("UNKNOWN");
   const [activeTab, setActiveTab] = useState<"menu" | "orders">("menu");
+  const [scrollY, setScrollY] = useState(0);
   const isValidTableId = id.length === 15;
   const activeUnpaidOrder = clientTable?.tableContexts[0]?.orders.find(isPaymentInstructionOrder);
   const [isVerified, setIsVerified] = useState(false);
@@ -120,6 +121,25 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
     });
     setActiveTab(tab);
   }, [activeTab]);
+
+  useEffect(() => {
+    setScrollY(0);
+  }, [activeTab]);
+
+  useEffect(() => {
+    const handleScroll = (e: Event) => {
+      const target = e.target as HTMLElement;
+      if (target && typeof target.scrollTop === "number") {
+        if (target.classList.contains("overflow-y-auto")) {
+          setScrollY(target.scrollTop);
+        }
+      }
+    };
+    window.addEventListener("scroll", handleScroll, true);
+    return () => {
+      window.removeEventListener("scroll", handleScroll, true);
+    };
+  }, []);
 
   const refreshClientTable = useCallback(async () => {
     if (isValidTableId) {
@@ -310,8 +330,13 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
           <OrderPaymentPanel order={activeUnpaidOrder} />
         ) : (
           <>
-            <Header />
-            <div className="w-full max-w-[600px] flex-1 overflow-hidden px-4 fc relative pt-16">
+            <Header scrollY={scrollY} />
+            <div
+              className="w-full max-w-[600px] flex-1 overflow-hidden px-4 fc relative transition-all duration-75 ease-out"
+              style={{
+                paddingTop: `${Math.max(60, 196 - scrollY)}px`
+              }}
+            >
               {activeTab === "menu" || tableAccessState === "INACTIVE" ? (
                 <div className="flex-1 fc overflow-hidden w-full">
                   <ShopIntro tableName={clientTable.name} tableSeats={clientTable.seats} />
