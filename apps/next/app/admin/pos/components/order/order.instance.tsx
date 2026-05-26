@@ -84,11 +84,11 @@ export default function OrderInstance({
               key={menuOrder.menuId}
               className="flex justify-between items-center text-sm font-semibold text-slate-650 dark:text-slate-350"
             >
-              <span className="flex items-center gap-1.5">
-                <span className="scale-90 opacity-80">{getMenuOrderStatusIcon(menuOrder, order)}</span>
-                <span className="truncate max-w-[140px]">{menu?.name}</span>
+              <span className="flex min-w-0 flex-1 items-center gap-1.5 pr-2">
+                <span className="scale-90 opacity-80 flex-shrink-0">{getMenuOrderStatusIcon(menuOrder, order)}</span>
+                <span className="min-w-0 flex-1 truncate">{menu?.name}</span>
               </span>
-              <span className="text-slate-800 dark:text-slate-200 font-black">x{menuOrder.quantity}</span>
+              <span className="flex-shrink-0 text-slate-800 dark:text-slate-200 font-black">x{menuOrder.quantity}</span>
             </div>
           );
         })}
@@ -96,4 +96,3 @@ export default function OrderInstance({
     </div>
   );
 }
-

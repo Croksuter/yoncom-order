@@ -77,9 +77,9 @@ export default function TableInstance({
                   key={menuOrder.id}
                   className="flex justify-between items-center text-xs font-semibold text-slate-650 dark:text-slate-100"
                 >
-                  <span className="flex items-center gap-1 truncate max-w-[100px]">
+                  <span className="flex min-w-0 flex-1 items-center gap-1 pr-1">
                     <span className="scale-75 opacity-70 flex-shrink-0">{getMenuOrderStatusIcon(menuOrder, order)}</span>
-                    <span className="truncate">{menuId2menu(menuOrder.menuId)?.name}</span>
+                    <span className="min-w-0 flex-1 truncate">{menuId2menu(menuOrder.menuId)?.name}</span>
                   </span>
                   <span className="text-slate-400 dark:text-white font-extrabold flex-shrink-0">x{menuOrder.quantity}</span>
                 </div>
