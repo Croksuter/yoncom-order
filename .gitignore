@@ -18,3 +18,15 @@ wrangler.toml
 
 next.env.d.ts
 *.log
+
+__pycache__
+*.py[cod]
+.pytest_cache
+.venv
+apps/*/.state
+apps/*/.env
+apps/*/.env.local
+apps/*/.logs
+apps/*/.chrome-profile
+apps/kb-bank-webhook/fetch.override.js
+apps/kb-bank-webhook/apps

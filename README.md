@@ -5,6 +5,7 @@ Next.js 기반 대학 축제 부스 운영용 주문/POS 시스템입니다. 현
 ## Active Workspace
 
 - `apps/next`: Next.js App Router app, API routes, UI, tests, and dummy seed script.
+- `apps/kb-bank-webhook`: standalone Python Selenium DOM watcher that reuses a manually logged-in KB browser screen and posts parsed deposit rows to the Yoncom deposit route.
 - `packages/db`: Drizzle schema and migrations.
 - `packages/shared`: shared request/response contracts used by the Next app.
 
@@ -14,6 +15,7 @@ Next.js 기반 대학 축제 부스 운영용 주문/POS 시스템입니다. 현
 - Admin operators use `/admin/pos` for orders, tables, inventory, deposit matching, pickup, and refund handling.
 - Kitchen operators use `/admin/cooker` for paid pending menu orders.
 - Payments use per-order `paymentCode` leases and `expectedTransferAmount = originalAmount - paymentCode`.
+- Bank deposit ingestion can be driven by the standalone `apps/kb-bank-webhook` bridge, which clicks the KB query screen, parses deposit rows from the DOM, and posts parsed deposits to `/api/admin/deposit`.
 - Menu and category records keep Korean `name`/`description` plus optional English `nameEn`/`descriptionEn`; the client table supports runtime Korean/English switching through `useTranslation` and `language.store`.
 
 ## Start Project

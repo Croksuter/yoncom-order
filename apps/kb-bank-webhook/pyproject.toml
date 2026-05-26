@@ -1,0 +1,9 @@
+[project]
+name = "kb-bank-webhook"
+version = "0.2.0"
+description = "Selenium DOM watcher for KB Bank deposits"
+requires-python = ">=3.11"
+dependencies = [
+  "requests>=2.32.0",
+  "selenium>=4.21.0"
+]
