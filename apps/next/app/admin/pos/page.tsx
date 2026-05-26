@@ -36,7 +36,7 @@ export default function AdminPosPage() {
         isInventoriesOpen ? "lg:w-1/2" : "lg:w-3/4"
       }`}>
         <div className="w-full h-full relative">
-          <Tables />
+          <Tables isInventoriesOpen={isInventoriesOpen} />
           
           {/* 재고 현황 토글 버튼 (PC 환경 우측 하단 고정) */}
           <button

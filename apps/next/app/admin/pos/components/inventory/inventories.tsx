@@ -58,7 +58,7 @@ export default function Inventories() {
           <div className="flex items-center gap-2 w-full">
             <Button
               size="sm"
-              className="bg-white hover:bg-slate-50 text-slate-700 dark:bg-slate-900 dark:text-slate-350 dark:hover:bg-slate-850 border border-slate-200 dark:border-slate-800 font-bold text-xs h-8 px-4 flex-1 rounded-xl shadow-sm transition-all"
+              className="bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs h-8 px-4 flex-1 rounded-xl shadow-sm shadow-brand-500/10 transition-all border-none"
               onClick={() => setMenuManageModalOpen(true)}
             >
               메뉴 추가/제거

@@ -138,14 +138,14 @@ export default function MenuManageModal({
         <DialogHeader className="w-full">
           <div className="flex justify-between items-center mr-6">
             <DialogTitle className="text-xl font-black text-slate-800 dark:text-slate-100">메뉴 관리</DialogTitle>
-            
+
             {/* Custom Premium Segmented Tab Selector */}
             <div className="bg-slate-100/80 dark:bg-slate-800/60 p-0.5 rounded-lg flex border border-slate-200/20 dark:border-slate-800/40">
               <button
                 type="button"
                 className={`flex items-center gap-1 px-3 py-1 text-xs font-bold rounded-md transition-all ${
                   activeTab === "create"
-                    ? "bg-white dark:bg-slate-900 text-slate-850 dark:text-white shadow-sm"
+                    ? "bg-white dark:bg-slate-900 text-brand-500 shadow-sm"
                     : "text-slate-400 dark:text-slate-500 hover:text-slate-650"
                 }`}
                 onClick={() => setActiveTab("create")}
@@ -170,8 +170,8 @@ export default function MenuManageModal({
             </div>
           </div>
           <DialogDescription className="text-xs text-slate-400 dark:text-slate-500 font-semibold mt-1">
-            {activeTab === "create" 
-              ? "매장에서 신규 판매할 신규 메뉴와 기본 가격, 재고 정보를 입력합니다." 
+            {activeTab === "create"
+              ? "매장에서 신규 판매할 신규 메뉴와 기본 가격, 재고 정보를 입력합니다."
               : "안전하게 비활성화된 메뉴를 목록에서 영구적으로 제거합니다."}
           </DialogDescription>
         </DialogHeader>
@@ -266,7 +266,7 @@ export default function MenuManageModal({
             {/* Right Column (Image upload) */}
             <div className="col-span-1 flex flex-col gap-3">
               <label className="text-xs uppercase font-bold text-slate-450 dark:text-slate-500 px-0.5">메뉴 이미지</label>
-              
+
               <div className="w-full aspect-square border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden bg-slate-50/60 dark:bg-slate-900/40 flex items-center justify-center relative group shadow-inner">
                 {menuImage ? (
                   <>
@@ -316,7 +316,7 @@ export default function MenuManageModal({
                   )}
                 </div>
               </div>
-              
+
               <p className="text-xs text-slate-400 dark:text-slate-500 font-medium text-center mt-1 leading-normal">
                 JPG, PNG, GIF 파일 가능 (최대 5MB)
               </p>
@@ -364,16 +364,16 @@ export default function MenuManageModal({
 
         {/* Footer Actions */}
         <DialogFooter className="border-t border-slate-100 dark:border-slate-850 pt-4 flex gap-2">
-          <Button 
-            onClick={handleClose} 
-            variant="outline" 
+          <Button
+            onClick={handleClose}
+            variant="outline"
             disabled={isBusy}
             className="border-slate-200 dark:border-slate-800 rounded-xl font-bold text-sm px-5 h-10 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-850"
           >
             취소
           </Button>
-          <Button 
-            onClick={handleConfirm} 
+          <Button
+            onClick={handleConfirm}
             disabled={isBusy || (activeTab === "remove" && deletableMenus.length === 0)}
             className={`font-bold text-sm px-6 h-10 transition-all shadow-sm border-none text-white ${
               activeTab === "create"
@@ -381,10 +381,10 @@ export default function MenuManageModal({
                 : "bg-rose-500 hover:bg-rose-600 shadow-rose-500/10"
             }`}
           >
-            {duringConfirm 
-              ? "처리 중..." 
-              : activeTab === "create" 
-                ? "확인 및 추가" 
+            {duringConfirm
+              ? "처리 중..."
+              : activeTab === "create"
+                ? "확인 및 추가"
                 : "확인 및 제거"}
           </Button>
         </DialogFooter>

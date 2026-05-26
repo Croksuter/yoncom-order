@@ -8,9 +8,7 @@ import CreateTableModal from "./table.create.modal";
 import UpdateTableModal from "./table.update.modal";
 import RemoveTableModal from "./table.remove.modal";
 import { Skeleton } from "~/components/ui/skeleton";
-const [min, sqrt, ceil] = [Math.min, Math.sqrt, Math.ceil];
-
-export default function Tables() {
+export default function Tables({ isInventoriesOpen = true }: { isInventoriesOpen?: boolean }) {
   const [createTableModalOpen, setCreateTableModalOpen] = useState(false);
   const [updateTableModalOpen, setUpdateTableModalOpen] = useState(false);
   const [removeTableModalOpen, setRemoveTableModalOpen] = useState(false);
@@ -65,7 +63,7 @@ export default function Tables() {
           {(isLoaded || tables.length > 0) ? (
             <div className="flex-1 p-4 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
               <div className={"grid gap-4"} style={{
-                gridTemplateColumns: `repeat(${min(ceil(sqrt(activeTables.length)), 4)}, minmax(0, 1fr))`,
+                gridTemplateColumns: `repeat(${isInventoriesOpen ? 3 : 4}, minmax(0, 1fr))`,
               }}>
                 {activeTables
                   .sort((a, b) => a.name.localeCompare(b.name))

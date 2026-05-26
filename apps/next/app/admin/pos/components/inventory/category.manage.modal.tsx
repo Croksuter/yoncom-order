@@ -98,14 +98,14 @@ export default function CategoryManageModal({
         <DialogHeader className="w-full">
           <div className="flex justify-between items-center mr-6">
             <DialogTitle className="text-xl font-black text-slate-800 dark:text-slate-100">카테고리 관리</DialogTitle>
-            
+
             {/* Custom Segmented Tab Selector */}
             <div className="bg-slate-100/80 dark:bg-slate-800/60 p-0.5 rounded-lg flex border border-slate-200/20 dark:border-slate-800/40">
               <button
                 type="button"
                 className={`flex items-center gap-1 px-3 py-1 text-xs font-bold rounded-md transition-all ${
                   activeTab === "create"
-                    ? "bg-white dark:bg-slate-900 text-slate-850 dark:text-white shadow-sm"
+                    ? "bg-white dark:bg-slate-900 text-brand-500 shadow-sm"
                     : "text-slate-400 dark:text-slate-500 hover:text-slate-650"
                 }`}
                 onClick={() => setActiveTab("create")}
@@ -130,8 +130,8 @@ export default function CategoryManageModal({
             </div>
           </div>
           <DialogDescription className="text-xs text-slate-400 dark:text-slate-500 font-semibold mt-1">
-            {activeTab === "create" 
-              ? "새로운 메뉴들을 분류할 카테고리 명칭을 등록합니다." 
+            {activeTab === "create"
+              ? "새로운 메뉴들을 분류할 카테고리 명칭을 등록합니다."
               : "내부에 속해있는 메뉴가 없는 비어있는 카테고리를 영구 제거합니다."}
           </DialogDescription>
         </DialogHeader>
@@ -169,9 +169,9 @@ export default function CategoryManageModal({
                       const menuCount = getMenuCount(category.id);
                       const hasMenus = menuCount > 0;
                       return (
-                        <SelectItem 
-                          key={category.id} 
-                          value={category.id} 
+                        <SelectItem
+                          key={category.id}
+                          value={category.id}
                           disabled={hasMenus}
                           className="font-semibold text-slate-700 dark:text-slate-350 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                         >
@@ -203,16 +203,16 @@ export default function CategoryManageModal({
 
         {/* Footer Actions */}
         <DialogFooter className="border-t border-slate-100 dark:border-slate-850 pt-4 flex gap-2">
-          <Button 
-            onClick={handleClose} 
-            variant="outline" 
+          <Button
+            onClick={handleClose}
+            variant="outline"
             disabled={isBusy}
             className="border-slate-200 dark:border-slate-800 rounded-xl font-bold text-sm px-5 h-10 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-850"
           >
             취소
           </Button>
-          <Button 
-            onClick={handleConfirm} 
+          <Button
+            onClick={handleConfirm}
             disabled={isBusy || (activeTab === "remove" && (removeCategoryId.length === 0 || getMenuCount(removeCategoryId) > 0))}
             className={`font-bold text-sm px-6 h-10 transition-all shadow-sm border-none text-white ${
               activeTab === "create"
@@ -220,10 +220,10 @@ export default function CategoryManageModal({
                 : "bg-rose-500 hover:bg-rose-600 shadow-rose-500/10"
             }`}
           >
-            {duringConfirm 
-              ? "처리 중..." 
-              : activeTab === "create" 
-                ? "확인 및 추가" 
+            {duringConfirm
+              ? "처리 중..."
+              : activeTab === "create"
+                ? "확인 및 추가"
                 : "확인 및 제거"}
           </Button>
         </DialogFooter>
