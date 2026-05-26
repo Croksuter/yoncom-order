@@ -1,10 +1,18 @@
 .git
 .github
+.code-review-graph
+**/.code-review-graph
 .next
 **/.next
 node_modules
 **/node_modules
 .pnpm-store
+.venv
+**/.venv
+__pycache__
+**/__pycache__
+.pytest_cache
+**/.pytest_cache
 
 .env
 .env.*
@@ -27,6 +35,12 @@ coverage
 test-results
 playwright-report
 **/*.tsbuildinfo
+
+apps/kb-bank-webhook
+apps/next/scripts
+apps/next/test
+docs
+workers
 
 .DS_Store
 *.log
