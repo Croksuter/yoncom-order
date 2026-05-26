@@ -1,5 +1,5 @@
 import { fail, routeError } from "~/lib/server/api";
-import { getImageContentType, readStoredImage } from "~/lib/server/image-storage";
+import { readStoredImage } from "~/lib/server/image-storage";
 
 type ImageRouteContext = {
   params: Promise<{ filename: string }>;
@@ -11,12 +11,12 @@ export async function GET(_request: Request, { params }: ImageRouteContext) {
   const { filename } = await params;
 
   try {
-    const bytes = await readStoredImage(filename);
+    const image = await readStoredImage(filename);
 
-    return new Response(bytes, {
+    return new Response(image.bytes, {
       headers: {
         "cache-control": "public, max-age=31536000, immutable",
-        "content-type": getImageContentType(filename),
+        "content-type": image.contentType,
       },
     });
   } catch (error) {

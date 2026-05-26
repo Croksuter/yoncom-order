@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start --port 3000",
     "seed:dummy": "node scripts/seed-dummy-data.mjs",
+    "migrate:images": "node scripts/migrate-menu-images-to-d1.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
@@ -32,6 +33,7 @@
     "react": "19.2.6",
     "react-dom": "19.2.6",
     "shared": "workspace:*",
+    "sharp": "0.34.5",
     "tailwind-merge": "^3.3.0",
     "zod": "^3.24.4",
     "zustand": "^5.0.4"

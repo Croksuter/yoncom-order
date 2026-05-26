@@ -50,6 +50,13 @@
       "when": 1779814336079,
       "tag": "0006_high_songbird",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1779820603356,
+      "tag": "0007_closed_sage",
+      "breakpoints": true
     }
   ]
 }

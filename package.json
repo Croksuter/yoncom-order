@@ -9,6 +9,7 @@
     "build": "pnpm --filter web-next build",
     "start": "pnpm --filter web-next start",
     "seed:dummy": "pnpm --filter web-next seed:dummy",
+    "migrate:images": "pnpm --filter web-next migrate:images",
     "typecheck": "pnpm --filter web-next typecheck",
     "typecheck:next": "pnpm --filter web-next typecheck",
     "test": "pnpm --filter web-next test",

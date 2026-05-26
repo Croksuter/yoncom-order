@@ -41,7 +41,12 @@ Next.js 기반 대학 축제 부스 운영용 주문/POS 시스템입니다. 현
    pnpm seed:dummy
    ```
 
-5. Run the app
+5. Move existing menu image references into D1 when needed
+   ```bash
+   pnpm migrate:images
+   ```
+
+6. Run the app
    ```bash
    pnpm dev
    ```
@@ -87,8 +92,11 @@ CLOUDFLARE_DATABASE_ID=
 CLOUDFLARE_D1_TOKEN=
 REALTIME_NOTIFY_URL=
 REALTIME_NOTIFY_SECRET=
-YONCOM_IMAGE_UPLOAD_DIR=/app/.data/images
 ```
+
+Uploaded menu images are center-cropped to a square using the shorter original
+side, converted to PNG, and stored in Cloudflare D1, so no container volume or
+image upload directory is required.
 
 Only public, client-bundled values may be provided as build args:
 

@@ -1,7 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import path from "node:path";
+import sharp from "sharp";
 
 type ContractCase = {
   label: string;
@@ -57,44 +55,105 @@ describe("admin image upload contract", () => {
     }));
   });
 
-  it("stores an uploaded image and serves it through /image/[filename]", async () => {
-    const uploadDir = await mkdtemp(path.join(tmpdir(), "yoncom-image-test-"));
-    vi.stubEnv("YONCOM_IMAGE_UPLOAD_DIR", uploadDir);
+  it("stores an uploaded image in D1 and serves it through /image/[filename]", async () => {
+    const storedImages = new Map<string, {
+      contentType: string;
+      chunkCount: number;
+      chunks: { chunkIndex: number; data: string }[];
+    }>();
 
-    try {
-      const formData = new FormData();
-      formData.set("file", new File([new Uint8Array([137, 80, 78, 71])], "menu.png", { type: "image/png" }));
+    vi.doMock("~/lib/server/db", () => ({
+      queryD1Batch: vi.fn(async (statements: Array<{ sql: string; params?: unknown[] }>) => {
+        for (const statement of statements) {
+          const params = statement.params ?? [];
+          if (statement.sql.includes("INSERT INTO uploadedImages")) {
+            storedImages.set(String(params[0]), {
+              contentType: String(params[2]),
+              chunkCount: Number(params[6]),
+              chunks: [],
+            });
+          }
 
-      const { PUT } = await import("~/app/api/admin/image/route");
-      const uploadResponse = await PUT(new Request("http://order.test/api/admin/image", {
-        method: "PUT",
-        headers: {
-          origin: "http://order.test",
-          cookie: "yoncom_csrf=csrf-token",
-          "x-csrf-token": "csrf-token",
-          "idempotency-key": "test-idempotency-key",
-        },
-        body: formData,
-      }));
+          if (statement.sql.includes("INSERT INTO uploadedImageChunks")) {
+            const image = storedImages.get(String(params[0]));
+            image?.chunks.push({
+              chunkIndex: Number(params[1]),
+              data: String(params[2]),
+            });
+          }
+        }
 
-      expect(uploadResponse.status).toBe(200);
-      const uploadBody = await uploadResponse.json();
-      expect(uploadBody.result.filename).toMatch(/^\/image\/.+\.png$/);
+        return statements.map(() => ({
+          success: true,
+          results: [],
+          meta: { changes: 1 },
+        }));
+      }),
+      queryD1: vi.fn(async (sql: string, params: unknown[]) => {
+        const imageId = String(params[0]);
+        const image = storedImages.get(imageId);
+        if (!image) return [];
 
-      const storedFilename = uploadBody.result.filename.replace("/image/", "");
-      await expect(readFile(path.join(uploadDir, storedFilename))).resolves.toEqual(Buffer.from([137, 80, 78, 71]));
+        if (sql.includes("FROM uploadedImages")) {
+          return [{
+            id: imageId,
+            contentType: image.contentType,
+            chunkCount: image.chunkCount,
+          }];
+        }
 
-      const { GET } = await import("~/app/image/[filename]/route");
-      const readResponse = await GET(new Request(`http://order.test/image/${storedFilename}`), {
-        params: Promise.resolve({ filename: storedFilename }),
-      });
+        if (sql.includes("FROM uploadedImageChunks")) {
+          return image.chunks.toSorted((a, b) => a.chunkIndex - b.chunkIndex);
+        }
 
-      expect(readResponse.status).toBe(200);
-      expect(readResponse.headers.get("content-type")).toBe("image/png");
-      expect(Array.from(new Uint8Array(await readResponse.arrayBuffer()))).toEqual([137, 80, 78, 71]);
-    } finally {
-      vi.unstubAllEnvs();
-      await rm(uploadDir, { recursive: true, force: true });
-    }
+        return [];
+      }),
+    }));
+
+    const originalImage = await sharp({
+      create: {
+        width: 8,
+        height: 4,
+        channels: 3,
+        background: "#ff0000",
+      },
+    }).png().toBuffer();
+
+    const formData = new FormData();
+    formData.set("file", new File([originalImage], "menu.png", { type: "image/png" }));
+
+    const { PUT } = await import("~/app/api/admin/image/route");
+    const uploadResponse = await PUT(new Request("http://order.test/api/admin/image", {
+      method: "PUT",
+      headers: {
+        origin: "http://order.test",
+        cookie: "yoncom_csrf=csrf-token",
+        "x-csrf-token": "csrf-token",
+        "idempotency-key": "test-idempotency-key",
+      },
+      body: formData,
+    }));
+
+    expect(uploadResponse.status).toBe(200);
+    const uploadBody = await uploadResponse.json();
+    expect(uploadBody.result.filename).toMatch(/^\/image\/.+\.png$/);
+
+    const storedFilename = uploadBody.result.filename.replace("/image/", "");
+    expect(storedImages.get(storedFilename)).toMatchObject({
+      contentType: "image/png",
+      chunkCount: 1,
+    });
+
+    const { GET } = await import("~/app/image/[filename]/route");
+    const readResponse = await GET(new Request(`http://order.test/image/${storedFilename}`), {
+      params: Promise.resolve({ filename: storedFilename }),
+    });
+
+    expect(readResponse.status).toBe(200);
+    expect(readResponse.headers.get("content-type")).toBe("image/png");
+    const returnedImage = Buffer.from(await readResponse.arrayBuffer());
+    const metadata = await sharp(returnedImage).metadata();
+    expect(metadata.width).toBe(4);
+    expect(metadata.height).toBe(4);
   });
 });

@@ -1,4 +1,4 @@
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { generateId } from "lucia";
 import { relations } from "drizzle-orm";
 
@@ -151,6 +151,37 @@ export const menusRelations = relations(menus, ({ one, many }) => ({
     references: [menuCategories.id],
   }),
 }));
+
+export const uploadedImages = sqliteTable("uploadedImages", {
+  id: text("id").primaryKey().notNull(),
+  originalName: text("originalName").notNull(),
+  contentType: text("contentType").notNull(),
+  extension: text("extension").notNull(),
+  byteSize: integer("byteSize").notNull(),
+  base64Size: integer("base64Size").notNull(),
+  chunkCount: integer("chunkCount").notNull(),
+  createdAt: integer("createdAt")
+    .notNull()
+    .$defaultFn(() => Date.now()),
+});
+
+export type UploadedImage = typeof uploadedImages.$inferSelect;
+
+export const uploadedImageChunks = sqliteTable(
+  "uploadedImageChunks",
+  {
+    imageId: text("imageId")
+      .notNull()
+      .references(() => uploadedImages.id, { onDelete: "cascade" }),
+    chunkIndex: integer("chunkIndex").notNull(),
+    data: text("data").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.imageId, table.chunkIndex] }),
+  ],
+);
+
+export type UploadedImageChunk = typeof uploadedImageChunks.$inferSelect;
 
 export type Menu = typeof menus.$inferSelect;
 

@@ -36,11 +36,9 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
-ENV YONCOM_IMAGE_UPLOAD_DIR=/app/.data/images
 
 RUN addgroup --system --gid 1001 nodejs \
   && adduser --system --uid 1001 nextjs \
-  && mkdir -p /app/.data/images \
   && chown -R nextjs:nodejs /app
 
 COPY --from=builder --chown=nextjs:nodejs /app/apps/next/.next/standalone ./
