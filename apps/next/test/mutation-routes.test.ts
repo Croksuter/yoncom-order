@@ -79,6 +79,14 @@ function handleRealtimeSql(sql: string) {
   return null;
 }
 
+function isTableContextBlockingOrderSql(sql: string) {
+  return sql.startsWith("SELECT o.* FROM orders o LEFT JOIN payments p ON")
+    && sql.includes("o.tableContextId = ?")
+    && sql.includes("COALESCE(o.status")
+    && sql.includes("p.paid = 1")
+    && sql.includes("COALESCE(p.status");
+}
+
 describe("implemented mutation route handlers", () => {
   beforeEach(() => {
     vi.resetModules();
@@ -499,7 +507,7 @@ describe("implemented mutation route handlers", () => {
       if (sql.startsWith("SELECT tc.tableId")) {
         return d1Success([{ tableId: "table_e2e_00001" }]);
       }
-      if (sql === "SELECT * FROM orders WHERE tableContextId = ? AND deletedAt IS NULL LIMIT 1") {
+      if (isTableContextBlockingOrderSql(sql)) {
         return d1Success([]);
       }
       if (sql.startsWith("UPDATE \"tableContexts\"")) {
@@ -638,6 +646,71 @@ describe("implemented mutation route handlers", () => {
     expect(insert?.params).toContain("user_admin0000");
   });
 
+  it("PUT /api/admin/payment-settings stores account guidance and emits table sync events", async () => {
+    const { requests } = installD1FetchMock(({ sql }) => {
+      const realtime = handleRealtimeSql(sql);
+      if (realtime) return realtime;
+      if (sql.includes("CREATE TABLE IF NOT EXISTS paymentSettings")) {
+        return d1Success([], { duration: 1, changes: 0 });
+      }
+      if (sql === "SELECT * FROM paymentSettings WHERE id = ? LIMIT 1") {
+        return d1Success([]);
+      }
+      if (sql.startsWith("INSERT INTO paymentSettings")) {
+        return d1Success([], { duration: 1, changes: 1 });
+      }
+      if (sql === "SELECT id FROM tables WHERE deletedAt IS NULL") {
+        return d1Success([{ id: "table_e2e_00001" }]);
+      }
+      throw new Error(`Unexpected SQL: ${sql}`);
+    });
+
+    const { PUT } = await import("~/app/api/admin/payment-settings/route");
+    const response = await PUT(guardedJsonRequest(
+      "http://order.test/api/admin/payment-settings",
+      "PUT",
+      {
+        paymentSettings: {
+          bankName: "테스트은행",
+          accountNumber: "123-456-7890",
+          accountHolder: "연컴 테스트",
+          tossTransferUrlTemplate: "supertoss://send?amount={amount}&bank={bankName}&accountNo={accountNumber}",
+          depositGuide: "테스트 입금 안내",
+        },
+      },
+    ));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual(expect.objectContaining({
+      result: expect.objectContaining({
+        bankName: "테스트은행",
+        accountNumber: "123-456-7890",
+        accountHolder: "연컴 테스트",
+        depositGuide: "테스트 입금 안내",
+      }),
+      affectedScopes: expect.arrayContaining(["venue:default", "table:table_e2e_00001"]),
+    }));
+
+    const upsert = requests.find((request) => request.sql.startsWith("INSERT INTO paymentSettings"));
+    expect(upsert?.params).toEqual(expect.arrayContaining([
+      "default",
+      "테스트은행",
+      "123-456-7890",
+      "연컴 테스트",
+      "테스트 입금 안내",
+    ]));
+    const domainEventInserts = requests.filter((request) => request.sql.startsWith("INSERT INTO domainEvents"));
+    expect(domainEventInserts).toHaveLength(2);
+    expect(domainEventInserts.map((request) => request.params[3])).toEqual([
+      "paymentSettings.updated",
+      "paymentSettings.updated",
+    ]);
+    expect(domainEventInserts.map((request) => request.params[1])).toEqual(expect.arrayContaining([
+      "venue:default",
+      "table:table_e2e_00001",
+    ]));
+  });
+
   it("admin mutation routes reject requests when requireAdmin fails", async () => {
     vi.resetModules();
     vi.doMock("~/lib/server/auth-session", () => ({
@@ -664,11 +737,11 @@ describe("implemented mutation route handlers", () => {
   });
 
   it("DELETE /api/admin/order keeps a paid cancelled order visible and marks its payment refund pending", async () => {
-    const { requests } = installD1FetchMock(({ sql }) => {
+    const { requests } = installD1FetchMock(({ sql, params }) => {
       const realtime = handleRealtimeSql(sql);
       if (realtime) return realtime;
       if (sql === "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?") {
-        return d1Success([{ name: "paymentCodeLeases" }]);
+        return d1Success(params[0] === "paymentCodeLeases" ? [{ name: params[0] }] : []);
       }
       if (sql === "PRAGMA table_info(\"payments\")") {
         return tableInfo(paymentColumns);
@@ -753,12 +826,18 @@ describe("implemented mutation route handlers", () => {
     expect(orderUpdate?.params).toContain("user_admin0000");
   });
 
-  it("PUT /api/admin/order/refund only completes refund pending payments", async () => {
-    const { requests } = installD1FetchMock(({ sql }) => {
+  it("PUT /api/admin/order/refund completes refund pending payments and vacates an empty table context", async () => {
+    const { requests } = installD1FetchMock(({ sql, params }) => {
       const realtime = handleRealtimeSql(sql);
       if (realtime) return realtime;
+      if (sql === "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?") {
+        return d1Success(params[0] === "tableContexts" ? [{ name: params[0] }] : []);
+      }
       if (sql === "PRAGMA table_info(\"payments\")") {
         return tableInfo(paymentColumns);
+      }
+      if (sql === "PRAGMA table_info(\"tableContexts\")") {
+        return tableInfo(["id", "tableId", "createdAt", "updatedAt", "deletedAt"]);
       }
       if (sql === "SELECT * FROM orders WHERE id = ? AND deletedAt IS NULL LIMIT 1") {
         return d1Success([{
@@ -786,6 +865,12 @@ describe("implemented mutation route handlers", () => {
       if (sql.startsWith("UPDATE \"payments\"")) {
         return d1Success([], { duration: 1, changes: 1 });
       }
+      if (isTableContextBlockingOrderSql(sql)) {
+        return d1Success([]);
+      }
+      if (sql.startsWith("UPDATE \"tableContexts\"")) {
+        return d1Success([], { duration: 1, changes: 1 });
+      }
       throw new Error(`Unexpected SQL: ${sql}`);
     });
 
@@ -803,5 +888,7 @@ describe("implemented mutation route handlers", () => {
     expect(paymentUpdate?.params).toContain("REFUNDED");
     expect(paymentUpdate?.params).toContain("user_admin0000");
     expect(paymentUpdate?.params).toContain("계좌 환불 완료");
+    const tableContextUpdate = requests.find((request) => request.sql.startsWith("UPDATE \"tableContexts\""));
+    expect(tableContextUpdate?.params[2]).toBe("ctx_12345678901");
   });
 });

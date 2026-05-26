@@ -17,6 +17,7 @@ import { useRealtimeSync } from "~/hooks/use-realtime-sync";
 import { useTranslation } from "~/hooks/use-translation";
 import { api } from "~/lib/query";
 import type * as ClientTableResponse from "shared/types/responses/client/table";
+import type * as AdminPaymentSettingsResponse from "shared/types/responses/admin/payment-settings";
 import { traceEvent } from "~/lib/verification-trace";
 import kyErrorHandler from "~/lib/ky-error-handler";
 
@@ -30,6 +31,7 @@ type TableSyncResponse = {
     events: unknown[];
     snapshot: {
       table: ClientTableResponse.Get["result"];
+      paymentSettings: AdminPaymentSettingsResponse.Get["result"];
     } | null;
     gap: boolean;
   };
@@ -42,6 +44,7 @@ type TableSessionResponse = {
     tableId: string;
     tableContextId: string | null;
     expiresAt: number | null;
+    paymentSettings: AdminPaymentSettingsResponse.Get["result"];
   };
 };
 
@@ -172,6 +175,7 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
         setTableAccessMessage(null);
         useTableStore.setState({
           clientTable: normalizeClientTable(response.result.snapshot.table),
+          paymentSettings: response.result.snapshot.paymentSettings,
           isLoaded: true,
           error: false,
         });
@@ -249,6 +253,7 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
               ...session.result.table,
               tableContexts: [],
             },
+            paymentSettings: session.result.paymentSettings,
             isLoaded: true,
             error: false,
           });
@@ -256,6 +261,7 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
         }
 
         setTableAccessState("RESUMED");
+        useTableStore.setState({ paymentSettings: session.result.paymentSettings });
         revisionRef.current = 0;
         await syncClientTable(0);
       } catch (error) {

@@ -11,11 +11,14 @@ import * as AdminOrderRequest from "shared/types/requests/admin/order";
 import * as AdminOrderResponse from "shared/types/responses/admin/order";
 import * as AdminDepositRequest from "shared/types/requests/admin/deposit";
 import * as AdminDepositResponse from "shared/types/responses/admin/deposit";
+import * as AdminPaymentSettingsRequest from "shared/types/requests/admin/payment-settings";
+import * as AdminPaymentSettingsResponse from "shared/types/responses/admin/payment-settings";
 
 type TableState = {
   clientTable: ClientTableResponse.Get["result"] | null;
   tables: AdminTableResponse.Get["result"];
   bankTransactions: AdminDepositResponse.Get["result"]["transactions"];
+  paymentSettings: AdminPaymentSettingsResponse.Get["result"] | null;
   isLoaded: boolean;
   error: boolean;
 
@@ -29,6 +32,7 @@ type TableState = {
       tableId: string;
       tableContextId: string | null;
       expiresAt: number | null;
+      paymentSettings: AdminPaymentSettingsResponse.Get["result"];
     };
   } | null>;
 
@@ -48,6 +52,8 @@ type TableState = {
   adminPayOrder: (query: AdminOrderRequest.PaidOrder) => Promise<AdminOrderResponse.Paid | null>;
   adminRefundOrder: (query: AdminOrderRequest.RefundOrder) => Promise<AdminOrderResponse.Refund | null>;
   loadBankTransactions: () => Promise<AdminDepositResponse.Get | null>;
+  loadPaymentSettings: () => Promise<AdminPaymentSettingsResponse.Get | null>;
+  updatePaymentSettings: (query: AdminPaymentSettingsRequest.Update) => Promise<AdminPaymentSettingsResponse.Update | null>;
   adminConfirmBankTransaction: (query: AdminDepositRequest.Confirm) => Promise<AdminDepositResponse.Confirm | null>;
   adminIgnoreBankTransaction: (query: AdminDepositRequest.Ignore) => Promise<AdminDepositResponse.Ignore | null>;
 
@@ -62,6 +68,7 @@ const useTableStore = create<TableState>((set, get) => ({
   clientTable: null,
   tables: [],
   bankTransactions: [],
+  paymentSettings: null,
   isLoaded: false,
   error: false,
 
@@ -89,6 +96,7 @@ const useTableStore = create<TableState>((set, get) => ({
         tableId: string;
         tableContextId: string | null;
         expiresAt: number | null;
+        paymentSettings: AdminPaymentSettingsResponse.Get["result"];
       };
     }
   >({
@@ -185,7 +193,7 @@ const useTableStore = create<TableState>((set, get) => ({
           ...tableContext,
           orders: tableContext.orders.sort((a, b) => b.createdAt - a.createdAt),
         })),
-    }}),
+    }, paymentSettings: res.result.paymentSettings ?? get().paymentSettings }),
   }),
 
   clientCancelOrder: async (query: ClientOrderRequest.Remove) => await queryStore<ClientOrderRequest.Remove, ClientOrderResponse.Remove>({
@@ -304,6 +312,31 @@ const useTableStore = create<TableState>((set, get) => ({
     method: "get",
     query: {},
     onSuccess: (res) => set({ bankTransactions: res.result.transactions }),
+  }),
+
+  loadPaymentSettings: async () => await queryStore<{}, AdminPaymentSettingsResponse.Get>({
+    route: "admin/payment-settings",
+    method: "get",
+    query: {},
+    onSuccess: (res) => set({ paymentSettings: res.result }),
+  }),
+
+  updatePaymentSettings: async (query: AdminPaymentSettingsRequest.Update) => await queryStore<
+    AdminPaymentSettingsRequest.Update,
+    AdminPaymentSettingsResponse.Update
+  >({
+    route: "admin/payment-settings",
+    method: "put",
+    query,
+    setter: set,
+    onSuccess: (res) => {
+      set({ paymentSettings: res.result });
+      toast({
+        title: "입금 안내 수정 완료",
+        description: "계좌 정보와 송금 안내가 실시간으로 반영됩니다.",
+        duration: 3000,
+      });
+    },
   }),
 
   adminConfirmBankTransaction: async (query: AdminDepositRequest.Confirm) => await queryStore<AdminDepositRequest.Confirm, AdminDepositResponse.Confirm>({

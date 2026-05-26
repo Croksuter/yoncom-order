@@ -1,6 +1,8 @@
 import { generateId } from "lucia";
 import { bankTransactionStatus, menuOrderStatus, orderStatus, paymentStatus } from "db/schema";
+import type { PaymentSettings } from "db/schema";
 import { executeD1, hasD1Table, queryD1 } from "~/lib/server/db";
+import { defaultPaymentSettings, normalizePaymentSettings } from "~/lib/payment-settings";
 import { revokeTableSessions } from "~/lib/server/table-session";
 import { appendDomainEvent, tableScope, venueScope, type DomainEventRecord } from "~/lib/server/sync-events";
 
@@ -109,6 +111,11 @@ type BankTransactionInput = {
   dedupeKey?: string;
 };
 
+type PaymentSettingsInput = Pick<
+  PaymentSettings,
+  "bankName" | "accountNumber" | "accountHolder" | "tossTransferUrlTemplate" | "depositGuide"
+>;
+
 const paymentCodeMin = 1;
 const paymentCodeMax = 99;
 const pendingOrderTtlMs = 5 * 60 * 1000;
@@ -117,6 +124,7 @@ const activePaymentStatuses = [paymentStatus.PENDING, paymentStatus.MANUAL_REVIE
 let tableContextTableName: string | null = null;
 const columnCache = new Map<string, Set<string>>();
 let defaultUserId: string | null | undefined;
+let paymentSettingsTableEnsured = false;
 
 export function quoteIdentifier(identifier: string) {
   return `"${identifier.replaceAll("\"", "\"\"")}"`;
@@ -257,6 +265,90 @@ async function withDomainEvent(
   };
 }
 
+async function ensurePaymentSettingsTable() {
+  if (paymentSettingsTableEnsured) {
+    return;
+  }
+
+  await executeD1(`
+    CREATE TABLE IF NOT EXISTS paymentSettings (
+      id TEXT PRIMARY KEY NOT NULL,
+      bankName TEXT NOT NULL,
+      accountNumber TEXT NOT NULL,
+      accountHolder TEXT NOT NULL,
+      tossTransferUrlTemplate TEXT NOT NULL,
+      depositGuide TEXT NOT NULL,
+      createdAt INTEGER NOT NULL,
+      updatedAt INTEGER NOT NULL
+    )
+  `);
+  paymentSettingsTableEnsured = true;
+}
+
+async function getPaymentSettingsScopes() {
+  const tables = await queryD1<{ id: string }>(
+    "SELECT id FROM tables WHERE deletedAt IS NULL",
+  );
+  return [venueScope, ...tables.map((table) => tableScope(table.id))];
+}
+
+export async function getPaymentSettings() {
+  await ensurePaymentSettingsTable();
+  const [settings] = await queryD1<PaymentSettings>(
+    "SELECT * FROM paymentSettings WHERE id = ? LIMIT 1",
+    [defaultPaymentSettings.id],
+  );
+
+  return normalizePaymentSettings(settings);
+}
+
+export async function updatePaymentSettings(input: PaymentSettingsInput): Promise<MutationResult> {
+  await ensurePaymentSettingsTable();
+
+  const current = await getPaymentSettings();
+  const timestamp = now();
+  const settings = normalizePaymentSettings({
+    ...current,
+    ...input,
+    createdAt: current.createdAt || timestamp,
+    updatedAt: timestamp,
+  });
+
+  await executeD1(
+    `INSERT INTO paymentSettings
+      (id, bankName, accountNumber, accountHolder, tossTransferUrlTemplate, depositGuide, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET
+      bankName = excluded.bankName,
+      accountNumber = excluded.accountNumber,
+      accountHolder = excluded.accountHolder,
+      tossTransferUrlTemplate = excluded.tossTransferUrlTemplate,
+      depositGuide = excluded.depositGuide,
+      updatedAt = excluded.updatedAt`,
+    [
+      settings.id,
+      settings.bankName,
+      settings.accountNumber,
+      settings.accountHolder,
+      settings.tossTransferUrlTemplate,
+      settings.depositGuide,
+      settings.createdAt,
+      settings.updatedAt,
+    ],
+  );
+
+  return await withDomainEvent(
+    { result: settings, status: 200 },
+    {
+      type: "paymentSettings.updated",
+      scopes: await getPaymentSettingsScopes(),
+      entityType: "paymentSettings",
+      entityId: settings.id,
+      payload: { settings },
+    },
+  );
+}
+
 async function getTableIdForOrder(orderId: string) {
   const [row] = await queryD1<{ tableId: string }>(
     `SELECT tc.tableId
@@ -348,9 +440,20 @@ async function closeTableContext(tableContextId: string, timestamp = now()) {
 }
 
 async function closeTableContextIfEmpty(tableId: string, tableContextId: string, timestamp = now()) {
+  const paymentJoin = await paymentJoinSql("o", "p");
   const remainingOrders = await queryD1<OrderRow>(
-    "SELECT * FROM orders WHERE tableContextId = ? AND deletedAt IS NULL LIMIT 1",
-    [tableContextId],
+    `SELECT o.* FROM orders o LEFT JOIN payments p ON ${paymentJoin} AND p.deletedAt IS NULL WHERE o.tableContextId = ? AND o.deletedAt IS NULL AND (COALESCE(o.status, ?) NOT IN (?, ?) OR p.paid = 1 OR COALESCE(p.status, ?) IN (?, ?, ?, ?)) LIMIT 1`,
+    [
+      tableContextId,
+      orderStatus.ACTIVE,
+      orderStatus.CANCELLED,
+      orderStatus.EXPIRED,
+      paymentStatus.CANCELLED,
+      paymentStatus.PENDING,
+      paymentStatus.MANUAL_REVIEW,
+      paymentStatus.PAID,
+      paymentStatus.REFUND_PENDING,
+    ],
   );
 
   if (remainingOrders.length > 0) {
@@ -1372,6 +1475,9 @@ export async function completeOrderRefund(
   );
 
   const tableId = await getTableIdForOrder(orderId);
+  const tableVacated = tableId
+    ? await closeTableContextIfEmpty(tableId, order.tableContextId, timestamp)
+    : false;
   return await withDomainEvent(
     { result: "Order refund completed", status: 200 },
     {
@@ -1379,7 +1485,7 @@ export async function completeOrderRefund(
       scopes: [venueScope, ...(tableId ? [tableScope(tableId)] : [])],
       entityType: "order",
       entityId: orderId,
-      payload: { tableId, paymentId: payment.id },
+      payload: { tableId, paymentId: payment.id, tableContextId: order.tableContextId, tableVacated },
     },
   );
 }

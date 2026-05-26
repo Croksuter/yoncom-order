@@ -53,6 +53,54 @@ describe("implemented Next API route handlers", () => {
     await expect(response.json()).resolves.toEqual({ error: "Invalid request" });
   });
 
+  it("GET /api/table includes payment settings for client refreshes", async () => {
+    vi.doMock("~/lib/server/table-session", () => ({
+      requireTableSession: vi.fn(async () => ({
+        session: { tableContextId: "ctx_12345678901" },
+        response: null,
+      })),
+    }));
+    vi.doMock("~/lib/server/table-queries", () => ({
+      getAuthorizedClientTable: vi.fn(async () => ({
+        id: "table_123456789",
+        name: "A1",
+        seats: 4,
+        key: 1,
+        createdAt: 1710000000000,
+        updatedAt: 1710000000000,
+        deletedAt: null,
+        tableContexts: [],
+      })),
+    }));
+    vi.doMock("~/lib/server/d1-mutations", () => ({
+      getPaymentSettings: vi.fn(async () => ({
+        id: "default",
+        bankName: "테스트은행",
+        accountNumber: "123-456-7890",
+        accountHolder: "연컴 테스트",
+        tossTransferUrlTemplate: "supertoss://send?amount={amount}&bank={bankName}&accountNo={accountNumber}",
+        depositGuide: "테스트 입금 안내",
+        createdAt: 1,
+        updatedAt: 2,
+      })),
+    }));
+
+    const { GET } = await import("~/app/api/table/route");
+    const response = await GET(new Request("http://order.test/api/table?tableId=table_123456789"));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      result: expect.objectContaining({
+        id: "table_123456789",
+        paymentSettings: expect.objectContaining({
+          bankName: "테스트은행",
+          accountNumber: "123-456-7890",
+          depositGuide: "테스트 입금 안내",
+        }),
+      }),
+    });
+  });
+
   it("GET /api/admin/table returns the app-facing table relation payload", async () => {
     vi.doMock("~/lib/server/auth-session", () => ({
       requireAdmin: vi.fn(async () => null),
@@ -209,6 +257,12 @@ describe("implemented Next API route handlers", () => {
       if (sql.startsWith("SELECT tableId, id AS tableContextId")) {
         return d1Success([]);
       }
+      if (sql.includes("CREATE TABLE IF NOT EXISTS paymentSettings")) {
+        return d1Success([], { duration: 1, changes: 0 });
+      }
+      if (sql === "SELECT * FROM paymentSettings WHERE id = ? LIMIT 1") {
+        return d1Success([]);
+      }
       throw new Error(`Unexpected SQL: ${sql}`);
     });
 
@@ -260,6 +314,12 @@ describe("implemented Next API route handlers", () => {
           expiresAt: Date.now() + 1000,
           revokedAt: null,
         }]);
+      }
+      if (sql.includes("CREATE TABLE IF NOT EXISTS paymentSettings")) {
+        return d1Success([], { duration: 1, changes: 0 });
+      }
+      if (sql === "SELECT * FROM paymentSettings WHERE id = ? LIMIT 1") {
+        return d1Success([]);
       }
       throw new Error(`Unexpected SQL: ${sql}`);
     });

@@ -368,6 +368,23 @@ export const bankTransactionsRelations = relations(bankTransactions, ({ one }) =
 
 export type BankTransaction = typeof bankTransactions.$inferSelect;
 
+export const paymentSettings = sqliteTable("paymentSettings", {
+  id: text("id").primaryKey().notNull(),
+  bankName: text("bankName").notNull(),
+  accountNumber: text("accountNumber").notNull(),
+  accountHolder: text("accountHolder").notNull(),
+  tossTransferUrlTemplate: text("tossTransferUrlTemplate").notNull(),
+  depositGuide: text("depositGuide").notNull(),
+  createdAt: integer("createdAt")
+    .notNull()
+    .$defaultFn(() => Date.now()),
+  updatedAt: integer("updatedAt")
+    .notNull()
+    .$defaultFn(() => Date.now()),
+});
+
+export type PaymentSettings = typeof paymentSettings.$inferSelect;
+
 export const menuOrders = sqliteTable("menuOrders", {
   id: text("id")
     .primaryKey()

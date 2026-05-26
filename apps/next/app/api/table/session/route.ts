@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { guardUnsafeRequest, parseJsonBody, routeError } from "~/lib/server/api";
+import { getPaymentSettings } from "~/lib/server/d1-mutations";
 import { resolveTableSessionAccess } from "~/lib/server/table-session";
 
 const sessionValidation = z.object({
@@ -13,7 +14,27 @@ export async function POST(request: Request) {
   try {
     const { tableId } = await parseJsonBody(request, sessionValidation);
     const result = await resolveTableSessionAccess(request, tableId);
-    return result.response;
+    if (!result.response.ok) {
+      return result.response;
+    }
+
+    const body = (await result.response.clone().json().catch(() => null)) as { result?: Record<string, unknown> } | null;
+    if (!body?.result) {
+      return result.response;
+    }
+
+    return Response.json(
+      {
+        result: {
+          ...body.result,
+          paymentSettings: await getPaymentSettings(),
+        },
+      },
+      {
+        status: result.response.status,
+        headers: new Headers(result.response.headers),
+      },
+    );
   } catch (error) {
     return routeError(error);
   }

@@ -1,6 +1,6 @@
-import { fail, ok, parseSearchParams, routeError } from "~/lib/server/api";
+import { ok, parseSearchParams, routeError } from "~/lib/server/api";
 import { requireAdmin } from "~/lib/server/auth-session";
-import { getPendingBankTransactions } from "~/lib/server/d1-mutations";
+import { getPaymentSettings, getPendingBankTransactions } from "~/lib/server/d1-mutations";
 import { getDb } from "~/lib/server/db";
 import { getDomainEventsAfter, getScopeRevision, venueScope } from "~/lib/server/sync-events";
 import { getTablesWithRelations } from "~/lib/server/table-queries";
@@ -21,7 +21,8 @@ export async function GET(request: Request) {
     const revision = await getScopeRevision(venueScope);
     const events = await getDomainEventsAfter(venueScope, afterRevision);
     const hasGap = events.length > 0 && events[0].revision > afterRevision + 1;
-    const needsSnapshot = afterRevision === 0 || hasGap;
+    const settingsChanged = events.some((event) => event.type === "paymentSettings.updated");
+    const needsSnapshot = afterRevision === 0 || hasGap || settingsChanged;
 
     return ok({
       scope: venueScope,
@@ -36,6 +37,7 @@ export async function GET(request: Request) {
           },
         }),
         bankTransactions: (await getPendingBankTransactions()).result,
+        paymentSettings: await getPaymentSettings(),
       } : null,
       gap: hasGap,
     });

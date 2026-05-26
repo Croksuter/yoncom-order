@@ -8,6 +8,12 @@ import useMenuStore from "~/stores/menu.store";
 import { runWithBlockingLoading } from "~/lib/blocking-loading";
 import * as ClientTableResponse from "shared/types/responses/client/table";
 import { useTranslation } from "~/hooks/use-translation";
+import {
+  buildTossTransferUrl,
+  getAccountCopyText,
+  getAccountHolderLabel,
+  normalizePaymentSettings,
+} from "~/lib/payment-settings";
 import { Copy, Check, Clock, AlertTriangle, Trash2, ArrowRight } from "lucide-react";
 
 type ClientOrder = ClientTableResponse.Get["result"]["tableContexts"][number]["orders"][number];
@@ -17,7 +23,7 @@ export default function OrderPaymentPanel({
 }: {
   order: ClientOrder;
 }) {
-  const { clientTable } = useTableStore();
+  const { clientTable, paymentSettings } = useTableStore();
   const { clientMenuCategories } = useMenuStore();
   const [copiedAccount, setCopiedAccount] = useState(false);
   const [copiedAmount, setCopiedAmount] = useState(false);
@@ -35,6 +41,7 @@ export default function OrderPaymentPanel({
   const originalAmount = order.payment.originalAmount ?? expectedTransferAmount;
   const paymentCode = order.payment.paymentCode ?? null;
   const expiresAt = typeof order.payment.expiresAt === "number" ? order.payment.expiresAt : null;
+  const activePaymentSettings = normalizePaymentSettings(paymentSettings);
 
   const clearTableContextIfLastOrder = () => {
     const activeContext = clientTable?.tableContexts[0];
@@ -162,12 +169,13 @@ export default function OrderPaymentPanel({
   };
 
   const handleTossPayment = () => {
-    window.open(`supertoss://send?amount=${expectedTransferAmount}&bank=토스뱅크&accountNo=100012345678`, "_blank");
+    window.open(buildTossTransferUrl(activePaymentSettings, expectedTransferAmount), "_blank");
   };
 
   const copyAccount = async () => {
+    const accountText = getAccountCopyText(activePaymentSettings);
     try {
-      await navigator.clipboard.writeText("1000-1234-5678");
+      await navigator.clipboard.writeText(accountText);
     } catch {
       toast({
         title: t("pay_bank_copy_failed"),
@@ -180,7 +188,7 @@ export default function OrderPaymentPanel({
     setCopiedAccount(true);
     toast({
       title: t("pay_bank_copy_success"),
-      description: "토스뱅크 1000-1234-5678",
+      description: accountText,
     });
     if (copiedAccountTimerRef.current) clearTimeout(copiedAccountTimerRef.current);
     copiedAccountTimerRef.current = setTimeout(() => {
@@ -301,11 +309,13 @@ export default function OrderPaymentPanel({
               className="flex w-full items-center justify-between overflow-hidden rounded-xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 transition-all hover:bg-slate-50 dark:hover:bg-slate-800/60 active:scale-[0.99] shadow-sm cursor-pointer"
             >
               <div className="flex flex-col text-left">
-                <span className="text-xs text-slate-400 font-bold leading-none mb-1">{t("pay_bank_name")}</span>
+                <span className="text-xs text-slate-400 font-bold leading-none mb-1">{activePaymentSettings.bankName}</span>
                 <span className="text-base font-black text-slate-800 dark:text-slate-100 leading-tight">
-                  1000-1234-5678
+                  {activePaymentSettings.accountNumber}
                 </span>
-                <span className="text-[10px] text-slate-400 mt-1 leading-none">{t("pay_account_holder")}</span>
+                <span className="text-[10px] text-slate-400 mt-1 leading-none">
+                  {getAccountHolderLabel(activePaymentSettings, language)}
+                </span>
               </div>
               <div className="flex items-center space-x-1 text-slate-400 hover:text-primary transition-colors shrink-0 pl-4 border-l border-slate-100 dark:border-slate-800 h-8">
                 <span className="text-xs font-bold">{copiedAccount ? t("pay_copied") : t("pay_copy")}</span>
@@ -345,8 +355,8 @@ export default function OrderPaymentPanel({
         {/* Warning Alert Banner */}
         <div className="bg-red-50 dark:bg-red-950/20 border border-red-100/50 dark:border-red-900/30 text-destructive dark:text-rose-500 rounded-2xl p-4 flex items-start gap-3 text-xs leading-relaxed font-semibold mb-6">
           <AlertTriangle className="h-5 w-5 shrink-0 text-destructive" />
-          <p>
-            {t("pay_warning_guideline")}
+          <p className="whitespace-pre-line">
+            {activePaymentSettings.depositGuide}
           </p>
         </div>
       </div>
