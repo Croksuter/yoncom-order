@@ -13,6 +13,8 @@
     "typecheck:next": "pnpm --filter web-next typecheck",
     "test": "pnpm --filter web-next test",
     "test:next": "pnpm --filter web-next test",
+    "kb-webhook": "cd apps/kb-bank-webhook && uv run python -m kb_bank_webhook --env-file .env",
+    "kb-webhook:test": "cd apps/kb-bank-webhook && uv run python -m unittest discover -s tests",
     "verify:realtime": "node scripts/verify-realtime-pipeline.mjs",
     "db:generate": "cd packages/db && pnpm db:generate",
     "db:migrate": "cd packages/db && pnpm db:migrate"

@@ -3,6 +3,7 @@
 ## Current Source Of Truth
 
 - `apps/next`: Next.js App Router application, API routes, UI, tests, and dummy seed script.
+- `apps/kb-bank-webhook`: standalone Python Selenium DOM watcher for manual KB login handoff and deposit webhook posting.
 - `packages/db`: Drizzle schema and migration SQL.
 - `packages/shared`: request/response contracts shared by the Next app.
 - `docs/verification/realtime-verification-pipeline.*`: canonical structured verification pipeline and operator checklist.
@@ -29,7 +30,7 @@ DB-backed routes and seed scripts require:
 - Customer ordering uses `clientOrderId` idempotency.
 - Payment requests use `expectedTransferAmount = originalAmount - paymentCode`.
 - `paymentCode` leases use the smallest available code in `1..99` and are released on paid/cancelled/expired/refunded terminal flows where applicable.
-- Bank deposits are ingested through `bankTransactions`; exact single matches can auto-pay, ambiguous matches require POS review.
+- Bank deposits are ingested through `bankTransactions`; exact single matches can auto-pay, ambiguous matches require POS review. The optional KB bridge clicks the logged-in KB account query screen, parses the transaction DOM table, and posts parsed account deposits to `/api/admin/deposit` using a Yoncom admin session, CSRF token, and stable idempotency key.
 - Menu order lifecycle is `PENDING -> READY -> PICKED_UP`.
 - Unpaid `PENDING` menu rows are displayed as `입금 대기`, not kitchen work.
 - Kitchen views only show active orders with `payment.status === "PAID"` and `menuOrder.status === "PENDING"`.
