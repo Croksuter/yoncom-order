@@ -27,6 +27,18 @@ export const api = ky.create({
   hooks: {
     beforeRequest: [
       (request) => {
+        // Automatically inject CSRF and Idempotency Key for all unsafe mutating HTTP requests
+        const unsafeMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+        if (unsafeMethods.has(request.method.toUpperCase())) {
+          const csrfToken = getCookie(csrfCookieName);
+          if (csrfToken && !request.headers.has("x-csrf-token")) {
+            request.headers.set("x-csrf-token", csrfToken);
+          }
+          if (!request.headers.has("idempotency-key")) {
+            request.headers.set("idempotency-key", crypto.randomUUID());
+          }
+        }
+
         const traceHeader = getTraceHeaderName();
         if (!request.headers.has(traceHeader)) {
           request.headers.set(traceHeader, newTraceId("http"));
@@ -74,11 +86,20 @@ export const api = ky.create({
 
 function getCookie(name: string) {
   if (typeof document === "undefined") return null;
-  return document.cookie
+  let cookieValue = document.cookie
     .split(";")
     .map((part) => part.trim())
     .find((part) => part.startsWith(`${name}=`))
     ?.slice(name.length + 1) ?? null;
+
+  // Self-healing CSRF: if the cookie is missing, generate and set a new one
+  if (!cookieValue && name === csrfCookieName) {
+    const newCsrfToken = crypto.randomUUID();
+    document.cookie = `${csrfCookieName}=${newCsrfToken}; path=/; max-age=604800; SameSite=Lax`;
+    cookieValue = newCsrfToken;
+  }
+
+  return cookieValue;
 }
 
 export function mutationHeaders(headers: HeadersInit) {

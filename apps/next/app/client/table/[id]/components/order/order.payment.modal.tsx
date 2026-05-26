@@ -185,15 +185,15 @@ export default function OrderPaymentModal({
         <div className="bg-slate-50 dark:bg-slate-950/30 border border-slate-100 dark:border-slate-800/80 rounded-2xl p-5 mb-6 flex flex-col gap-4 relative overflow-hidden">
           {/* Receipt Dotted Border separator */}
           <div className="grid w-full grid-cols-2 gap-y-2.5 pb-4 border-b border-dashed border-slate-200 dark:border-slate-800 text-xs">
-            <span className="font-bold text-slate-400 dark:text-slate-500">주문금액</span>
+            <span className="font-bold text-slate-400 dark:text-slate-300">주문금액</span>
             <span className="text-right font-bold text-slate-800 dark:text-slate-100">{originalAmount.toLocaleString()}원</span>
             
-            <span className="font-bold text-slate-400 dark:text-slate-500">결제코드</span>
-            <span className="text-right font-bold text-slate-500 dark:text-slate-400">
+            <span className="font-bold text-slate-400 dark:text-slate-300">결제코드</span>
+            <span className="text-right font-bold text-slate-500 dark:text-slate-200">
               {paymentCode !== null ? `${paymentCode}원 차감` : "-"}
             </span>
 
-            <span className="font-bold text-slate-400 dark:text-slate-500">입금 예정 시각</span>
+            <span className="font-bold text-slate-400 dark:text-slate-300">입금 예정 시각</span>
             <span className="text-right font-bold text-slate-800 dark:text-slate-100">
               {expiresAt ? new Date(expiresAt).toLocaleTimeString("ko-KR", {
                 hour: "2-digit",
@@ -206,7 +206,7 @@ export default function OrderPaymentModal({
 
           {/* Account Box */}
           <div className="space-y-1.5 pt-1">
-            <span className="block text-[11px] font-bold text-slate-400 dark:text-slate-500 pl-0.5 uppercase tracking-wider">
+            <span className="block text-[11px] font-bold text-slate-400 dark:text-slate-300 pl-0.5 uppercase tracking-wider">
               ⋅ 입금 계좌
             </span>
             <button
@@ -233,7 +233,7 @@ export default function OrderPaymentModal({
 
           {/* Target Amount Box */}
           <div className="space-y-1.5">
-            <span className="block text-[11px] font-bold text-slate-400 dark:text-slate-500 pl-0.5 uppercase tracking-wider">
+            <span className="block text-[11px] font-bold text-slate-400 dark:text-slate-300 pl-0.5 uppercase tracking-wider">
               ⋅ 정확히 보낼 금액
             </span>
             <button

@@ -151,7 +151,7 @@ export default function CartModal({
         <BottomSheetContent className="fc justify-between max-h-[85vh]">
           {noMenuOrder || invalidMenuOrder ? (
             <div className="fc items-center justify-center py-12 text-center space-y-4">
-              <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-full text-slate-400 dark:text-slate-500">
+              <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-full text-slate-400 dark:text-slate-300">
                 <ShoppingCart className="h-10 w-10" />
               </div>
               <div className="space-y-1">
@@ -203,7 +203,7 @@ export default function CartModal({
                             <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-100 truncate">
                               {menuOrderInfo!.menuName}
                             </h3>
-                            <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-0.5">
+                            <p className="text-xs text-slate-400 dark:text-slate-300 font-bold mt-0.5">
                               ₩ {menuOrderInfo!.menuPrice.toLocaleString()}
                             </p>
                           </div>
@@ -238,7 +238,7 @@ export default function CartModal({
 
               {/* Total Summary Row */}
               <div className="flex justify-between items-center py-4 border-t border-slate-100 dark:border-slate-800 mt-2">
-                <span className="text-sm text-slate-400 dark:text-slate-500 font-bold">최종 결제 금액</span>
+                <span className="text-sm text-slate-400 dark:text-slate-300 font-bold">최종 결제 금액</span>
                 <span className="text-2xl font-black text-primary dark:text-brand-400">
                   ₩ {visibleMenuOrderInfos.reduce((acc, item) => acc + item!.totalPrice, 0).toLocaleString()}
                 </span>

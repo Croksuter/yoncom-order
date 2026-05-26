@@ -70,8 +70,8 @@ export const getMenuOrderStatusLabel = (
   }
   if (order?.payment?.status === "MANUAL_REVIEW") return "입금 확인 필요";
   if (!isPaymentPaid(order?.payment)) return "입금 대기";
-  if (status === "PENDING") return "조리 대기";
-  if (status === "READY") return "준비 완료";
+  if (status === "PENDING") return "조리 중";
+  if (status === "READY") return "조리 완료";
   if (status === "PICKED_UP") return "수령 완료";
   return status ?? "-";
 };
@@ -83,8 +83,8 @@ export const getMenuOrderStatusIcon = (
   const label = getMenuOrderStatusLabel(menuOrder, order);
   if (label === "입금 대기") return "💳";
   if (label === "입금 확인 필요") return "⚠︎";
-  if (label === "조리 대기") return "⌛";
-  if (label === "준비 완료") return "🔔";
+  if (label === "조리 중" || label === "조리 대기") return "⌛";
+  if (label === "조리 완료" || label === "준비 완료") return "🔔";
   if (label === "수령 완료") return "✅";
   return "❌";
 };
@@ -95,7 +95,7 @@ export const getOrderStatusLabel = (order: OrderLike | null | undefined) => {
 
   const activeMenuOrders = (order?.menuOrders ?? []).filter((menuOrder) => !hasDeletedAt(menuOrder.deletedAt));
   if (activeMenuOrders.length > 0 && activeMenuOrders.every((menuOrder) => menuOrder.status === "PICKED_UP")) return "수령 완료";
-  if (activeMenuOrders.some((menuOrder) => menuOrder.status === "READY")) return "준비 완료";
-  if (activeMenuOrders.some((menuOrder) => menuOrder.status === "PENDING")) return "조리 대기";
+  if (activeMenuOrders.some((menuOrder) => menuOrder.status === "READY")) return "조리 완료";
+  if (activeMenuOrders.some((menuOrder) => menuOrder.status === "PENDING")) return "조리 중";
   return paymentLabel;
 };

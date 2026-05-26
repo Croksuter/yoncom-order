@@ -1,6 +1,8 @@
 "use client";
 
 import useTableStore from "~/stores/table.store";
+import { useTheme } from "~/hooks/use-theme";
+import { Sun, Moon } from "lucide-react";
 
 interface HeaderProps {
   scrollY: number;
@@ -8,6 +10,7 @@ interface HeaderProps {
 
 export default function Header({ scrollY }: HeaderProps) {
   const { clientTable } = useTableStore();
+  const { theme, toggleTheme, isDark, mounted } = useTheme();
 
   // Interpolation ratio (0 to 1) based on scroll position (0 to 136 pixels)
   const t = Math.min(scrollY / 136, 1);
@@ -51,22 +54,33 @@ export default function Header({ scrollY }: HeaderProps) {
           </p>
         </div>
 
-        {/* Placeholder if empty so that the badge is on the right */}
-        {t <= 0.5 && <div />}
+        {/* Right Actions Flex Container */}
+        <div className="flex items-center gap-2">
+          {mounted && (
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 transition-all flex items-center justify-center border border-white/15 cursor-pointer shrink-0"
+              title={isDark ? "라이트 모드로 변경" : "다크 모드로 변경"}
+            >
+              {isDark ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4 text-slate-300" />}
+            </button>
+          )}
 
-        {/* Right Side: Table Badge (smoothly transitions style) */}
-        <div
-          className="rounded-full font-sans transition-all duration-300 ease-in-out border border-transparent shadow-inner"
-          style={{
-            backgroundColor: `rgba(26, 73, 156, ${0.8 * (1 - t)})`,
-            borderColor: t > 0.5 ? "rgba(230, 238, 248, 0.3)" : "rgba(26, 73, 156, 0.2)",
-            color: "#ffffff",
-            fontSize: t > 0.5 ? "12px" : "14px",
-            padding: t > 0.5 ? "4px 12px" : "6px 16px",
-            fontWeight: t > 0.5 ? 500 : 700,
-          }}
-        >
-          {clientTable ? clientTable.name : "Table 07"}
+          {/* Right Side: Table Badge (smoothly transitions style) */}
+          <div
+            className="rounded-full font-sans transition-all duration-300 ease-in-out border border-transparent shadow-inner shrink-0"
+            style={{
+              backgroundColor: `rgba(26, 73, 156, ${0.8 * (1 - t)})`,
+              borderColor: t > 0.5 ? "rgba(230, 238, 248, 0.3)" : "rgba(26, 73, 156, 0.2)",
+              color: "#ffffff",
+              fontSize: t > 0.5 ? "12px" : "14px",
+              padding: t > 0.5 ? "4px 12px" : "6px 16px",
+              fontWeight: t > 0.5 ? 500 : 700,
+            }}
+          >
+            {clientTable ? clientTable.name : "Table 07"}
+          </div>
         </div>
       </nav>
 

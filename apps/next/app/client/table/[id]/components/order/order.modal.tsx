@@ -106,7 +106,7 @@ export default function OrderModal({
       >
         {!hasOrder ? (
           <div className="fc items-center justify-center py-12 text-center space-y-4">
-            <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-full text-slate-400 dark:text-slate-500">
+            <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-full text-slate-400 dark:text-slate-300">
               <AlertTriangle className="h-10 w-10 text-amber-500 animate-bounce" />
             </div>
             <div className="space-y-1">
@@ -163,7 +163,7 @@ export default function OrderModal({
 
             {/* Input field */}
             <div className="space-y-2 mb-6">
-              <label className="block text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider pl-1">
+              <label className="block text-[11px] font-bold text-slate-400 dark:text-slate-300 uppercase tracking-wider pl-1">
                 이체 예정인 정확한 금액 입력
               </label>
               <Input

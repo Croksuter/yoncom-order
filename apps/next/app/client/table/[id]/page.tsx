@@ -206,6 +206,14 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
   }, [activeUnpaidOrder]);
 
   useEffect(() => {
+    if (clientTable?.name) {
+      document.title = `${clientTable.name} | 첨크크`;
+    } else {
+      document.title = "고객 주문 | 첨크크";
+    }
+  }, [clientTable]);
+
+  useEffect(() => {
     if (tableAccessState === "INACTIVE" && clientTable?.tableContexts.some((context) => context.deletedAt === null)) {
       setTableAccessState("RESUMED");
     }

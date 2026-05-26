@@ -4,11 +4,16 @@ import { useState } from "react";
 import Inventories from "./components/inventory/inventories";
 import Orders from "./components/order/orders";
 import Tables from "./components/table/tables";
-import { ChevronLeft, ChevronRight, Package } from "lucide-react";
 import { traceEvent } from "~/lib/verification-trace";
+import { 
+  ChevronLeft, 
+  ChevronRight, 
+  Package
+} from "lucide-react";
 
 export default function AdminPosPage() {
   const [isInventoriesOpen, setIsInventoriesOpen] = useState(true);
+
   const toggleInventories = () => {
     const nextOpen = !isInventoriesOpen;
     traceEvent("client", "ui.panel.state", {
@@ -20,7 +25,7 @@ export default function AdminPosPage() {
   };
 
   return (
-    <main className="flex min-h-screen w-screen flex-col bg-slate-50 dark:bg-slate-950 p-2 lg:h-screen lg:flex-row lg:overflow-hidden relative transition-colors duration-300">
+    <div className="flex-1 overflow-y-auto lg:overflow-hidden p-2 flex flex-col lg:flex-row bg-slate-50 dark:bg-slate-950 relative transition-colors duration-300 animate-fade-in">
       {/* 주문 현황: 좌측 고정 (1/4) */}
       <div className="min-h-[18rem] w-full lg:h-full lg:min-h-0 lg:w-1/4 transition-all duration-300">
         <Orders />
@@ -30,8 +35,8 @@ export default function AdminPosPage() {
       <div className={`min-h-[24rem] w-full items-center justify-center fc lg:h-full lg:min-h-0 transition-all duration-300 ${
         isInventoriesOpen ? "lg:w-1/2" : "lg:w-3/4"
       }`}>
-        <div className="w-full h-full p-2 relative">
-          <Tables />
+        <div className="w-full h-full relative">
+          <Tables isInventoriesOpen={isInventoriesOpen} />
           
           {/* 재고 현황 토글 버튼 (PC 환경 우측 하단 고정) */}
           <button
@@ -72,6 +77,6 @@ export default function AdminPosPage() {
           {isInventoriesOpen ? "재고 접기" : "재고 보기"}
         </span>
       </button>
-    </main>
+    </div>
   );
 }

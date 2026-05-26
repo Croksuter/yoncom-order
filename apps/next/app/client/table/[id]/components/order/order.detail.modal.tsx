@@ -98,7 +98,7 @@ export default function OrderDetailModal({
 
             {/* Receipt Item List */}
             <div className="flex-1 overflow-y-auto no-scrollbar space-y-4 my-2 pr-1 max-h-[35vh]">
-              <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest pl-1">
+              <div className="text-[10px] font-bold text-slate-400 dark:text-slate-300 uppercase tracking-widest pl-1">
                 주문 상품 목록
               </div>
               <div className="border border-slate-100 dark:border-slate-850 rounded-2xl p-4 bg-slate-50/20 dark:bg-slate-950/10 space-y-3">
@@ -135,7 +135,7 @@ export default function OrderDetailModal({
 
             {/* Total Row */}
             <div className="flex justify-between items-center py-4 border-t border-slate-100 dark:border-slate-800 mt-2">
-              <span className="text-sm text-slate-400 dark:text-slate-500 font-bold">최종 입금 금액</span>
+              <span className="text-sm text-slate-400 dark:text-slate-300 font-bold">최종 입금 금액</span>
               <span className="text-2xl font-black text-primary dark:text-brand-400">
                 ₩ {expectedTransferAmount.toLocaleString()}
               </span>

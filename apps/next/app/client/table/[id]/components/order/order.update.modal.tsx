@@ -83,7 +83,7 @@ export default function OrderUpdateModal({
 
         {/* Quantity pills counter */}
         <div className="fc items-center justify-center space-y-3 mb-6 bg-slate-50 dark:bg-slate-950/40 p-4 rounded-2xl border border-slate-100/50 dark:border-slate-900/50">
-          <div className="text-xs text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">
+          <div className="text-xs text-slate-400 dark:text-slate-300 font-bold uppercase tracking-wider">
             수량 수정
           </div>
           <div className="flex items-center justify-between bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-full p-1.5 shadow-sm min-w-[150px]">
@@ -108,7 +108,7 @@ export default function OrderUpdateModal({
             </Button>
           </div>
 
-          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold">
+          <span className="text-[10px] text-slate-400 dark:text-slate-300 font-bold">
             주문 가능 수량: <span className="text-slate-750 dark:text-slate-350">{menu.quantity}개</span>
           </span>
         </div>

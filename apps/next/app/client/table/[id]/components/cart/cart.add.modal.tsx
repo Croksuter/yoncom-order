@@ -125,14 +125,14 @@ export default function CartAddModal({
               ₩ {menu.price.toLocaleString()}
             </span>
           </div>
-          <DialogDescription className="text-xs text-slate-400 dark:text-slate-500 font-medium leading-relaxed">
+          <DialogDescription className="text-xs text-slate-400 dark:text-slate-300 font-medium leading-relaxed">
             {menu.description || "엄선된 신선한 재료로 준비한 홈런포차 대표 추천 메뉴입니다. 지금 주문해 보세요."}
           </DialogDescription>
         </div>
 
         {/* Quantity Adjuster */}
         <div className="fc items-center justify-center space-y-3 mb-6 bg-slate-50 dark:bg-slate-950/40 p-4 rounded-2xl border border-slate-100/50 dark:border-slate-900/50">
-          <div className="text-xs text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">
+          <div className="text-xs text-slate-400 dark:text-slate-300 font-bold uppercase tracking-wider">
             수량 선택
           </div>
           <div className="flex items-center justify-between bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-full p-1.5 shadow-sm min-w-[150px]">
@@ -157,7 +157,7 @@ export default function CartAddModal({
             </Button>
           </div>
 
-          <div className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
+          <div className="text-[10px] text-slate-400 dark:text-slate-300 font-medium">
             주문 가능 수량: <span className="font-bold text-slate-700 dark:text-slate-300">{maxQuantity}개</span>
           </div>
         </div>

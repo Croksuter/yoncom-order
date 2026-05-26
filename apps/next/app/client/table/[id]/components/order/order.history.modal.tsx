@@ -54,7 +54,7 @@ export default function OrderHistoryModal({
         <BottomSheetContent className="fc justify-between max-h-[85vh]">
           {orderHistories.length === 0 ? (
             <div className="fc items-center justify-center py-12 text-center space-y-4">
-              <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-full text-slate-400 dark:text-slate-500">
+              <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-full text-slate-400 dark:text-slate-300">
                 <History className="h-10 w-10" />
               </div>
               <div className="space-y-1">
@@ -106,7 +106,7 @@ export default function OrderHistoryModal({
                       className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-950/20 hover:bg-slate-50 dark:hover:bg-slate-850 cursor-pointer transition-all active:scale-[0.99]"
                     >
                       <div className="fc gap-1 min-w-0">
-                        <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold">
+                        <span className="text-[10px] text-slate-400 dark:text-slate-300 font-bold">
                           {new Date(orderHistory.orderDate).toLocaleString("ko-KR", {
                             year: "numeric",
                             month: "2-digit",
@@ -148,7 +148,7 @@ export default function OrderHistoryModal({
 
               {/* Total Summary Row */}
               <div className="flex justify-between items-center py-4 border-t border-slate-100 dark:border-slate-800 mt-2">
-                <span className="text-sm text-slate-400 dark:text-slate-500 font-bold">누적 총 주문금액</span>
+                <span className="text-sm text-slate-400 dark:text-slate-300 font-bold">누적 총 주문금액</span>
                 <span className="text-2xl font-black text-primary dark:text-brand-400">
                   ₩ {orderHistories.filter((oh) => oh.order.deletedAt === null).reduce((acc, oh) => acc + oh.totalPrice, 0).toLocaleString()}
                 </span>
