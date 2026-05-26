@@ -45,8 +45,8 @@ export default function Menus({
   const selectedCategoryId = activeCategoryId || firstCategoryId;
   const menuContentMinHeight =
     categoryTabsHeight > 0
-      ? `max(0px, calc(100dvh - var(--client-header-height) - ${categoryTabsHeight}px - var(--client-footer-height)))`
-      : `max(0px, calc(100dvh - var(--client-header-height) - var(--client-footer-height)))`;
+      ? `max(0px, calc(100dvh - var(--client-header-height) - ${categoryTabsHeight}px - var(--client-footer-height) - 20px))`
+      : `max(0px, calc(100dvh - var(--client-header-height) - var(--client-footer-height) - 20px))`;
   const categoryResetScrollTop = isHeaderCollapsed ? 1 : 0;
 
   useEffect(() => {

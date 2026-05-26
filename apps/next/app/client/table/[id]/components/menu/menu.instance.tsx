@@ -48,10 +48,10 @@ export default function MenuInstance({ menu }: { menu: ClientMenuResponse.Get["r
       <article
         onClick={handleOpenMenu}
         className={`bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/60 shadow-[0_4px_12px_rgba(19,27,46,0.03)] overflow-hidden flex flex-row h-24 rounded-2xl relative smooth-transition group ${
-          isSoldOut 
-            ? "opacity-60 saturate-[0.1] cursor-not-allowed" 
-            : isOpening 
-              ? "pointer-events-none opacity-80 cursor-wait" 
+          isSoldOut
+            ? "opacity-60 saturate-[0.1] cursor-not-allowed"
+            : isOpening
+              ? "pointer-events-none opacity-80 cursor-wait"
               : "hover:shadow-[0_8px_20px_rgba(19,27,46,0.06)] hover:border-slate-200/80 cursor-pointer active:scale-[0.99]"
         }`}
       >
@@ -81,9 +81,9 @@ export default function MenuInstance({ menu }: { menu: ClientMenuResponse.Get["r
               {menu.description || "맛있는 홈런포차 대표 메뉴입니다."}
             </p>
           </div>
-          
+
           <div className="flex justify-between items-center mt-auto">
-            <span className="font-extrabold text-sm text-primary dark:text-brand-400">
+            <span className="font-extrabold text-sm text-primary dark:text-brand-600">
               ₩ {menu.price.toLocaleString()}
             </span>
             {!isSoldOut && (
