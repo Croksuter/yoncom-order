@@ -72,6 +72,18 @@ export default function AdminCookerPage() {
     setIsInitialized(true); // Ensure marked as initialized
   };
 
+  // Synchronize monitoring menus with actual active menu items
+  useEffect(() => {
+    if (!isInitialized || menus.length === 0) return;
+
+    const activeMenuIds = new Set(menus.filter(m => m.deletedAt === null).map(m => m.id));
+    const synchronizedMenus = monitoringMenus.filter(id => activeMenuIds.has(id));
+
+    if (synchronizedMenus.length !== monitoringMenus.length) {
+      updateMonitoringMenus(synchronizedMenus);
+    }
+  }, [menus, isInitialized, monitoringMenus]);
+
   return (
     <div className="flex-1 overflow-y-auto p-6 bg-slate-50 dark:bg-slate-950 transition-colors duration-300 flex flex-col gap-6 h-full animate-fade-in">
       {/* Monitoring Control Bar (Stitch Design) */}
