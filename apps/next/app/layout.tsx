@@ -5,8 +5,8 @@ import ThemeInitializer from "~/components/theme-initializer";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Yoncom Order",
-  description: "Yoncom Order festival booth POS",
+  title: "첨크크",
+  description: "첨크크 festival booth POS",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
