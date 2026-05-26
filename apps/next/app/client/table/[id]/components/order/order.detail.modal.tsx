@@ -87,7 +87,7 @@ export default function OrderDetailModal({
             <div className="bg-slate-50 dark:bg-slate-950/30 border border-slate-100 dark:border-slate-850 p-4 rounded-2xl flex flex-col gap-1 text-xs mb-4">
               <div className="flex justify-between font-bold text-slate-500">
                 <span>{t("order_payment_status")}</span>
-                <span className="text-primary dark:text-brand-600 font-extrabold">
+                <span className="text-primary dark:text-brand-700 font-extrabold">
                   {t(getStatusTranslationKey(getPaymentStatusLabel(orderDetail.payment, orderDetail)) as any)}
                 </span>
               </div>
@@ -125,7 +125,7 @@ export default function OrderDetailModal({
                           <span className="font-extrabold text-sm text-slate-800 dark:text-slate-100">
                             ₩ {menuOrderInfo!.totalPrice.toLocaleString()}
                           </span>
-                          <span className="text-[10px] font-bold text-primary dark:text-brand-600 mt-0.5">
+                          <span className="text-[10px] font-bold text-primary dark:text-brand-700 mt-0.5">
                             {menuOrder ? t(getStatusTranslationKey(getMenuOrderStatusLabel(menuOrder, orderDetail)) as any) : "-"}
                           </span>
                         </div>
@@ -139,7 +139,7 @@ export default function OrderDetailModal({
             {/* Total Row */}
             <div className="flex justify-between items-center py-4 border-t border-slate-100 dark:border-slate-800 mt-2">
               <span className="text-sm text-slate-400 dark:text-slate-300 font-bold">{t("order_final_price")}</span>
-              <span className="text-2xl font-black text-primary dark:text-brand-600">
+              <span className="text-2xl font-black text-primary dark:text-brand-700">
                 ₩ {expectedTransferAmount.toLocaleString()}
               </span>
             </div>

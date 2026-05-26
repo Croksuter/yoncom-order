@@ -85,7 +85,7 @@ export default function TableDetailModal({
             <span>테이블 설정 상세</span>
             <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
               inUse
-                ? "bg-brand-50 text-brand-600 dark:bg-brand-950/20 dark:text-brand-600"
+                ? "bg-brand-50 text-brand-600 dark:bg-brand-950/20 dark:text-brand-700"
                 : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-200"
             }`}>
               {inUse ? "사용 중 (활성화)" : "미사용 (비활성화)"}

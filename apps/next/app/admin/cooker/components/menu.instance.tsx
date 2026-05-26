@@ -67,7 +67,7 @@ export default function MenuInstance({
         </div>
 
         {/* Quantity display */}
-        <span className="text-brand-500 dark:text-brand-600 text-3xl font-black tracking-tight self-center">
+        <span className="text-brand-500 dark:text-brand-700 text-3xl font-black tracking-tight self-center">
           x{order.quantity}
         </span>
       </div>

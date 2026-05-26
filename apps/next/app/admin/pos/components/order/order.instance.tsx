@@ -46,7 +46,7 @@ export default function OrderInstance({
     hoverClass = "hover:border-amber-400/50 dark:hover:border-amber-500/30 hover:shadow-[0_8px_20px_rgba(245,158,11,0.08)]";
   } else if (statusLabel.includes("조리 중") || statusLabel.includes("조리 대기")) {
     borderClass = "border-l-4 border-l-brand-500 dark:border-l-brand-500";
-    badgeClass = "bg-brand-50 dark:bg-brand-950/20 text-brand-600 dark:text-brand-600 border-brand-100 dark:border-brand-900/30";
+    badgeClass = "bg-brand-50 dark:bg-brand-950/20 text-brand-600 dark:text-brand-700 border-brand-100 dark:border-brand-900/30";
     hoverClass = "hover:border-brand-400/50 dark:hover:border-brand-500/30 hover:shadow-[0_8px_20px_rgba(99,102,241,0.08)]";
   } else if (statusLabel.includes("조리 완료") || statusLabel.includes("준비 완료") || statusLabel.includes("수령 완료") || statusLabel.includes("결제 완료")) {
     borderClass = "border-l-4 border-l-emerald-500 dark:border-l-emerald-500";

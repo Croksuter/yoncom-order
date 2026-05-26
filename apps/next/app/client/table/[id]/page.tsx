@@ -58,6 +58,7 @@ const collapsedHeaderHeight = 60;
 const headerCollapseDistance = expandedHeaderHeight - collapsedHeaderHeight;
 const collapsedHeaderOffset = headerCollapseDistance;
 const clientFooterReservedHeight = 88;
+const paymentSyncIntervalMs = 1000;
 type TableAccessState = "UNKNOWN" | "INACTIVE" | "RESUMED" | "BLOCKED";
 
 function normalizeClientTable(table: ClientTableResponse.Get["result"]) {
@@ -123,6 +124,7 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
       ? `table:${id}`
       : null;
   const revisionRef = useRef(0);
+  const paymentSyncInFlightRef = useRef(false);
   const setTracedActiveTab = useCallback((tab: "menu" | "orders") => {
     traceEvent("client", "ui.panel.state", {
       panel: "client.table.activeTab",
@@ -201,6 +203,36 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
   }, [syncClientTable, tableAccessState]);
 
   useRealtimeSync(tableScope, syncClientTableFromRealtime);
+
+  useEffect(() => {
+    if (!activeUnpaidOrder || tableAccessState !== "RESUMED") {
+      return;
+    }
+
+    const syncPaymentState = async () => {
+      if (paymentSyncInFlightRef.current) {
+        return;
+      }
+      paymentSyncInFlightRef.current = true;
+      traceEvent("client", "payment.pending.resync", {
+        orderId: activeUnpaidOrder.id,
+        tableId: id,
+      });
+      try {
+        await syncClientTable();
+      } finally {
+        paymentSyncInFlightRef.current = false;
+      }
+    };
+
+    const interval = window.setInterval(() => {
+      void syncPaymentState();
+    }, paymentSyncIntervalMs);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [activeUnpaidOrder?.id, id, syncClientTable, tableAccessState]);
 
   useEffect(() => {
     if (activeUnpaidOrder) {

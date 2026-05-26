@@ -281,7 +281,7 @@ export default function InventoryDetailModal({
                 ) : (
                   <>
                     <UploadCloud className="h-4.5 w-4.5 text-brand-500" />
-                    <span className="text-xs font-bold text-brand-650 dark:text-brand-600">
+                    <span className="text-xs font-bold text-brand-650 dark:text-brand-700">
                       {menuImage ? '이미지 변경하기' : '신규 이미지 업로드'}
                     </span>
                   </>

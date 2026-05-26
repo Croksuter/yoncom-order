@@ -232,7 +232,7 @@ export default function DashboardLayout({
 
             {/* Profile Info Row */}
             <div className="relative flex items-center h-10 w-full">
-              <div className="w-10 h-10 rounded-full bg-brand-100 dark:bg-brand-950/40 text-brand-600 dark:text-brand-600 font-black flex items-center justify-center flex-shrink-0 text-[12px] shadow-inner absolute left-0 top-0">
+              <div className="w-10 h-10 rounded-full bg-brand-100 dark:bg-brand-950/40 text-brand-600 dark:text-brand-700 font-black flex items-center justify-center flex-shrink-0 text-[12px] shadow-inner absolute left-0 top-0">
                 {profileInitials}
               </div>
               <div className={`transition-all duration-300 absolute left-12 top-0 ${
@@ -262,7 +262,7 @@ export default function DashboardLayout({
           <div className="flex items-center gap-4 sm:gap-6">
             <div className="flex flex-col items-end">
               <span className="text-xs sm:text-sm font-bold text-slate-400 dark:text-slate-300 uppercase tracking-wider">Total Sales</span>
-              <span className="text-lg sm:text-xl font-black text-brand-600 dark:text-brand-600">
+              <span className="text-lg sm:text-xl font-black text-brand-600 dark:text-brand-700">
                 ₩{totalRevenue.toLocaleString()}
               </span>
             </div>

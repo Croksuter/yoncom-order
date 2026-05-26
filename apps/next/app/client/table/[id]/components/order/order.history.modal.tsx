@@ -152,7 +152,7 @@ export default function OrderHistoryModal({
               {/* Total Summary Row */}
               <div className="flex justify-between items-center py-4 border-t border-slate-100 dark:border-slate-800 mt-2">
                 <span className="text-sm text-slate-400 dark:text-slate-300 font-bold">{t("order_history_accumulated")}</span>
-                <span className="text-2xl font-black text-primary dark:text-brand-600">
+                <span className="text-2xl font-black text-primary dark:text-brand-700">
                   ₩ {orderHistories.filter((oh) => oh.order.deletedAt === null).reduce((acc, oh) => acc + oh.totalPrice, 0).toLocaleString()}
                 </span>
               </div>

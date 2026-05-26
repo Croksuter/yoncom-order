@@ -361,6 +361,20 @@ async function getTableIdForOrder(orderId: string) {
   return row?.tableId ?? null;
 }
 
+async function getTableIdForPayment(paymentId: string) {
+  const paymentJoin = await paymentJoinSql("o", "p");
+  const [row] = await queryD1<{ tableId: string }>(
+    `SELECT tc.tableId
+     FROM payments p
+     INNER JOIN orders o ON ${paymentJoin}
+     INNER JOIN tableContexts tc ON tc.id = o.tableContextId
+     WHERE p.id = ?
+     LIMIT 1`,
+    [paymentId],
+  );
+  return row?.tableId ?? null;
+}
+
 async function getTableIdForMenuOrder(menuOrderId: string) {
   const [row] = await queryD1<{ tableId: string; orderId: string }>(
     `SELECT tc.tableId, mo.orderId
@@ -1244,6 +1258,8 @@ export async function ingestBankTransaction(input: BankTransactionInput): Promis
     });
   }
 
+  const matchedTableId = autoCandidate ? await getTableIdForPayment(autoCandidate.paymentId) : null;
+
   return await withDomainEvent({
     result: {
       bankTransactionId: transactionId,
@@ -1254,10 +1270,10 @@ export async function ingestBankTransaction(input: BankTransactionInput): Promis
     status: 200,
   }, {
     type: autoCandidate ? "bankTransaction.autoMatched" : "bankTransaction.ingested",
-    scopes: [venueScope],
+    scopes: [venueScope, ...(matchedTableId ? [tableScope(matchedTableId)] : [])],
     entityType: "bankTransaction",
     entityId: transactionId,
-    payload: { paymentId: autoCandidate?.paymentId ?? null, amount: input.amount, status },
+    payload: { tableId: matchedTableId, paymentId: autoCandidate?.paymentId ?? null, amount: input.amount, status },
   });
 }
 
@@ -1305,6 +1321,8 @@ export async function confirmBankTransaction(bankTransactionId: string, paymentI
     return { error: "Payment Not Found", status: 404 };
   }
 
+  const tableId = await getTableIdForPayment(paymentId);
+
   await markPaymentPaidById(paymentId, {
     bank: transaction.source,
     depositor: transaction.depositor,
@@ -1326,10 +1344,10 @@ export async function confirmBankTransaction(bankTransactionId: string, paymentI
     { result: "Payment matched", status: 200 },
     {
       type: "bankTransaction.confirmed",
-      scopes: [venueScope],
+      scopes: [venueScope, ...(tableId ? [tableScope(tableId)] : [])],
       entityType: "bankTransaction",
       entityId: bankTransactionId,
-      payload: { paymentId },
+      payload: { tableId, paymentId },
     },
   );
 }

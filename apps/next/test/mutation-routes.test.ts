@@ -590,19 +590,99 @@ describe("implemented mutation route handlers", () => {
     ));
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual(expect.objectContaining({
+    const body = await response.json();
+    expect(body).toEqual(expect.objectContaining({
       result: {
         bankTransactionId: expect.any(String),
         status: "AUTO_MATCHED",
         matchedPaymentId: "pay_e2e_000001",
         candidateCount: 1,
       },
+      affectedScopes: expect.arrayContaining(["venue:default", "table:table_e2e_00001"]),
     }));
     const update = requests.find((request) => request.sql.startsWith("UPDATE \"payments\""));
     expect(update?.params).toContain(1);
     expect(update?.params).toContain("PAID");
     expect(update?.params).toContain("테스트은행");
     expect(update?.params).toContain("테스터");
+    const domainEventInserts = requests.filter((request) => request.sql.startsWith("INSERT INTO domainEvents"));
+    expect(domainEventInserts.map((request) => request.params[1])).toEqual(expect.arrayContaining([
+      "venue:default",
+      "table:table_e2e_00001",
+    ]));
+  });
+
+  it("PUT /api/admin/deposit/confirm emits table sync for the matched payment", async () => {
+    const { requests } = installD1FetchMock(({ sql }) => {
+      const realtime = handleRealtimeSql(sql);
+      if (realtime) return realtime;
+      if (sql === "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?") {
+        return d1Success([{ name: "paymentCodeLeases" }]);
+      }
+      if (sql === "PRAGMA table_info(\"payments\")") {
+        return tableInfo(paymentColumns);
+      }
+      if (sql === "PRAGMA table_info(\"bankTransactions\")") {
+        return tableInfo(["id", "dedupeKey", "amount", "depositor", "receivedAt", "rawText", "source", "status", "matchedPaymentId", "createdAt"]);
+      }
+      if (sql === "SELECT * FROM bankTransactions WHERE id = ? LIMIT 1") {
+        return d1Success([{
+          id: "banktx_00000001",
+          dedupeKey: "manual:1710000000000:23999:tester",
+          amount: 23999,
+          depositor: "테스터",
+          receivedAt: 1710000000000,
+          rawText: "테스트은행 테스터 23999",
+          source: "테스트은행",
+          status: "NEEDS_REVIEW",
+          matchedPaymentId: null,
+          createdAt: 1,
+        }]);
+      }
+      if (sql === "SELECT * FROM payments WHERE id = ? AND deletedAt IS NULL LIMIT 1") {
+        return d1Success([{
+          id: "payment_0000001",
+          paid: 0,
+          amount: 23999,
+          status: "PENDING",
+          orderId: "order_e2e_0001",
+          createdAt: 1,
+          updatedAt: 1,
+          deletedAt: null,
+        }]);
+      }
+      if (sql.startsWith("UPDATE \"payments\"")) {
+        return d1Success([], { duration: 1, changes: 1 });
+      }
+      if (sql === "DELETE FROM paymentCodeLeases WHERE paymentId = ?") {
+        return d1Success([], { duration: 1, changes: 1 });
+      }
+      if (sql.startsWith("UPDATE \"bankTransactions\"")) {
+        return d1Success([], { duration: 1, changes: 1 });
+      }
+      throw new Error(`Unexpected SQL: ${sql}`);
+    });
+
+    const { PUT } = await import("~/app/api/admin/deposit/confirm/route");
+    const response = await PUT(guardedJsonRequest(
+      "http://order.test/api/admin/deposit/confirm",
+      "PUT",
+      {
+        bankTransactionId: "banktx_00000001",
+        paymentId: "payment_0000001",
+      },
+    ));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual(expect.objectContaining({
+      result: "Payment matched",
+      affectedScopes: expect.arrayContaining(["venue:default", "table:table_e2e_00001"]),
+    }));
+    const domainEventInserts = requests.filter((request) => request.sql.startsWith("INSERT INTO domainEvents"));
+    expect(domainEventInserts.map((request) => request.params[1])).toEqual(expect.arrayContaining([
+      "venue:default",
+      "table:table_e2e_00001",
+    ]));
   });
 
   it("POST /api/admin/table includes legacy userId when the live tables schema requires it", async () => {
