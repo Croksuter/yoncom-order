@@ -9,6 +9,8 @@ const repoRoot = resolve(appRoot, "../..");
 loadEnvConfig(repoRoot);
 
 const nextConfig: NextConfig = {
+  output: "standalone",
+  outputFileTracingRoot: repoRoot,
   turbopack: {
     root: repoRoot,
   },

@@ -57,3 +57,44 @@ git diff --check
 ```
 
 Browser workflow verification should follow `docs/verification/realtime-verification-pipeline.md` and use the Codex in-app Browser surface.
+
+## Docker and Dokploy
+
+The deployable container is the Next.js web/API app only. The KB Bank Selenium bridge stays outside the image because it needs a user-operated Chrome session, a reusable browser profile, local state, and run logs.
+
+Build and smoke locally:
+
+```bash
+docker build -t yoncom-order:local .
+docker run --env-file .env.local -p 3000:3000 yoncom-order:local
+curl http://localhost:3000/api
+```
+
+Dokploy should use a GitHub application with Dockerfile build type:
+
+- Repository branch: `main`
+- Dockerfile path: `/Dockerfile`
+- Exposed port: `3000`
+- Domain: `yoncom-order.croksuter.com`
+- Health check: `GET /api`
+- Auto Deploy: enabled
+
+Keep secrets out of Docker build args and source control. In Dokploy, set runtime environment variables for:
+
+```text
+CLOUDFLARE_ACCOUNT_ID=
+CLOUDFLARE_DATABASE_ID=
+CLOUDFLARE_D1_TOKEN=
+REALTIME_NOTIFY_URL=
+REALTIME_NOTIFY_SECRET=
+YONCOM_IMAGE_UPLOAD_DIR=/app/.data/images
+```
+
+Only public, client-bundled values may be provided as build args:
+
+```text
+NEXT_PUBLIC_YONCOM_TRACE=0
+NEXT_PUBLIC_REALTIME_SOCKET_URL=
+```
+
+For the KB bridge worker, set `YONCOM_APP_BASE_URL=https://yoncom-order.croksuter.com`. The bridge uses Python `requests`, so browser CORS does not apply, but the app's Origin guard still requires the request URL and `Origin` header to use the same public Yoncom base URL.

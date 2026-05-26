@@ -1,4 +1,4 @@
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 import { fileURLToPath } from "node:url";
 
 const appRoot = fileURLToPath(new URL(".", import.meta.url));
@@ -6,6 +6,7 @@ const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
 
 export default defineConfig({
   test: {
+    exclude: [...configDefaults.exclude, ".next/**"],
     environment: "node",
     globals: true,
     restoreMocks: true,
