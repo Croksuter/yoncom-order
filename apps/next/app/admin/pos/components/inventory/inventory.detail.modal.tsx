@@ -108,7 +108,9 @@ export default function InventoryDetailModal({
         <DialogHeader className="w-full">
           <DialogTitle className="text-xl font-black text-slate-800 dark:text-slate-100 flex items-center justify-between">
             <span>메뉴 상세 및 재고 설정</span>
-            <span className="text-xs font-semibold text-slate-400 dark:text-slate-500">#{menu.id.slice(-6).toUpperCase()}</span>
+            <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 mr-6">
+              메뉴 고유코드: <span className="font-mono bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded font-bold">#{menu.id.slice(-6).toUpperCase()}</span>
+            </span>
           </DialogTitle>
           <DialogDescription className="text-xs text-slate-455 dark:text-slate-500 font-semibold">
             메뉴 정보와 실시간 재고 사양을 업데이트하고 활성화 여부를 설정합니다.

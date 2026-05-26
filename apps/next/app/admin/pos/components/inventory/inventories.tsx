@@ -1,20 +1,18 @@
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import useMenuStore from "~/stores/menu.store";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
 import InventoryDetailModal from "./inventory.detail.modal";
 import { Menu } from "db/schema";
 import { Button } from "~/components/ui/button";
-import InventoryCreateModal from "./inventory.create.modal";
-import InventoryRemoveModal from "./inventory.remove.modal";
+import MenuManageModal from "./menu.manage.modal";
+import CategoryManageModal from "./category.manage.modal";
 
 export default function Inventories() {
   const [menuDetail, setMenuDetail] = useState<Menu | null>(null);
   const [menuDetailModalOpenState, setMenuDetailModalOpenState] = useState(false);
   const { menus, menuCategories } = useMenuStore();
 
-  const [createMenuModalOpen, setCreateMenuModalOpen] = useState(false);
-  const [removeMenuModalOpen, setRemoveMenuModalOpen] = useState(false);
+  const [menuManageModalOpen, setMenuManageModalOpen] = useState(false);
+  const [categoryManageModalOpen, setCategoryManageModalOpen] = useState(false);
 
   const activeMenus = menus.filter((menu) => menu?.deletedAt === null);
 
@@ -34,13 +32,13 @@ export default function Inventories() {
     <div className="full p-2 h-full">
       <div className="full bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 shadow-md rounded-3xl flex flex-col overflow-hidden">
         {/* Header Block */}
-        <div className="h-[76px] bg-slate-50/50 dark:bg-slate-800/30 border-b border-slate-200/60 dark:border-slate-800/60 flex justify-between items-center px-4 shrink-0">
-          <div className="flex flex-col gap-1">
+        <div className="bg-slate-50/50 dark:bg-slate-800/30 border-b border-slate-200/60 dark:border-slate-800/60 flex flex-col px-4 py-3 shrink-0 gap-3">
+          <div className="flex justify-between items-center w-full">
             <h3 className="font-extrabold text-base text-slate-800 dark:text-white leading-none">
               재고 현황
             </h3>
             {/* Status indicators */}
-            <div className="flex gap-3 text-xs font-black text-slate-500 dark:text-slate-400 mt-1">
+            <div className="flex gap-3 text-xs font-black text-slate-500 dark:text-slate-400">
               <span className="flex items-center gap-1.5" title="좋음">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
                 <span>{goodCount}</span>
@@ -55,21 +53,22 @@ export default function Inventories() {
               </span>
             </div>
           </div>
-          <div className="flex gap-2">
+
+          {/* Action Button Groups (Merged cleanly underneath!) */}
+          <div className="flex items-center gap-2 w-full">
             <Button
               size="sm"
-              className="bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs h-8 px-3 rounded-xl transition-all shadow-sm shadow-brand-500/10 shrink-0"
-              onClick={() => setCreateMenuModalOpen(true)}
+              className="bg-white hover:bg-slate-50 text-slate-700 dark:bg-slate-900 dark:text-slate-350 dark:hover:bg-slate-850 border border-slate-200 dark:border-slate-800 font-bold text-xs h-8 px-4 flex-1 rounded-xl shadow-sm transition-all"
+              onClick={() => setMenuManageModalOpen(true)}
             >
-              메뉴 추가
+              메뉴 추가/제거
             </Button>
             <Button
               size="sm"
-              variant="outline"
-              className="border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 font-bold text-xs h-8 px-3 rounded-xl transition-all shrink-0"
-              onClick={() => setRemoveMenuModalOpen(true)}
+              className="bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs h-8 px-4 flex-1 rounded-xl shadow-sm shadow-brand-500/10 transition-all border-none"
+              onClick={() => setCategoryManageModalOpen(true)}
             >
-              메뉴 제거
+              카테고리 추가/제거
             </Button>
           </div>
         </div>
@@ -108,14 +107,14 @@ export default function Inventories() {
                         <span className="truncate block w-full">{menu.name}</span>
                       </td>
                       <td className="px-4 py-3.5 text-center">
-                        <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-xs font-bold px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-750">
+                        <span className="bg-slate-100 dark:bg-slate-850 text-slate-600 dark:text-slate-400 text-xs font-bold px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-750">
                           {menuCategories.find((category) => category.id === menu.menuCategoryId)?.name ?? "기타"}
                         </span>
                       </td>
                       <td className="px-4 py-3.5 text-end">
-                        <span className={`text-xs font-black ${
+                        <span className={`text-md font-black ${
                           isOutOfStock
-                            ? "text-rose-500 dark:text-rose-400"
+                            ? "text-rose-500 dark:text-rose-455"
                             : isLowStock
                               ? "text-amber-500 dark:text-amber-400 font-extrabold"
                               : "text-emerald-500 dark:text-emerald-400"
@@ -130,6 +129,8 @@ export default function Inventories() {
           </table>
         </div>
       </div>
+
+      {/* Modals */}
       {menuDetail && (
         <InventoryDetailModal
           menu={menuDetail}
@@ -137,15 +138,14 @@ export default function Inventories() {
           setOpenState={setMenuDetailModalOpenState}
         />
       )}
-      <InventoryCreateModal
-        openState={createMenuModalOpen}
-        setOpenState={setCreateMenuModalOpen}
+      <MenuManageModal
+        openState={menuManageModalOpen}
+        setOpenState={setMenuManageModalOpen}
       />
-      <InventoryRemoveModal
-        openState={removeMenuModalOpen}
-        setOpenState={setRemoveMenuModalOpen}
+      <CategoryManageModal
+        openState={categoryManageModalOpen}
+        setOpenState={setCategoryManageModalOpen}
       />
     </div>
   );
-
 }

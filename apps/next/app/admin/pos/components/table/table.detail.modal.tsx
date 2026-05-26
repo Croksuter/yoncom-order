@@ -79,7 +79,7 @@ export default function TableDetailModal({
 
   return (
     <Dialog open={openState} onOpenChange={handleCancel}>
-      <DialogContent className="max-w-md bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl shadow-2xl p-6 overflow-hidden">
+      <DialogContent className="max-w-lg bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl shadow-2xl p-6 overflow-hidden">
         <DialogHeader className="w-full">
           <DialogTitle className="text-xl font-black text-slate-800 dark:text-slate-100 flex items-center justify-between">
             <span>테이블 설정 상세</span>
