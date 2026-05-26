@@ -3,7 +3,7 @@ export const translations = {
     // Header & Intro
     brand_title: "첨크크",
     brand_sub: "연세대학교 컴퓨터과학과",
-    pocha_title: "연컴 홈런포차",
+    pocha_title: "첨크크",
     brand_booth: "연세대학교 컴퓨터과학과 부스",
     brand_slogan: "늦은 밤 밤샘 디버깅을 버텨낼 절대적인 필수 영양소.",
     change_to_dark: "라이트 모드로 변경", // Button tooltip for switching to light, but the label in header was: isDark ? "라이트 모드로 변경" : "다크 모드로 변경"
@@ -20,7 +20,7 @@ export const translations = {
 
     // Menus & Menu Details
     sold_out: "품절",
-    menu_desc_fallback: "맛있는 홈런포차 대표 메뉴입니다.",
+    menu_desc_fallback: "맛있는 첨크크 대표 메뉴입니다.",
     menu_load_failed: "메뉴 정보를 불러오는데 실패했습니다.",
     menu_load_failed_desc: "다시 시도해주세요.",
     menu_sold_out_alert: "메뉴가 품절 또는 비활성화 되었습니다.",
@@ -112,7 +112,7 @@ export const translations = {
     pay_expected_time: "입금 예정 시각",
     pay_account_info: "입금 계좌",
     pay_bank_name: "토스뱅크",
-    pay_account_holder: "예금주: 연컴 홈런포차",
+    pay_account_holder: "예금주: 첨크크",
     pay_copy: "복사",
     pay_copied: "복사 완료",
     pay_exact_amount: "정확히 보낼 금액",
@@ -154,7 +154,7 @@ export const translations = {
     // Header & Intro
     brand_title: "Chum-Keu-Keu",
     brand_sub: "Dept. of Computer Science, Yonsei Univ.",
-    pocha_title: "CS HomeRun Pocha",
+    pocha_title: "Chum-Keu-Keu",
     brand_booth: "Dept. of Computer Science Booth, Yonsei Univ.",
     brand_slogan: "Absolute Vital for Debugging Late into the Night.",
     change_to_dark: "Switch to Dark Mode",
@@ -171,7 +171,7 @@ export const translations = {
 
     // Menus & Menu Details
     sold_out: "Sold Out",
-    menu_desc_fallback: "A delicious signature menu item of Home Run Pocha.",
+    menu_desc_fallback: "A delicious signature menu item of Chum-Keu-Keu.",
     menu_load_failed: "Failed to load menu info.",
     menu_load_failed_desc: "Please try again.",
     menu_sold_out_alert: "This item is sold out or deactivated.",
@@ -263,7 +263,7 @@ export const translations = {
     pay_expected_time: "Transfer Deadline",
     pay_account_info: "Deposit Account",
     pay_bank_name: "Toss Bank",
-    pay_account_holder: "Holder: CS HomeRun Pocha",
+    pay_account_holder: "Holder: Chum-Keu-Keu",
     pay_copy: "Copy",
     pay_copied: "Copied",
     pay_exact_amount: "Exact Amount to Send",

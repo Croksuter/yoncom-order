@@ -4,7 +4,7 @@ export const defaultPaymentSettings: PaymentSettings = {
   id: "default",
   bankName: "토스뱅크",
   accountNumber: "1000-1234-5678",
-  accountHolder: "연컴 홈런포차",
+  accountHolder: "첨크크",
   tossTransferUrlTemplate: "supertoss://send?amount={amount}&bank={bankName}&accountNo={accountNumber}",
   depositGuide: "주문금액이 아니라 결제코드가 차감된 입금액을 1원 단위까지 정확하게 이체해 주세요. 입금액이 다를 경우 입금 자동 확인이 지연되거나 지불 취소 처리가 필요할 수 있습니다.",
   createdAt: 0,

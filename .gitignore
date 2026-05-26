@@ -7,6 +7,8 @@ artifacts
 .DS_Store
 .vscode
 packages/db/.env
+.code-review-graph
+docs
 
 wrangler.jsonc
 wrangler.toml
