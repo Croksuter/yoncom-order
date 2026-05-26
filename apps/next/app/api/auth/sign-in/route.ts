@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { Scrypt } from "lucia";
-import { users } from "db/schema";
+import { userRole, users } from "db/schema";
 import { signInValidation } from "shared/types/requests/client/auth";
-import { authResponse } from "~/lib/server/auth-session";
+import { authResponse, ensureUserEnabledColumn, isUserEnabled } from "~/lib/server/auth-session";
 import { getDb } from "~/lib/server/db";
 import { guardUnsafeRequest, parseJsonBody, routeError } from "~/lib/server/api";
 
@@ -13,11 +13,18 @@ export async function POST(request: Request) {
 
   try {
     const { email, password } = await parseJsonBody(request, signInValidation);
+    await ensureUserEnabledColumn();
+
     const user = await getDb().query.users.findFirst({
-      where: eq(users.email, email),
+      where: and(eq(users.email, email), isNull(users.deletedAt)),
     });
 
-    if (!user || !(await new Scrypt().verify(user.password, password))) {
+    if (
+      !user ||
+      user.role !== userRole.ADMIN ||
+      !isUserEnabled(user) ||
+      !(await new Scrypt().verify(user.password, password))
+    ) {
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 

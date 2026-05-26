@@ -1,0 +1,1 @@
+ALTER TABLE `users` ADD `enabled` integer DEFAULT false NOT NULL;

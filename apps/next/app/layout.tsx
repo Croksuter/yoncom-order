@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Toaster } from "~/components/ui/toaster";
 import GlobalLoading from "~/components/global-loading";
+import ThemeInitializer from "~/components/theme-initializer";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -11,25 +12,8 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ko" suppressHydrationWarning>
-      <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                try {
-                  var saved = localStorage.getItem('theme');
-                  if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                    document.documentElement.classList.add('dark');
-                  } else {
-                    document.documentElement.classList.remove('dark');
-                  }
-                } catch (e) {}
-              })();
-            `,
-          }}
-        />
-      </head>
       <body>
+        <ThemeInitializer />
         <GlobalLoading />
         {children}
         <Toaster />

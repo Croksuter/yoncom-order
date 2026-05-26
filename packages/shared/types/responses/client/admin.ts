@@ -1,6 +1,13 @@
-import { User } from "lucia";
+import type { UserRole } from "db/schema";
+
+export type PublicSessionUser = {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+};
 
 export type HeartBeat = {
   result: string;
-  user: User | null;
+  user: PublicSessionUser | null;
 }

@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { generateId, Scrypt } from "lucia";
-import { users } from "db/schema";
+import { userRole, users } from "db/schema";
 import { signUpValidation } from "shared/types/requests/client/auth";
+import { ensureUserEnabledColumn } from "~/lib/server/auth-session";
 import { getDb } from "~/lib/server/db";
 import { guardUnsafeRequest, parseJsonBody, routeError } from "~/lib/server/api";
 
@@ -12,6 +13,8 @@ export async function POST(request: Request) {
 
   try {
     const { email, password, name } = await parseJsonBody(request, signUpValidation);
+    await ensureUserEnabledColumn();
+
     const existingUser = await getDb().query.users.findFirst({
       where: eq(users.email, email),
     });
@@ -25,6 +28,8 @@ export async function POST(request: Request) {
       email,
       password: await new Scrypt().hash(password),
       name,
+      role: userRole.ADMIN,
+      enabled: false,
     });
 
     return NextResponse.json({ result: "Success" });

@@ -74,6 +74,7 @@ export const users = sqliteTable("users", {
     .notNull()
     .$defaultFn(() => generateId(15)),
   role: text("role").notNull().$type<UserRole>().default(userRole.UNVERIFIED),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(false),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),

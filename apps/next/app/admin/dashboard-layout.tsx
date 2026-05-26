@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { PublicSessionUser } from "shared/types/responses/client/admin";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import useTableStore from "~/stores/table.store";
@@ -20,7 +21,25 @@ import {
   Moon
 } from "lucide-react";
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+function getProfileInitials(name: string) {
+  const trimmed = name.trim();
+  if (!trimmed) return "AD";
+
+  const parts = trimmed.split(/\s+/).filter(Boolean);
+  if (parts.length > 1) {
+    return parts.map((part) => part[0]).join("").slice(0, 2).toUpperCase();
+  }
+
+  return trimmed.slice(0, 2).toUpperCase();
+}
+
+export default function DashboardLayout({
+  children,
+  user,
+}: {
+  children: React.ReactNode;
+  user: PublicSessionUser;
+}) {
   const { theme, toggleTheme, isDark, mounted } = useTheme();
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
@@ -70,6 +89,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const isCooker = pathname === "/admin/cooker";
   const title = isCooker ? "Kitchen Monitor" : "Dashboard Overview";
   const subtitle = isCooker ? "메뉴별 실시간 대기열 모니터링" : "POS Dashboard & Live Status";
+  const profileInitials = getProfileInitials(user.name);
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-slate-50 dark:bg-slate-950 font-sans transition-colors duration-300 relative">
@@ -213,14 +233,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {/* Profile Info Row */}
             <div className="relative flex items-center h-10 w-full">
               <div className="w-10 h-10 rounded-full bg-brand-100 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400 font-black flex items-center justify-center flex-shrink-0 text-[12px] shadow-inner absolute left-0 top-0">
-                BF
+                {profileInitials}
               </div>
               <div className={`transition-all duration-300 absolute left-12 top-0 ${
                 isSidebarHovered
                   ? "opacity-100 translate-x-0 pointer-events-auto"
                   : "opacity-0 -translate-x-3 overflow-hidden pointer-events-none"
               }`}>
-                <p className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">Baseball Fan</p>
+                <p className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">{user.name}</p>
                 <p className="text-xs text-slate-400 dark:text-slate-300 font-semibold uppercase tracking-wider truncate">Manager</p>
               </div>
             </div>

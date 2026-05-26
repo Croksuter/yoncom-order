@@ -7,6 +7,41 @@ import { executeD1, queryD1 } from "~/lib/server/db";
 export const authCookieName = "yoncom_session";
 export const csrfCookieName = "yoncom_csrf";
 const sessionMaxAgeSeconds = 60 * 60 * 24 * 7;
+let userEnabledColumnEnsured = false;
+
+export type PublicSessionUser = Pick<User, "id" | "name" | "email" | "role">;
+
+export function isUserEnabled(user: { enabled?: boolean | number | null } | null | undefined) {
+  const enabled = user?.enabled;
+  return enabled === true || enabled === 1;
+}
+
+export function toPublicSessionUser(user: User): PublicSessionUser {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+  };
+}
+
+export async function ensureUserEnabledColumn() {
+  if (userEnabledColumnEnsured) return;
+
+  const columns = await queryD1<{ name: string }>('PRAGMA table_info("users")');
+  if (!columns.some((column) => column.name === "enabled")) {
+    try {
+      await executeD1('ALTER TABLE "users" ADD "enabled" integer DEFAULT false NOT NULL');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.toLowerCase().includes("duplicate column")) {
+        throw error;
+      }
+    }
+  }
+
+  userEnabledColumnEnsured = true;
+}
 
 export async function getSessionUser() {
   const cookieStore = await cookies();
@@ -16,11 +51,13 @@ export async function getSessionUser() {
     return null;
   }
 
+  await ensureUserEnabledColumn();
+
   const [user] = await queryD1<User>(
     `SELECT u.*
      FROM sessions s
      INNER JOIN users u ON u.id = s.user_id
-     WHERE s.id = ? AND s.expires_at > ? AND u.deletedAt IS NULL
+     WHERE s.id = ? AND s.expires_at > ? AND u.deletedAt IS NULL AND u.enabled = 1
      LIMIT 1`,
     [sessionId, Date.now()],
   );
