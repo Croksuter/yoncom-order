@@ -36,10 +36,61 @@ type OrderRow = BaseRow & {
 
 type MenuRow = BaseRow & {
   name: string;
+  nameEn?: string | null;
   price: number;
   quantity: number;
   available?: boolean | number;
   menuCategoryId: string;
+};
+
+type MenuCategoryWithMenus<TMenu extends MenuRow = MenuRow> = {
+  menus: TMenu[];
+};
+
+type FirstOrderRuleRow = {
+  id: string;
+  enabled: boolean | number;
+  requiredCount: number;
+  createdAt: number | string;
+  updatedAt: number | string;
+};
+
+type FirstOrderRuleMenuCountRow = {
+  ruleId: string;
+  menuId: string;
+  countAs: number;
+  createdAt: number | string;
+  updatedAt: number | string;
+};
+
+type FirstOrderRuleInput = {
+  enabled: boolean;
+  requiredCount: number;
+  menuCounts: Array<{ menuId: string; countAs: number }>;
+};
+
+type MenuBundleItemRow = {
+  bundleMenuId: string;
+  componentMenuId: string;
+  quantity: number;
+  createdAt: number | string;
+  updatedAt: number | string;
+};
+
+type MenuBundleItemInput = {
+  componentMenuId: string;
+  quantity: number;
+};
+
+type MenuBundleItemWithMenu = MenuBundleItemRow & {
+  componentName?: string | null;
+  componentNameEn?: string | null;
+  componentQuantity?: number | null;
+  componentAvailable?: boolean | number | null;
+};
+
+type MenuBundleResponseItem = Pick<MenuBundleItemRow, "bundleMenuId" | "componentMenuId" | "quantity"> & {
+  componentMenu?: Pick<MenuRow, "id" | "name" | "nameEn" | "quantity" | "available"> | null;
 };
 
 type PaymentRow = BaseRow & {
@@ -120,11 +171,14 @@ const paymentCodeMin = 1;
 const paymentCodeMax = 99;
 const pendingOrderTtlMs = 5 * 60 * 1000;
 const activePaymentStatuses = [paymentStatus.PENDING, paymentStatus.MANUAL_REVIEW];
+const firstOrderRuleId = "default";
 
 let tableContextTableName: string | null = null;
 const columnCache = new Map<string, Set<string>>();
 let defaultUserId: string | null | undefined;
 let paymentSettingsTableEnsured = false;
+let firstOrderRuleTablesEnsured = false;
+let menuBundleTableEnsured = false;
 
 export function quoteIdentifier(identifier: string) {
   return `"${identifier.replaceAll("\"", "\"\"")}"`;
@@ -285,6 +339,55 @@ async function ensurePaymentSettingsTable() {
   paymentSettingsTableEnsured = true;
 }
 
+async function ensureFirstOrderRuleTables() {
+  if (firstOrderRuleTablesEnsured) {
+    return;
+  }
+
+  await executeD1(`
+    CREATE TABLE IF NOT EXISTS firstOrderRules (
+      id TEXT PRIMARY KEY NOT NULL,
+      enabled INTEGER DEFAULT 0 NOT NULL,
+      requiredCount INTEGER DEFAULT 1 NOT NULL,
+      createdAt INTEGER NOT NULL,
+      updatedAt INTEGER NOT NULL
+    )
+  `);
+  await executeD1(`
+    CREATE TABLE IF NOT EXISTS firstOrderRuleMenuCounts (
+      ruleId TEXT NOT NULL,
+      menuId TEXT NOT NULL,
+      countAs INTEGER DEFAULT 0 NOT NULL,
+      createdAt INTEGER NOT NULL,
+      updatedAt INTEGER NOT NULL,
+      PRIMARY KEY(ruleId, menuId),
+      FOREIGN KEY (ruleId) REFERENCES firstOrderRules(id) ON DELETE cascade,
+      FOREIGN KEY (menuId) REFERENCES menus(id) ON DELETE cascade
+    )
+  `);
+  firstOrderRuleTablesEnsured = true;
+}
+
+async function ensureMenuBundleTable() {
+  if (menuBundleTableEnsured) {
+    return;
+  }
+
+  await executeD1(`
+    CREATE TABLE IF NOT EXISTS menuBundleItems (
+      bundleMenuId TEXT NOT NULL,
+      componentMenuId TEXT NOT NULL,
+      quantity INTEGER NOT NULL,
+      createdAt INTEGER NOT NULL,
+      updatedAt INTEGER NOT NULL,
+      PRIMARY KEY(bundleMenuId, componentMenuId),
+      FOREIGN KEY (bundleMenuId) REFERENCES menus(id) ON DELETE cascade,
+      FOREIGN KEY (componentMenuId) REFERENCES menus(id) ON DELETE cascade
+    )
+  `);
+  menuBundleTableEnsured = true;
+}
+
 async function getPaymentSettingsScopes() {
   const tables = await queryD1<{ id: string }>(
     "SELECT id FROM tables WHERE deletedAt IS NULL",
@@ -400,6 +503,301 @@ export function aggregateMenuOrders(menuOrders: MenuOrderInput[]) {
 
 function placeholders(length: number) {
   return Array.from({ length }, () => "?").join(", ");
+}
+
+function isEnabled(value: boolean | number | null | undefined) {
+  return value === true || value === 1;
+}
+
+function isMenuAvailable(menu?: Pick<MenuRow, "available"> | null) {
+  return menu?.available !== false && menu?.available !== 0;
+}
+
+function normalizeFirstOrderRule(
+  rule?: FirstOrderRuleRow | null,
+  menuCounts: FirstOrderRuleMenuCountRow[] = [],
+) {
+  const timestamp = now();
+  const normalizedRule = rule ?? {
+    id: firstOrderRuleId,
+    enabled: 0,
+    requiredCount: 1,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+
+  return {
+    ...normalizedRule,
+    enabled: isEnabled(normalizedRule.enabled),
+    createdAt: Number(normalizedRule.createdAt),
+    updatedAt: Number(normalizedRule.updatedAt),
+    menuCounts: menuCounts.map((menuCount) => ({
+      ...menuCount,
+      createdAt: Number(menuCount.createdAt),
+      updatedAt: Number(menuCount.updatedAt),
+    })),
+  };
+}
+
+export async function getFirstOrderRule() {
+  if (!(await hasD1Table("firstOrderRules"))) {
+    return normalizeFirstOrderRule();
+  }
+
+  const rule = (await queryD1<FirstOrderRuleRow>(
+    "SELECT * FROM firstOrderRules WHERE id = ? LIMIT 1",
+    [firstOrderRuleId],
+  ))[0] ?? null;
+
+  const menuCounts = rule && await hasD1Table("firstOrderRuleMenuCounts")
+    ? await queryD1<FirstOrderRuleMenuCountRow>(
+      "SELECT * FROM firstOrderRuleMenuCounts WHERE ruleId = ?",
+      [firstOrderRuleId],
+    )
+    : [];
+
+  return normalizeFirstOrderRule(rule, menuCounts);
+}
+
+export async function updateFirstOrderRule(input: FirstOrderRuleInput): Promise<MutationResult> {
+  const uniqueMenuCounts = [...new Map(input.menuCounts.map((item) => [item.menuId, item])).values()]
+    .filter((item) => item.countAs !== 0);
+  if (uniqueMenuCounts.length > 0) {
+    const menuIds = uniqueMenuCounts.map((item) => item.menuId);
+    const menus = await queryD1<MenuRow>(
+      `SELECT * FROM menus WHERE id IN (${placeholders(menuIds.length)}) AND deletedAt IS NULL`,
+      menuIds,
+    );
+    if (menus.length !== menuIds.length) {
+      return { error: "Menu Not Found", status: 404 };
+    }
+  }
+
+  const timestamp = now();
+  await ensureFirstOrderRuleTables();
+  await executeD1(
+    `INSERT INTO firstOrderRules (id, enabled, requiredCount, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET
+      enabled = excluded.enabled,
+      requiredCount = excluded.requiredCount,
+      updatedAt = excluded.updatedAt`,
+    [
+      firstOrderRuleId,
+      input.enabled ? 1 : 0,
+      input.requiredCount,
+      timestamp,
+      timestamp,
+    ],
+  );
+
+  await executeD1("DELETE FROM firstOrderRuleMenuCounts WHERE ruleId = ?", [firstOrderRuleId]);
+  for (const menuCount of uniqueMenuCounts) {
+    await insertD1Row("firstOrderRuleMenuCounts", {
+      ruleId: firstOrderRuleId,
+      menuId: menuCount.menuId,
+      countAs: menuCount.countAs,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    });
+  }
+
+  return await withDomainEvent(
+    { result: await getFirstOrderRule(), status: 200 },
+    {
+      type: "firstOrderRule.updated",
+      scopes: [venueScope],
+      entityType: "firstOrderRule",
+      entityId: firstOrderRuleId,
+    },
+  );
+}
+
+async function validateFirstOrderRule(
+  requestedMenuOrders: MenuOrderInput[],
+  menusById: Map<string, MenuRow>,
+) {
+  const rule = await getFirstOrderRule();
+  if (!rule.enabled) return null;
+
+  const countByMenuId = new Map(rule.menuCounts.map((menuCount) => [menuCount.menuId, menuCount.countAs]));
+  const matchedCount = requestedMenuOrders.reduce((total, menuOrder) => {
+    const menu = menusById.get(menuOrder.menuId);
+    if (!menu) {
+      return total;
+    }
+    return total + menuOrder.quantity * (countByMenuId.get(menuOrder.menuId) ?? 0);
+  }, 0);
+
+  return matchedCount >= rule.requiredCount ? null : "First Order Rule Not Satisfied";
+}
+
+async function getMenuBundleItemsByBundleId(bundleMenuIds: string[]) {
+  const uniqueBundleMenuIds = [...new Set(bundleMenuIds)];
+  const byBundleId = new Map<string, MenuBundleItemWithMenu[]>();
+  if (uniqueBundleMenuIds.length === 0 || !(await hasD1Table("menuBundleItems"))) {
+    return byBundleId;
+  }
+
+  const rows = await queryD1<MenuBundleItemWithMenu>(
+    `SELECT mbi.*,
+      m.name AS componentName,
+      m.nameEn AS componentNameEn,
+      m.quantity AS componentQuantity,
+      m.available AS componentAvailable
+     FROM menuBundleItems mbi
+     LEFT JOIN menus m ON m.id = mbi.componentMenuId AND m.deletedAt IS NULL
+     WHERE mbi.bundleMenuId IN (${placeholders(uniqueBundleMenuIds.length)})`,
+    uniqueBundleMenuIds,
+  );
+
+  for (const row of rows) {
+    const list = byBundleId.get(row.bundleMenuId) ?? [];
+    list.push(row);
+    byBundleId.set(row.bundleMenuId, list);
+  }
+
+  return byBundleId;
+}
+
+export async function getMenuBundleItemsForMenuIds(menuIds: string[]) {
+  return await getMenuBundleItemsByBundleId(menuIds);
+}
+
+function buildStockEffects(
+  requestedMenuOrders: MenuOrderInput[],
+  bundleItemsByBundleId: Map<string, MenuBundleItemRow[]>,
+) {
+  const stockEffects = new Map<string, number>();
+  for (const menuOrder of requestedMenuOrders) {
+    const bundleItems = bundleItemsByBundleId.get(menuOrder.menuId) ?? [];
+    if (bundleItems.length === 0) {
+      stockEffects.set(menuOrder.menuId, (stockEffects.get(menuOrder.menuId) ?? 0) + menuOrder.quantity);
+      continue;
+    }
+
+    for (const item of bundleItems) {
+      stockEffects.set(
+        item.componentMenuId,
+        (stockEffects.get(item.componentMenuId) ?? 0) + menuOrder.quantity * item.quantity,
+      );
+    }
+  }
+
+  return [...stockEffects.entries()].map(([menuId, quantity]) => ({ menuId, quantity }));
+}
+
+function bundleItemResponse(item: MenuBundleItemWithMenu): MenuBundleResponseItem {
+  return {
+    bundleMenuId: item.bundleMenuId,
+    componentMenuId: item.componentMenuId,
+    quantity: item.quantity,
+    componentMenu: item.componentName
+      ? {
+        id: item.componentMenuId,
+        name: item.componentName,
+        nameEn: item.componentNameEn ?? null,
+        quantity: item.componentQuantity ?? 0,
+        available: isEnabled(item.componentAvailable),
+      }
+      : null,
+  };
+}
+
+export async function enrichMenuCategoriesWithBundles<TCategory extends MenuCategoryWithMenus>(
+  categories: TCategory[],
+) {
+  const menuIds = categories.flatMap((category) => category.menus.map((menu) => menu.id));
+  const bundleItemsByBundleId = await getMenuBundleItemsByBundleId(menuIds);
+
+  return categories.map((category) => ({
+    ...category,
+    menus: category.menus.map((menu) => {
+      const bundleItems = bundleItemsByBundleId.get(menu.id) ?? [];
+      if (bundleItems.length === 0) {
+        return menu;
+      }
+
+      const bundleAvailableQuantity = Math.max(0, Math.min(
+        ...bundleItems.map((item) => {
+          if (!item.componentName || !isEnabled(item.componentAvailable) || item.quantity <= 0) {
+            return 0;
+          }
+          return Math.floor(Number(item.componentQuantity ?? 0) / item.quantity);
+        }),
+      ));
+
+      return {
+        ...menu,
+        bundleItems: bundleItems.map(bundleItemResponse),
+        bundleAvailableQuantity,
+      };
+    }),
+  }));
+}
+
+export async function updateMenuBundle(
+  bundleMenuId: string,
+  items: MenuBundleItemInput[],
+): Promise<MutationResult> {
+  const bundleMenu = (await queryD1<MenuRow>(
+    "SELECT * FROM menus WHERE id = ? AND deletedAt IS NULL LIMIT 1",
+    [bundleMenuId],
+  ))[0];
+
+  if (!bundleMenu) {
+    return { error: "Menu Not Found", status: 404 };
+  }
+
+  const uniqueItems = [...new Map(items.map((item) => [item.componentMenuId, item])).values()];
+  if (uniqueItems.some((item) => item.componentMenuId === bundleMenuId)) {
+    return { error: "Bundle Cannot Include Itself", status: 400 };
+  }
+
+  if (uniqueItems.length > 0) {
+    const componentMenuIds = uniqueItems.map((item) => item.componentMenuId);
+    const componentMenus = await queryD1<MenuRow>(
+      `SELECT * FROM menus WHERE id IN (${placeholders(componentMenuIds.length)}) AND deletedAt IS NULL`,
+      componentMenuIds,
+    );
+    if (componentMenus.length !== componentMenuIds.length) {
+      return { error: "Menu Not Found", status: 404 };
+    }
+
+    const nestedBundles = await getMenuBundleItemsByBundleId(componentMenuIds);
+    if ([...nestedBundles.values()].some((bundleItems) => bundleItems.length > 0)) {
+      return { error: "Nested Bundle Not Supported", status: 400 };
+    }
+  }
+
+  const timestamp = now();
+  await ensureMenuBundleTable();
+  await executeD1("DELETE FROM menuBundleItems WHERE bundleMenuId = ?", [bundleMenuId]);
+  for (const item of uniqueItems) {
+    await insertD1Row("menuBundleItems", {
+      bundleMenuId,
+      componentMenuId: item.componentMenuId,
+      quantity: item.quantity,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    });
+  }
+
+  return await withDomainEvent(
+    {
+      result: {
+        bundleMenuId,
+        items: (await getMenuBundleItemsByBundleId([bundleMenuId])).get(bundleMenuId) ?? [],
+      },
+      status: 200,
+    },
+    {
+      type: "menuBundle.updated",
+      scopes: [venueScope],
+      entityType: "menu",
+      entityId: bundleMenuId,
+    },
+  );
 }
 
 export async function findActiveTableContext(tableId: string) {
@@ -679,8 +1077,19 @@ async function allocatePaymentCode(paymentId: string, originalAmount: number, ex
   return null;
 }
 
-async function restoreStock(menuOrders: MenuOrderInput[], timestamp = now()) {
-  for (const menuOrder of menuOrders) {
+async function restoreStock(
+  menuOrders: MenuOrderInput[],
+  timestamp = now(),
+  options: { expandBundles?: boolean } = {},
+) {
+  const stockEffects = options.expandBundles === false
+    ? menuOrders
+    : buildStockEffects(
+      menuOrders,
+      await getMenuBundleItemsByBundleId(menuOrders.map((menuOrder) => menuOrder.menuId)),
+    );
+
+  for (const menuOrder of stockEffects) {
     await executeD1(
       "UPDATE menus SET quantity = quantity + ?, updatedAt = ? WHERE id = ?",
       [menuOrder.quantity, timestamp, menuOrder.menuId],
@@ -800,10 +1209,36 @@ async function createClientOrderInternal(
     return { error: "Menu Not Found", status: 409 };
   }
 
+  const bundleItemsByBundleId = await getMenuBundleItemsByBundleId(menuIds);
   for (const menuOrder of requestedMenuOrders) {
     const menu = menusById.get(menuOrder.menuId);
+    if (!menu || !isMenuAvailable(menu)) {
+      return { error: "Menu Not Enough", status: 409 };
+    }
+  }
 
-    if (!menu || menu.quantity < menuOrder.quantity || menu.available === false || menu.available === 0) {
+  if (mode.kind === "new-session") {
+    const firstOrderRuleError = await validateFirstOrderRule(requestedMenuOrders, menusById);
+    if (firstOrderRuleError) {
+      return { error: firstOrderRuleError, status: 409 };
+    }
+  }
+
+  const stockEffects = buildStockEffects(requestedMenuOrders, bundleItemsByBundleId);
+  const stockMenuIds = stockEffects.map((menuOrder) => menuOrder.menuId);
+  const stockMenus = await queryD1<MenuRow>(
+    `SELECT * FROM menus WHERE id IN (${placeholders(stockMenuIds.length)}) AND deletedAt IS NULL`,
+    stockMenuIds,
+  );
+  const stockMenusById = new Map(stockMenus.map((menu) => [menu.id, menu]));
+
+  if (stockMenus.length !== stockMenuIds.length) {
+    return { error: "Menu Not Enough", status: 409 };
+  }
+
+  for (const stockEffect of stockEffects) {
+    const stockMenu = stockMenusById.get(stockEffect.menuId);
+    if (!stockMenu || stockMenu.quantity < stockEffect.quantity || !isMenuAvailable(stockMenu)) {
       return { error: "Menu Not Enough", status: 409 };
     }
   }
@@ -827,14 +1262,14 @@ async function createClientOrderInternal(
   let createdTableContext: TableContextRow | null = null;
 
   try {
-    for (const menuOrder of requestedMenuOrders) {
+    for (const menuOrder of stockEffects) {
       const result = await executeD1(
         "UPDATE menus SET quantity = quantity - ?, updatedAt = ? WHERE id = ? AND deletedAt IS NULL AND available = 1 AND quantity >= ?",
         [menuOrder.quantity, timestamp, menuOrder.menuId, menuOrder.quantity],
       );
 
       if (result.changed <= 0) {
-        await restoreStock(deducted, timestamp);
+        await restoreStock(deducted, timestamp, { expandBundles: false });
         await releasePaymentCodeLease(paymentId);
         return { error: "Menu Not Enough", status: 409 };
       }
@@ -844,7 +1279,7 @@ async function createClientOrderInternal(
 
     if (mode.kind === "new-session") {
       if (await findActiveTableContext(tableId)) {
-        await restoreStock(deducted, timestamp);
+        await restoreStock(deducted, timestamp, { expandBundles: false });
         await releasePaymentCodeLease(paymentId);
         return { error: "Table already in use", status: 403 };
       }
@@ -853,7 +1288,7 @@ async function createClientOrderInternal(
     }
 
     if (!tableContext) {
-      await restoreStock(deducted, timestamp);
+      await restoreStock(deducted, timestamp, { expandBundles: false });
       await releasePaymentCodeLease(paymentId);
       return { error: "Invalid table session", status: 403 };
     }
@@ -911,19 +1346,19 @@ async function createClientOrderInternal(
       method: "미결제",
     });
 
-      return await withDomainEvent({
-        result: buildCreateOrderResult({ id: orderId, displayNumber }, payment),
-        status: 200,
-        tableContextId: tableContext.id,
-      }, {
-        type: "order.created",
-        scopes: [venueScope, tableScope(tableId)],
-        entityType: "order",
-        entityId: orderId,
-        payload: { tableId, orderId, paymentId },
-      });
+    return await withDomainEvent({
+      result: buildCreateOrderResult({ id: orderId, displayNumber }, payment),
+      status: 200,
+      tableContextId: tableContext.id,
+    }, {
+      type: "order.created",
+      scopes: [venueScope, tableScope(tableId)],
+      entityType: "order",
+      entityId: orderId,
+      payload: { tableId, orderId, paymentId },
+    });
   } catch (error) {
-    await restoreStock(deducted, timestamp);
+    await restoreStock(deducted, timestamp, { expandBundles: false });
     await releasePaymentCodeLease(paymentId);
     if (createdTableContext) {
       await closeTableContext(createdTableContext.id, timestamp);
@@ -990,12 +1425,7 @@ export async function cancelOrder(
 
     const shouldRestoreStock = menuOrders.length > 0 && menuOrders.every((menuOrder) => menuOrder.status === menuOrderStatus.PENDING);
     if (shouldRestoreStock) {
-      for (const menuOrder of menuOrders) {
-        await queryD1(
-          "UPDATE menus SET quantity = quantity + ?, updatedAt = ? WHERE id = ?",
-          [menuOrder.quantity, timestamp, menuOrder.menuId],
-        );
-      }
+      await restoreStock(menuOrders, timestamp);
     }
 
     await updateD1Rows(
@@ -1045,12 +1475,7 @@ export async function cancelOrder(
     );
   }
 
-  for (const menuOrder of menuOrders) {
-    await queryD1(
-      "UPDATE menus SET quantity = quantity + ?, updatedAt = ? WHERE id = ?",
-      [menuOrder.quantity, timestamp, menuOrder.menuId],
-    );
-  }
+  await restoreStock(menuOrders, timestamp);
 
   await updateD1Rows(
     "menuOrders",

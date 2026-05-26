@@ -134,16 +134,19 @@ export default function CartModal({
     const newQuantity = currentOrder.quantity + delta;
     if (newQuantity <= 0) {
       useCartStore.getState().removeMenuOrder(menuId);
-    } else if (newQuantity <= targetMenu.quantity) {
-      useCartStore.getState().updateMenuOrder(menuId, {
-        menuId,
-        quantity: newQuantity,
-      });
     } else {
-      toast({
-        title: t("cart_max_qty_toast", { qty: targetMenu.quantity }),
-        variant: "destructive",
-      });
+      const availableQuantity = targetMenu.bundleAvailableQuantity ?? targetMenu.quantity;
+      if (newQuantity <= availableQuantity) {
+        useCartStore.getState().updateMenuOrder(menuId, {
+          menuId,
+          quantity: newQuantity,
+        });
+      } else {
+        toast({
+          title: t("cart_max_qty_toast", { qty: availableQuantity }),
+          variant: "destructive",
+        });
+      }
     }
   };
 

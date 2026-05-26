@@ -1,6 +1,6 @@
 import { ok, parseSearchParams, routeError } from "~/lib/server/api";
 import { requireAdmin } from "~/lib/server/auth-session";
-import { getPaymentSettings, getPendingBankTransactions } from "~/lib/server/d1-mutations";
+import { enrichMenuCategoriesWithBundles, getPaymentSettings, getPendingBankTransactions } from "~/lib/server/d1-mutations";
 import { getDb } from "~/lib/server/db";
 import { getDomainEventsAfter, getScopeRevision, venueScope } from "~/lib/server/sync-events";
 import { getTablesWithRelations } from "~/lib/server/table-queries";
@@ -24,18 +24,22 @@ export async function GET(request: Request) {
     const settingsChanged = events.some((event) => event.type === "paymentSettings.updated");
     const needsSnapshot = afterRevision === 0 || hasGap || settingsChanged;
 
+    const menuSnapshot = needsSnapshot
+      ? await getDb().query.menuCategories.findMany({
+        where: isNull(menuCategories.deletedAt),
+        with: {
+          menus: true,
+        },
+      })
+      : null;
+
     return ok({
       scope: venueScope,
       revision,
       events,
       snapshot: needsSnapshot ? {
         tables: await getTablesWithRelations(),
-        menuCategories: await getDb().query.menuCategories.findMany({
-          where: isNull(menuCategories.deletedAt),
-          with: {
-            menus: true,
-          },
-        }),
+        menuCategories: await enrichMenuCategoriesWithBundles(menuSnapshot ?? []),
         bankTransactions: (await getPendingBankTransactions()).result,
         paymentSettings: await getPaymentSettings(),
       } : null,

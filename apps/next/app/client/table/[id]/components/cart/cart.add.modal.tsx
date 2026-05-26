@@ -31,7 +31,7 @@ export default function CartAddModal({
   const { t, language } = useTranslation();
 
   const recentOrderedQuantity = menuOrders.find((m) => m.menuId === menu.id)?.quantity ?? 0;
-  const maxQuantity = menu.quantity;
+  const maxQuantity = menu.bundleAvailableQuantity ?? menu.quantity;
 
   // Recover quantity from cart when modal opens
   useEffect(() => {

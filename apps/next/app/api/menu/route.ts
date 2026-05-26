@@ -3,6 +3,7 @@ import { menuCategories } from "db/schema";
 import { getValidation } from "shared/types/requests/client/menu";
 import { ok, parseSearchParams, routeError } from "~/lib/server/api";
 import { getDb } from "~/lib/server/db";
+import { enrichMenuCategoriesWithBundles } from "~/lib/server/d1-mutations";
 
 export async function GET(request: Request) {
   try {
@@ -15,7 +16,7 @@ export async function GET(request: Request) {
       },
     });
 
-    return ok(result);
+    return ok(await enrichMenuCategoriesWithBundles(result));
   } catch (error) {
     return routeError(error);
   }

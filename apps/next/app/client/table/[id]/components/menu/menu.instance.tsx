@@ -13,7 +13,8 @@ export default function MenuInstance({ menu }: { menu: ClientMenuResponse.Get["r
   const [isOpening, setIsOpening] = useState(false);
   const { t, language } = useTranslation();
 
-  const isSoldOut = menu.quantity <= 0 || !menu.available;
+  const availableQuantity = menu.bundleAvailableQuantity ?? menu.quantity;
+  const isSoldOut = availableQuantity <= 0 || !menu.available;
 
   const handleOpenMenu = async () => {
     if (isOpening || isSoldOut) return;
@@ -31,7 +32,8 @@ export default function MenuInstance({ menu }: { menu: ClientMenuResponse.Get["r
       }
       const updatedMenuCategories = useMenuStore.getState().clientMenuCategories;
       const updatedMenuState = updatedMenuCategories?.flatMap((m) => m.menus).find((m) => m.id === menu.id);
-      if (!updatedMenuState?.available || updatedMenuState.quantity <= 0) {
+      const updatedAvailableQuantity = updatedMenuState?.bundleAvailableQuantity ?? updatedMenuState?.quantity ?? 0;
+      if (!updatedMenuState?.available || updatedAvailableQuantity <= 0) {
         toast({
           title: t("menu_sold_out_alert"),
           description: t("menu_sold_out_alert_desc"),
@@ -110,4 +112,3 @@ export default function MenuInstance({ menu }: { menu: ClientMenuResponse.Get["r
     </>
   );
 }
-

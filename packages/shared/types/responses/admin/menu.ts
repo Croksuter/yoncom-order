@@ -1,4 +1,5 @@
 import * as Schema from "db/schema";
+import type { Menu } from "../client/menu";
 
 export type Create = {
   result: string;
@@ -14,6 +15,6 @@ export type Remove = {
 
 export type Get = {
   result: (Schema.MenuCategory & {
-    menus: Schema.Menu[];
+    menus: Menu[];
   })[];
 }

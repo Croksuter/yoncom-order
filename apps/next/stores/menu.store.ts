@@ -6,6 +6,10 @@ import * as AdminMenuRequest from "types/requests/admin/menu";
 import * as AdminMenuResponse from "types/responses/admin/menu";
 import * as AdminMenuCategoryRequest from "types/requests/admin/menuCategory";
 import * as AdminMenuCategoryResponse from "types/responses/admin/menuCategory";
+import * as AdminFirstOrderRuleRequest from "types/requests/admin/first-order-rule";
+import * as AdminFirstOrderRuleResponse from "types/responses/admin/first-order-rule";
+import * as AdminMenuBundleRequest from "types/requests/admin/menu-bundle";
+import * as AdminMenuBundleResponse from "types/responses/admin/menu-bundle";
 import * as AdminImageRequest from "types/requests/admin/image";
 import * as AdminImageResponse from "types/responses/admin/image";
 import kyErrorHandler from '~/lib/ky-error-handler';
@@ -16,7 +20,8 @@ import { useLoadingStore } from '~/stores/loading.store';
 export type MenuState = {
   clientMenuCategories: ClientMenuResponse.Get["result"] | null;
   menuCategories: Schema.MenuCategory[];
-  menus: Schema.Menu[];
+  menus: ClientMenuResponse.Menu[];
+  firstOrderRule: AdminFirstOrderRuleResponse.Rule | null;
   isLoaded: boolean;
   error: boolean;
 
@@ -31,15 +36,19 @@ export type MenuState = {
   createMenuCategory: (query: AdminMenuCategoryRequest.Create) => Promise<AdminMenuCategoryResponse.Create | null>;
   removeMenuCategory: (query: AdminMenuCategoryRequest.Remove) => Promise<AdminMenuCategoryResponse.Remove | null>;
   updateMenuCategory: (query: AdminMenuCategoryRequest.Update) => Promise<AdminMenuCategoryResponse.Update | null>;
+  loadFirstOrderRule: (query: AdminFirstOrderRuleRequest.Get) => Promise<AdminFirstOrderRuleResponse.Get | null>;
+  updateFirstOrderRule: (query: AdminFirstOrderRuleRequest.Update) => Promise<AdminFirstOrderRuleResponse.Update | null>;
+  updateMenuBundle: (query: AdminMenuBundleRequest.Update) => Promise<AdminMenuBundleResponse.Update | null>;
 
   // 다른 store에서 사용하기 위해 노출. component에서 사용하지 않음.
-  _setMenus: (menus: Schema.Menu[]) => void;
+  _setMenus: (menus: ClientMenuResponse.Menu[]) => void;
 }
 
 const useMenuStore = create<MenuState>((set, get) => ({
   clientMenuCategories: null,
   menuCategories: [],
   menus: [],
+  firstOrderRule: null,
   isLoaded: false,
   error: false,
 
@@ -180,7 +189,54 @@ const useMenuStore = create<MenuState>((set, get) => ({
     },
   }),
 
-  _setMenus: (menus: Schema.Menu[]) => set({ menus }),
+  loadFirstOrderRule: async (query: AdminFirstOrderRuleRequest.Get) => queryStore<
+    AdminFirstOrderRuleRequest.Get,
+    AdminFirstOrderRuleResponse.Get
+  >({
+    route: "admin/first-order-rule",
+    method: "get",
+    query,
+    setter: set,
+    onSuccess: (res) => set({ firstOrderRule: res.result }),
+  }),
+
+  updateFirstOrderRule: async (query: AdminFirstOrderRuleRequest.Update) => queryStore<
+    AdminFirstOrderRuleRequest.Update,
+    AdminFirstOrderRuleResponse.Update
+  >({
+    route: "admin/first-order-rule",
+    method: "put",
+    query,
+    setter: set,
+    onSuccess: (res) => {
+      set({ firstOrderRule: res.result });
+      toast({
+        title: "첫 주문 규칙 저장 완료",
+        description: "비활성 테이블 첫 주문 규칙을 저장했습니다.",
+        duration: 3000,
+      });
+    },
+  }),
+
+  updateMenuBundle: async (query: AdminMenuBundleRequest.Update) => queryStore<
+    AdminMenuBundleRequest.Update,
+    AdminMenuBundleResponse.Update
+  >({
+    route: "admin/menu-bundle",
+    method: "put",
+    query,
+    setter: set,
+    onSuccess: () => {
+      toast({
+        title: "세트 구성 저장 완료",
+        description: "세트메뉴 구성을 저장했습니다.",
+        duration: 3000,
+      });
+      get().adminLoad({});
+    },
+  }),
+
+  _setMenus: (menus: ClientMenuResponse.Menu[]) => set({ menus }),
 }));
 
 export default useMenuStore;

@@ -5,6 +5,8 @@ import { Menu } from "db/schema";
 import { Button } from "~/components/ui/button";
 import MenuManageModal from "./menu.manage.modal";
 import CategoryManageModal from "./category.manage.modal";
+import FirstOrderRuleModal from "./first-order-rule.modal";
+import BundleManageModal from "./bundle.manage.modal";
 
 export default function Inventories() {
   const [menuDetail, setMenuDetail] = useState<Menu | null>(null);
@@ -13,6 +15,8 @@ export default function Inventories() {
 
   const [menuManageModalOpen, setMenuManageModalOpen] = useState(false);
   const [categoryManageModalOpen, setCategoryManageModalOpen] = useState(false);
+  const [firstOrderRuleModalOpen, setFirstOrderRuleModalOpen] = useState(false);
+  const [bundleManageModalOpen, setBundleManageModalOpen] = useState(false);
 
   const activeMenus = menus.filter((menu) => menu?.deletedAt === null);
 
@@ -55,20 +59,34 @@ export default function Inventories() {
           </div>
 
           {/* Action Button Groups (Merged cleanly underneath!) */}
-          <div className="flex items-center gap-2 w-full">
+          <div className="grid grid-cols-2 gap-2 w-full">
             <Button
               size="sm"
-              className="bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs h-8 px-4 flex-1 rounded-xl shadow-sm shadow-brand-500/10 transition-all border-none"
+              className="bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs h-8 px-3 rounded-xl shadow-sm shadow-brand-500/10 transition-all border-none"
               onClick={() => setMenuManageModalOpen(true)}
             >
               메뉴 추가/제거
             </Button>
             <Button
               size="sm"
-              className="bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs h-8 px-4 flex-1 rounded-xl shadow-sm shadow-brand-500/10 transition-all border-none"
+              className="bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs h-8 px-3 rounded-xl shadow-sm shadow-brand-500/10 transition-all border-none"
               onClick={() => setCategoryManageModalOpen(true)}
             >
-              카테고리 추가/수정/제거
+              카테고리 관리
+            </Button>
+            <Button
+              size="sm"
+              className="bg-slate-700 hover:bg-slate-800 text-white font-bold text-xs h-8 px-3 rounded-xl shadow-sm transition-all border-none"
+              onClick={() => setFirstOrderRuleModalOpen(true)}
+            >
+              첫 주문 규칙
+            </Button>
+            <Button
+              size="sm"
+              className="bg-slate-700 hover:bg-slate-800 text-white font-bold text-xs h-8 px-3 rounded-xl shadow-sm transition-all border-none"
+              onClick={() => setBundleManageModalOpen(true)}
+            >
+              세트 구성
             </Button>
           </div>
         </div>
@@ -145,6 +163,14 @@ export default function Inventories() {
       <CategoryManageModal
         openState={categoryManageModalOpen}
         setOpenState={setCategoryManageModalOpen}
+      />
+      <FirstOrderRuleModal
+        openState={firstOrderRuleModalOpen}
+        setOpenState={setFirstOrderRuleModalOpen}
+      />
+      <BundleManageModal
+        openState={bundleManageModalOpen}
+        setOpenState={setBundleManageModalOpen}
       />
     </div>
   );

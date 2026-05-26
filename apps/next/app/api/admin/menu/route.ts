@@ -4,7 +4,7 @@ import { createValidation, getValidation, removeValidation, updateValidation } f
 import { fail, guardUnsafeRequest, mutationOk, ok, parseJsonBody, parseSearchParams, routeError } from "~/lib/server/api";
 import { requireAdmin } from "~/lib/server/auth-session";
 import { getDb } from "~/lib/server/db";
-import { createAdminMenu, removeAdminMenu, updateAdminMenu } from "~/lib/server/d1-mutations";
+import { createAdminMenu, enrichMenuCategoriesWithBundles, removeAdminMenu, updateAdminMenu } from "~/lib/server/d1-mutations";
 
 export async function GET(request: Request) {
   const adminError = await requireAdmin();
@@ -20,7 +20,7 @@ export async function GET(request: Request) {
       },
     });
 
-    return ok(result);
+    return ok(await enrichMenuCategoriesWithBundles(result));
   } catch (error) {
     return routeError(error);
   }

@@ -32,10 +32,11 @@ export default function OrderUpdateModal({
   }, [menuOrder]);
 
   const menu = menus.find((m) => m.id === menuOrder.menuId)!;
+  const availableQuantity = menu.bundleAvailableQuantity ?? menu.quantity;
 
   const handleConfirm = async () => {
     if (duringConfirm) return;
-    if (quantity < 0 || quantity > menu.quantity) {
+    if (quantity < 0 || quantity > availableQuantity) {
       setInvalid(true);
       return;
     }
@@ -101,17 +102,17 @@ export default function OrderUpdateModal({
               {quantity}
             </span>
             <Button
-              onClick={() => quantity < menu.quantity && setQuantity(quantity + 1)}
+              onClick={() => quantity < availableQuantity && setQuantity(quantity + 1)}
               className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 p-0 flex items-center justify-center cursor-pointer"
               variant="ghost"
-              disabled={quantity >= menu.quantity || duringConfirm}
+              disabled={quantity >= availableQuantity || duringConfirm}
             >
               <PlusIcon className="h-4 w-4 stroke-[3px]" />
             </Button>
           </div>
 
           <span className="text-[10px] text-slate-400 dark:text-slate-300 font-bold">
-            {t("cart_available_qty")}<span className="text-slate-750 dark:text-slate-350">{menu.quantity}{t("order_history_item_unit")}</span>
+            {t("cart_available_qty")}<span className="text-slate-750 dark:text-slate-350">{availableQuantity}{t("order_history_item_unit")}</span>
           </span>
         </div>
 
@@ -143,4 +144,3 @@ export default function OrderUpdateModal({
     </Dialog>
   );
 }
-

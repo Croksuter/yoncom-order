@@ -2,14 +2,14 @@ import useMenuStore from "~/stores/menu.store";
 import useTableStore from "~/stores/table.store";
 import { toast } from "./use-toast";
 import useCartStore, { CartState } from "~/stores/cart.store";
-import * as Schema from "db/schema";
+import * as ClientMenuResponse from "shared/types/responses/client/menu";
 
 export function useValidateOrder() {
   const { clientTable } = useTableStore();
   const { menus, clientLoad } = useMenuStore();
 
   return async function validateOrder(menuOrders: CartState["menuOrders"]) {
-    const beforeMenus = JSON.parse(JSON.stringify(menus)) as Schema.Menu[];
+    const beforeMenus = JSON.parse(JSON.stringify(menus)) as ClientMenuResponse.Menu[];
     const success = await clientLoad({});
 
     if (!success) {
@@ -35,7 +35,8 @@ export function useValidateOrder() {
         useCartStore.getState().removeMenuOrder(menuOrder.menuId);
         return false;
       }
-      if (menuOrder.quantity > updatedMenu.quantity) {
+      const updatedAvailableQuantity = updatedMenu.bundleAvailableQuantity ?? updatedMenu.quantity;
+      if (menuOrder.quantity > updatedAvailableQuantity) {
         toast({
           title: "메뉴 수량이 변경되었습니다.",
           description: "다시 시도해주세요.",
@@ -51,7 +52,7 @@ export function useValidateOrder() {
         });
         return false;
       }
-      if (!updatedMenu.available || updatedMenu.quantity <= 0) {
+      if (!updatedMenu.available || updatedAvailableQuantity <= 0) {
         toast({
           title: "메뉴가 품절 또는 비활성화 되었습니다.",
           description: "다른 메뉴를 주문해주세요.",

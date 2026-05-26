@@ -146,11 +146,110 @@ export const menus = sqliteTable("menus", {
 
 export const menusRelations = relations(menus, ({ one, many }) => ({
   menuOrders: many(menuOrders),
+  bundleItems: many(menuBundleItems, {
+    relationName: "bundleMenu",
+  }),
+  bundleComponentItems: many(menuBundleItems, {
+    relationName: "componentMenu",
+  }),
+  firstOrderRuleMenuCounts: many(firstOrderRuleMenuCounts),
   menuCategory: one(menuCategories, {
     fields: [menus.menuCategoryId],
     references: [menuCategories.id],
   }),
 }));
+
+export type Menu = typeof menus.$inferSelect;
+
+export const firstOrderRules = sqliteTable("firstOrderRules", {
+  id: text("id").primaryKey().notNull(),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(false),
+  requiredCount: integer("requiredCount").notNull().default(1),
+  createdAt: integer("createdAt")
+    .notNull()
+    .$defaultFn(() => Date.now()),
+  updatedAt: integer("updatedAt")
+    .notNull()
+    .$defaultFn(() => Date.now()),
+});
+
+export const firstOrderRulesRelations = relations(firstOrderRules, ({ many }) => ({
+  menuCounts: many(firstOrderRuleMenuCounts),
+}));
+
+export type FirstOrderRule = typeof firstOrderRules.$inferSelect;
+
+export const firstOrderRuleMenuCounts = sqliteTable(
+  "firstOrderRuleMenuCounts",
+  {
+    ruleId: text("ruleId")
+      .notNull()
+      .references(() => firstOrderRules.id, { onDelete: "cascade" }),
+    menuId: text("menuId")
+      .notNull()
+      .references(() => menus.id, { onDelete: "cascade" }),
+    countAs: integer("countAs").notNull().default(0),
+    createdAt: integer("createdAt")
+      .notNull()
+      .$defaultFn(() => Date.now()),
+    updatedAt: integer("updatedAt")
+      .notNull()
+      .$defaultFn(() => Date.now()),
+  },
+  (table) => [
+    primaryKey({ columns: [table.ruleId, table.menuId] }),
+  ],
+);
+
+export const firstOrderRuleMenuCountsRelations = relations(firstOrderRuleMenuCounts, ({ one }) => ({
+  rule: one(firstOrderRules, {
+    fields: [firstOrderRuleMenuCounts.ruleId],
+    references: [firstOrderRules.id],
+  }),
+  menu: one(menus, {
+    fields: [firstOrderRuleMenuCounts.menuId],
+    references: [menus.id],
+  }),
+}));
+
+export type FirstOrderRuleMenuCount = typeof firstOrderRuleMenuCounts.$inferSelect;
+
+export const menuBundleItems = sqliteTable(
+  "menuBundleItems",
+  {
+    bundleMenuId: text("bundleMenuId")
+      .notNull()
+      .references(() => menus.id, { onDelete: "cascade" }),
+    componentMenuId: text("componentMenuId")
+      .notNull()
+      .references(() => menus.id, { onDelete: "cascade" }),
+    quantity: integer("quantity").notNull(),
+    createdAt: integer("createdAt")
+      .notNull()
+      .$defaultFn(() => Date.now()),
+    updatedAt: integer("updatedAt")
+      .notNull()
+      .$defaultFn(() => Date.now()),
+  },
+  (table) => [
+    primaryKey({ columns: [table.bundleMenuId, table.componentMenuId] }),
+  ],
+);
+
+export const menuBundleItemsRelations = relations(menuBundleItems, ({ one }) => ({
+  bundleMenu: one(menus, {
+    fields: [menuBundleItems.bundleMenuId],
+    references: [menus.id],
+    relationName: "bundleMenu",
+  }),
+  componentMenu: one(menus, {
+    fields: [menuBundleItems.componentMenuId],
+    references: [menus.id],
+    relationName: "componentMenu",
+  }),
+}));
+
+export type MenuBundleItem = typeof menuBundleItems.$inferSelect;
 
 export const uploadedImages = sqliteTable("uploadedImages", {
   id: text("id").primaryKey().notNull(),
@@ -182,8 +281,6 @@ export const uploadedImageChunks = sqliteTable(
 );
 
 export type UploadedImageChunk = typeof uploadedImageChunks.$inferSelect;
-
-export type Menu = typeof menus.$inferSelect;
 
 export const tables = sqliteTable("tables", {
   id: text("id")

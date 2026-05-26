@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { d1Success, installD1FetchMock, stubCloudflareEnv } from "./helpers/d1";
+import { d1Success, installD1FetchMock, stubCloudflareEnv, type D1Request } from "./helpers/d1";
 
 const paymentColumns = [
   "id",
@@ -87,10 +87,169 @@ function isTableContextBlockingOrderSql(sql: string) {
     && sql.includes("COALESCE(p.status");
 }
 
+function testMenu(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "menu_e2e_000001",
+    name: "Test Menu",
+    nameEn: null,
+    description: null,
+    descriptionEn: null,
+    price: 12000,
+    quantity: 5,
+    available: 1,
+    menuCategoryId: "cat_e2e_000000",
+    image: null,
+    createdAt: 1,
+    updatedAt: 1,
+    deletedAt: null,
+    ...overrides,
+  };
+}
+
+function testTableContext(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "ctx_12345678901",
+    tableId: "table_e2e_00001",
+    createdAt: 1,
+    updatedAt: 1,
+    deletedAt: null,
+    ...overrides,
+  };
+}
+
+function installCreateOrderMutationMock(options: {
+  menus: Array<Record<string, unknown>>;
+  existingMode?: boolean;
+  activeTableContext?: Record<string, unknown> | null;
+  existingOrder?: Record<string, unknown> | null;
+  existingPayment?: Record<string, unknown> | null;
+  firstOrderRule?: Record<string, unknown> | null;
+  firstOrderRuleMenuCounts?: Array<Record<string, unknown>>;
+  bundleItems?: Array<Record<string, unknown>>;
+  stockUpdateChanges?: Record<string, number>;
+}) {
+  return installD1FetchMock(({ sql, params }: D1Request) => {
+    const realtime = handleRealtimeSql(sql);
+    if (realtime) return realtime;
+    if (sql === "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?") {
+      const tableName = String(params[0]);
+      const availableTables = new Set([
+        "tableContexts",
+        "paymentCodeLeases",
+        ...(options.firstOrderRule !== undefined ? ["firstOrderRules"] : []),
+        ...(options.firstOrderRuleMenuCounts ? ["firstOrderRuleMenuCounts"] : []),
+        ...(options.bundleItems ? ["menuBundleItems"] : []),
+      ]);
+      return d1Success(availableTables.has(tableName) ? [{ name: tableName }] : []);
+    }
+    if (sql === "PRAGMA table_info(\"payments\")") {
+      return tableInfo(paymentColumns);
+    }
+    if (sql === "PRAGMA table_info(\"orders\")") {
+      return tableInfo(orderColumns);
+    }
+    if (sql === "PRAGMA table_info(\"tableContexts\")") {
+      return tableInfo(["id", "tableId", "createdAt", "updatedAt", "deletedAt"]);
+    }
+    if (sql === "PRAGMA table_info(\"menuOrders\")") {
+      return tableInfo(["id", "quantity", "status", "orderId", "menuId", "createdAt", "updatedAt", "deletedAt"]);
+    }
+    if (sql.startsWith("SELECT * FROM payments WHERE deletedAt IS NULL AND paid = 0 AND expiresAt")) {
+      return d1Success([]);
+    }
+    if (sql === "DELETE FROM paymentCodeLeases WHERE expiresAt <= ?") {
+      return d1Success([], { duration: 1, changes: 0 });
+    }
+    if (sql === "SELECT * FROM orders WHERE clientOrderId = ? AND deletedAt IS NULL LIMIT 1") {
+      return d1Success(options.existingOrder ? [options.existingOrder] : []);
+    }
+    if (sql === "SELECT * FROM payments WHERE orderId = ? AND deletedAt IS NULL LIMIT 1") {
+      return d1Success(options.existingPayment ? [options.existingPayment] : []);
+    }
+    if (sql === "SELECT * FROM tables WHERE id = ? AND deletedAt IS NULL LIMIT 1") {
+      return d1Success([{
+        id: "table_e2e_00001",
+        key: 7,
+        name: "E2E Table",
+        seats: 2,
+        createdAt: 1,
+        updatedAt: 1,
+        deletedAt: null,
+      }]);
+    }
+    if (sql === "SELECT * FROM \"tableContexts\" WHERE id = ? AND tableId = ? AND deletedAt IS NULL LIMIT 1") {
+      return d1Success(options.activeTableContext ? [options.activeTableContext] : [testTableContext()]);
+    }
+    if (sql === "SELECT * FROM \"tableContexts\" WHERE tableId = ? AND deletedAt IS NULL LIMIT 1") {
+      return d1Success(options.activeTableContext && !options.existingMode ? [options.activeTableContext] : []);
+    }
+    if (sql.includes("LEFT JOIN payments")) {
+      return d1Success([]);
+    }
+    if (sql.startsWith("SELECT * FROM menus WHERE id IN")) {
+      const ids = new Set(params.map(String));
+      return d1Success(options.menus.filter((menu) => ids.has(String(menu.id))));
+    }
+    if (sql === "SELECT * FROM firstOrderRules WHERE id = ? LIMIT 1") {
+      return d1Success(options.firstOrderRule ? [options.firstOrderRule] : []);
+    }
+    if (sql === "SELECT * FROM firstOrderRuleMenuCounts WHERE ruleId = ?") {
+      return d1Success(options.firstOrderRuleMenuCounts ?? []);
+    }
+    if (sql.startsWith("SELECT mbi.*")) {
+      return d1Success((options.bundleItems ?? []).map((item) => {
+        const component = options.menus.find((menu) => menu.id === item.componentMenuId);
+        return {
+          ...item,
+          componentName: component?.name ?? null,
+          componentNameEn: component?.nameEn ?? null,
+          componentQuantity: component?.quantity ?? null,
+          componentAvailable: component?.available ?? null,
+        };
+      }));
+    }
+    if (sql === "SELECT * FROM payments WHERE deletedAt IS NULL AND paid = 0 AND COALESCE(status, ?) IN (?, ?)") {
+      return d1Success([]);
+    }
+    if (sql === "INSERT OR IGNORE INTO paymentCodeLeases (code, paymentId, expiresAt, createdAt) VALUES (?, ?, ?, ?)") {
+      return d1Success([], { duration: 1, changes: 1 });
+    }
+    if (sql === "UPDATE menus SET quantity = quantity - ?, updatedAt = ? WHERE id = ? AND deletedAt IS NULL AND available = 1 AND quantity >= ?") {
+      return d1Success([], {
+        duration: 1,
+        changes: options.stockUpdateChanges?.[String(params[2])] ?? 1,
+      });
+    }
+    if (sql === "UPDATE menus SET quantity = quantity + ?, updatedAt = ? WHERE id = ?") {
+      return d1Success([], { duration: 1, changes: 1 });
+    }
+    if (sql.startsWith("INSERT INTO \"tableContexts\"")) {
+      return d1Success([], { duration: 1, changes: 1 });
+    }
+    if (sql === "SELECT COALESCE(MAX(displayNumber), 0) + 1 AS nextDisplayNumber FROM orders") {
+      return d1Success([{ nextDisplayNumber: 1 }]);
+    }
+    if (sql.startsWith("INSERT INTO \"orders\"")) {
+      return d1Success([], { duration: 1, changes: 1 });
+    }
+    if (sql.startsWith("INSERT INTO \"menuOrders\"")) {
+      return d1Success([], { duration: 1, changes: 1 });
+    }
+    if (sql.startsWith("INSERT INTO \"payments\"")) {
+      return d1Success([], { duration: 1, changes: 1 });
+    }
+    if (sql === "DELETE FROM paymentCodeLeases WHERE paymentId = ?") {
+      return d1Success([], { duration: 1, changes: 1 });
+    }
+    throw new Error(`Unexpected SQL: ${sql}`);
+  });
+}
+
 describe("implemented mutation route handlers", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    vi.doUnmock("~/lib/server/d1-mutations");
     vi.doMock("~/lib/server/auth-session", () => ({
       csrfCookieName: "yoncom_csrf",
       requireAdmin: vi.fn(async () => null),
@@ -428,6 +587,450 @@ describe("implemented mutation route handlers", () => {
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({ error: "Table already in use" });
     expect(requests.some((request) => request.sql.startsWith("INSERT INTO \"orders\""))).toBe(false);
+  });
+
+  it("first-order rule rejects an inactive-table first order before stock, payment, or table context writes", async () => {
+    const { requests } = installCreateOrderMutationMock({
+      menus: [testMenu({ id: "menu_rule_000001", menuCategoryId: "cat_other_00000", quantity: 5 })],
+      firstOrderRule: {
+        id: "default",
+        enabled: 1,
+        requiredCount: 2,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+      firstOrderRuleMenuCounts: [{
+        ruleId: "default",
+        menuId: "menu_rule_000001",
+        countAs: 0,
+        createdAt: 1,
+        updatedAt: 1,
+      }],
+    });
+
+    const { createClientOrderForNewTableSession } = await import("~/lib/server/d1-mutations");
+    const result = await createClientOrderForNewTableSession(
+      "table_e2e_00001",
+      "client-order-rule-reject",
+      [{ menuId: "menu_rule_000001", quantity: 1 }],
+    );
+
+    expect(result).toEqual({ error: "First Order Rule Not Satisfied", status: 409 });
+    expect(requests.some((request) => request.sql.startsWith("UPDATE menus SET quantity = quantity -"))).toBe(false);
+    expect(requests.some((request) => request.sql.startsWith("INSERT INTO \"tableContexts\""))).toBe(false);
+    expect(requests.some((request) => request.sql.startsWith("INSERT INTO \"orders\""))).toBe(false);
+    expect(requests.some((request) => request.sql.startsWith("INSERT INTO \"payments\""))).toBe(false);
+  });
+
+  it("first-order rule accepts countAs overrides on inactive-table first orders", async () => {
+    const { requests } = installCreateOrderMutationMock({
+      menus: [testMenu({ id: "menu_rule_000002", menuCategoryId: "cat_required00", quantity: 5, price: 7000 })],
+      firstOrderRule: {
+        id: "default",
+        enabled: 1,
+        requiredCount: 3,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+      firstOrderRuleMenuCounts: [{
+        ruleId: "default",
+        menuId: "menu_rule_000002",
+        countAs: 3,
+        createdAt: 1,
+        updatedAt: 1,
+      }],
+    });
+
+    const { createClientOrderForNewTableSession } = await import("~/lib/server/d1-mutations");
+    const result = await createClientOrderForNewTableSession(
+      "table_e2e_00001",
+      "client-order-rule-pass",
+      [{ menuId: "menu_rule_000002", quantity: 1 }],
+    );
+
+    expect(result.error).toBeUndefined();
+    expect(result.status).toBe(200);
+    expect(result.result).toEqual(expect.objectContaining({
+      payment: expect.objectContaining({
+        originalAmount: 7000,
+      }),
+    }));
+    expect(requests.some((request) => request.sql.startsWith("INSERT INTO \"tableContexts\""))).toBe(true);
+    const stockUpdate = requests.find((request) => request.sql.startsWith("UPDATE menus SET quantity = quantity -"));
+    expect(stockUpdate?.params[0]).toBe(1);
+    expect(stockUpdate?.params[2]).toBe("menu_rule_000002");
+  });
+
+  it("first-order rule is bypassed for existing-session second orders", async () => {
+    const { requests } = installCreateOrderMutationMock({
+      existingMode: true,
+      activeTableContext: testTableContext(),
+      menus: [testMenu({ id: "menu_second_0001", menuCategoryId: "cat_other_00000", quantity: 5 })],
+      firstOrderRule: {
+        id: "default",
+        enabled: 1,
+        requiredCount: 99,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+      firstOrderRuleMenuCounts: [],
+    });
+
+    const { createClientOrder } = await import("~/lib/server/d1-mutations");
+    const result = await createClientOrder(
+      "table_e2e_00001",
+      "ctx_12345678901",
+      "client-order-second",
+      [{ menuId: "menu_second_0001", quantity: 1 }],
+    );
+
+    expect(result.error).toBeUndefined();
+    expect(result.status).toBe(200);
+    expect(requests.some((request) => request.sql === "SELECT * FROM firstOrderRules WHERE id = ? LIMIT 1")).toBe(false);
+  });
+
+  it("bundle orders decrement component stock, charge the bundle price, and store one bundle menuOrder row", async () => {
+    const { requests } = installCreateOrderMutationMock({
+      existingMode: true,
+      activeTableContext: testTableContext(),
+      menus: [
+        testMenu({ id: "menu_bundle_0001", name: "Bundle", price: 15000, quantity: 99, menuCategoryId: "cat_bundle0000" }),
+        testMenu({ id: "menu_component01", name: "Component", price: 4000, quantity: 10, menuCategoryId: "cat_component0" }),
+      ],
+      bundleItems: [{
+        bundleMenuId: "menu_bundle_0001",
+        componentMenuId: "menu_component01",
+        quantity: 2,
+        createdAt: 1,
+        updatedAt: 1,
+      }],
+    });
+
+    const { createClientOrder } = await import("~/lib/server/d1-mutations");
+    const result = await createClientOrder(
+      "table_e2e_00001",
+      "ctx_12345678901",
+      "client-order-bundle",
+      [{ menuId: "menu_bundle_0001", quantity: 2 }],
+    );
+
+    expect(result.error).toBeUndefined();
+    expect(result.status).toBe(200);
+    expect(result.result).toEqual(expect.objectContaining({
+      payment: expect.objectContaining({
+        originalAmount: 30000,
+      }),
+    }));
+    const stockUpdate = requests.find((request) => request.sql.startsWith("UPDATE menus SET quantity = quantity -"));
+    expect(stockUpdate?.params[0]).toBe(4);
+    expect(stockUpdate?.params[2]).toBe("menu_component01");
+    const menuOrderInsert = requests.find((request) => request.sql.startsWith("INSERT INTO \"menuOrders\""));
+    expect(menuOrderInsert?.params).toContain("menu_bundle_0001");
+    expect(requests.filter((request) => request.sql.startsWith("INSERT INTO \"menuOrders\""))).toHaveLength(1);
+  });
+
+  it("bundle stock conflicts roll back prior component decrements and skip order writes", async () => {
+    const { requests } = installCreateOrderMutationMock({
+      existingMode: true,
+      activeTableContext: testTableContext(),
+      menus: [
+        testMenu({ id: "menu_bundle_0002", name: "Bundle", price: 15000, quantity: 99, menuCategoryId: "cat_bundle0000" }),
+        testMenu({ id: "menu_component02", name: "Component A", quantity: 10, menuCategoryId: "cat_component0" }),
+        testMenu({ id: "menu_component03", name: "Component B", quantity: 10, menuCategoryId: "cat_component0" }),
+      ],
+      bundleItems: [
+        { bundleMenuId: "menu_bundle_0002", componentMenuId: "menu_component02", quantity: 1, createdAt: 1, updatedAt: 1 },
+        { bundleMenuId: "menu_bundle_0002", componentMenuId: "menu_component03", quantity: 1, createdAt: 1, updatedAt: 1 },
+      ],
+      stockUpdateChanges: {
+        menu_component02: 1,
+        menu_component03: 0,
+      },
+    });
+
+    const { createClientOrder } = await import("~/lib/server/d1-mutations");
+    const result = await createClientOrder(
+      "table_e2e_00001",
+      "ctx_12345678901",
+      "client-order-bundle-conflict",
+      [{ menuId: "menu_bundle_0002", quantity: 1 }],
+    );
+
+    expect(result).toEqual({ error: "Menu Not Enough", status: 409 });
+    const restock = requests.find((request) => request.sql === "UPDATE menus SET quantity = quantity + ?, updatedAt = ? WHERE id = ?");
+    expect(restock?.params[0]).toBe(1);
+    expect(restock?.params[2]).toBe("menu_component02");
+    expect(requests.some((request) => request.sql.startsWith("INSERT INTO \"orders\""))).toBe(false);
+    expect(requests.some((request) => request.sql.startsWith("INSERT INTO \"payments\""))).toBe(false);
+  });
+
+  it("idempotent bundle order retries return the existing payment without double decrementing stock", async () => {
+    const { requests } = installCreateOrderMutationMock({
+      existingMode: true,
+      activeTableContext: testTableContext(),
+      menus: [testMenu({ id: "menu_bundle_0003", name: "Bundle", price: 15000, quantity: 99 })],
+      existingOrder: {
+        id: "ord_existing001",
+        tableContextId: "ctx_12345678901",
+        clientOrderId: "client-order-bundle-retry",
+        displayNumber: 8,
+        status: "ACTIVE",
+        createdAt: 1,
+        updatedAt: 1,
+        deletedAt: null,
+      },
+      existingPayment: {
+        id: "pay_existing001",
+        paid: 0,
+        amount: 14999,
+        status: "PENDING",
+        paymentCode: 1,
+        originalAmount: 15000,
+        expectedTransferAmount: 14999,
+        orderId: "ord_existing001",
+        expiresAt: 9999999999999,
+        createdAt: 1,
+        updatedAt: 1,
+        deletedAt: null,
+      },
+    });
+
+    const { createClientOrder } = await import("~/lib/server/d1-mutations");
+    const result = await createClientOrder(
+      "table_e2e_00001",
+      "ctx_12345678901",
+      "client-order-bundle-retry",
+      [{ menuId: "menu_bundle_0003", quantity: 1 }],
+    );
+
+    expect(result.status).toBe(200);
+    expect(result.result).toEqual(expect.objectContaining({
+      displayNumber: 8,
+      payment: expect.objectContaining({
+        id: "pay_existing001",
+        originalAmount: 15000,
+      }),
+    }));
+    expect(requests.some((request) => request.sql.startsWith("UPDATE menus SET quantity = quantity -"))).toBe(false);
+  });
+
+  it("GET /api/admin/first-order-rule returns the configured rule through the admin API", async () => {
+    const getFirstOrderRule = vi.fn(async () => ({
+      id: "default",
+      enabled: true,
+      requiredCount: 2,
+      createdAt: 1,
+      updatedAt: 1,
+      menuCounts: [],
+    }));
+    vi.doMock("~/lib/server/d1-mutations", () => ({
+      getFirstOrderRule,
+      updateFirstOrderRule: vi.fn(),
+    }));
+
+    const { GET } = await import("~/app/api/admin/first-order-rule/route");
+    const response = await GET(new Request("http://order.test/api/admin/first-order-rule"));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      result: {
+        id: "default",
+        enabled: true,
+        requiredCount: 2,
+        createdAt: 1,
+        updatedAt: 1,
+        menuCounts: [],
+      },
+    });
+    expect(getFirstOrderRule).toHaveBeenCalledTimes(1);
+  });
+
+  it("PUT /api/admin/first-order-rule stores menu-level count settings without a category", async () => {
+    const updateFirstOrderRule = vi.fn(async (rule: {
+      enabled: boolean;
+      requiredCount: number;
+      menuCounts: Array<{ menuId: string; countAs: number }>;
+    }) => ({
+      result: {
+        id: "default",
+        ...rule,
+        createdAt: 1,
+        updatedAt: 1,
+        menuCounts: rule.menuCounts.map((menuCount: { menuId: string; countAs: number }) => ({
+          ruleId: "default",
+          ...menuCount,
+          createdAt: 1,
+          updatedAt: 1,
+        })),
+      },
+      status: 200,
+    }));
+    vi.doMock("~/lib/server/d1-mutations", () => ({
+      getFirstOrderRule: vi.fn(),
+      updateFirstOrderRule,
+    }));
+
+    const rule = {
+      enabled: true,
+      requiredCount: 2,
+      menuCounts: [
+        { menuId: "menu_rule000003", countAs: 1 },
+        { menuId: "menu_rule000004", countAs: 0 },
+      ],
+    };
+    const { PUT } = await import("~/app/api/admin/first-order-rule/route");
+    const response = await PUT(guardedJsonRequest(
+      "http://order.test/api/admin/first-order-rule",
+      "PUT",
+      { rule },
+    ));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual(expect.objectContaining({
+      result: expect.objectContaining({
+        enabled: true,
+        requiredCount: 2,
+        menuCounts: expect.arrayContaining([
+          expect.objectContaining({ menuId: "menu_rule000003", countAs: 1 }),
+          expect.objectContaining({ menuId: "menu_rule000004", countAs: 0 }),
+        ]),
+      }),
+    }));
+    expect(updateFirstOrderRule).toHaveBeenCalledWith(rule);
+  });
+
+  it("PUT /api/admin/first-order-rule rejects the old category-scoped payload shape", async () => {
+    const updateFirstOrderRule = vi.fn();
+    vi.doMock("~/lib/server/d1-mutations", () => ({
+      getFirstOrderRule: vi.fn(),
+      updateFirstOrderRule,
+    }));
+
+    const { PUT } = await import("~/app/api/admin/first-order-rule/route");
+    const response = await PUT(guardedJsonRequest(
+      "http://order.test/api/admin/first-order-rule",
+      "PUT",
+      {
+        rule: {
+          enabled: true,
+          menuCategoryId: "cat_required00",
+          requiredCount: 2,
+          menuCounts: [],
+        },
+      },
+    ));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: "Invalid request" });
+    expect(updateFirstOrderRule).not.toHaveBeenCalled();
+  });
+
+  it("updateFirstOrderRule creates the isolated rule tables when the DB has not migrated yet", async () => {
+    const createdTables = new Set<string>();
+    const { requests } = installD1FetchMock(({ sql, params }) => {
+      const realtime = handleRealtimeSql(sql);
+      if (realtime) return realtime;
+      if (sql === "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?") {
+        return d1Success(createdTables.has(String(params[0])) ? [{ name: params[0] }] : []);
+      }
+      if (sql.startsWith("SELECT * FROM menus WHERE id IN")) {
+        return d1Success([testMenu({ id: "menu_rule000005" })]);
+      }
+      if (sql.includes("CREATE TABLE IF NOT EXISTS firstOrderRules")) {
+        createdTables.add("firstOrderRules");
+        return d1Success([], { duration: 1, changes: 0 });
+      }
+      if (sql.includes("CREATE TABLE IF NOT EXISTS firstOrderRuleMenuCounts")) {
+        createdTables.add("firstOrderRuleMenuCounts");
+        return d1Success([], { duration: 1, changes: 0 });
+      }
+      if (sql.startsWith("INSERT INTO firstOrderRules")) {
+        return d1Success([], { duration: 1, changes: 1 });
+      }
+      if (sql === "DELETE FROM firstOrderRuleMenuCounts WHERE ruleId = ?") {
+        return d1Success([], { duration: 1, changes: 0 });
+      }
+      if (sql === "PRAGMA table_info(\"firstOrderRuleMenuCounts\")") {
+        return tableInfo(["ruleId", "menuId", "countAs", "createdAt", "updatedAt"]);
+      }
+      if (sql.startsWith("INSERT INTO \"firstOrderRuleMenuCounts\"")) {
+        return d1Success([], { duration: 1, changes: 1 });
+      }
+      if (sql === "SELECT * FROM firstOrderRules WHERE id = ? LIMIT 1") {
+        return d1Success([{
+          id: "default",
+          enabled: 1,
+          requiredCount: 2,
+          createdAt: 1,
+          updatedAt: 1,
+        }]);
+      }
+      if (sql === "SELECT * FROM firstOrderRuleMenuCounts WHERE ruleId = ?") {
+        return d1Success([{
+          ruleId: "default",
+          menuId: "menu_rule000005",
+          countAs: 1,
+          createdAt: 1,
+          updatedAt: 1,
+        }]);
+      }
+      throw new Error(`Unexpected SQL: ${sql}`);
+    });
+
+    const { updateFirstOrderRule } = await import("~/lib/server/d1-mutations");
+    const result = await updateFirstOrderRule({
+      enabled: true,
+      requiredCount: 2,
+      menuCounts: [{ menuId: "menu_rule000005", countAs: 1 }],
+    });
+
+    expect(result.status).toBe(200);
+    expect(createdTables).toEqual(new Set(["firstOrderRules", "firstOrderRuleMenuCounts"]));
+    expect(requests.some((request) => request.sql.startsWith("INSERT INTO firstOrderRules"))).toBe(true);
+  });
+
+  it("PUT /api/admin/menu-bundle accepts empty items to clear bundle composition", async () => {
+    const updateMenuBundle = vi.fn(async () => ({
+      result: { bundleMenuId: "menu_bundle0001", items: [] },
+      status: 200,
+    }));
+    vi.doMock("~/lib/server/d1-mutations", () => ({
+      updateMenuBundle,
+    }));
+
+    const { PUT } = await import("~/app/api/admin/menu-bundle/route");
+    const response = await PUT(guardedJsonRequest(
+      "http://order.test/api/admin/menu-bundle",
+      "PUT",
+      { bundleMenuId: "menu_bundle0001", items: [] },
+    ));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual(expect.objectContaining({
+      result: { bundleMenuId: "menu_bundle0001", items: [] },
+    }));
+    expect(updateMenuBundle).toHaveBeenCalledWith("menu_bundle0001", []);
+  });
+
+  it("PUT /api/admin/menu-bundle rejects invalid component quantities before mutation", async () => {
+    const updateMenuBundle = vi.fn();
+    vi.doMock("~/lib/server/d1-mutations", () => ({
+      updateMenuBundle,
+    }));
+
+    const { PUT } = await import("~/app/api/admin/menu-bundle/route");
+    const response = await PUT(guardedJsonRequest(
+      "http://order.test/api/admin/menu-bundle",
+      "PUT",
+      {
+        bundleMenuId: "menu_bundle0001",
+        items: [{ componentMenuId: "menu_comp000001", quantity: 0 }],
+      },
+    ));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: "Invalid request" });
+    expect(updateMenuBundle).not.toHaveBeenCalled();
   });
 
   it("DELETE /api/order vacates the table context when the last unpaid order is cancelled", async () => {
