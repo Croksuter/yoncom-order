@@ -90,20 +90,11 @@ export default function Orders() {
               </span>
             </div>
           </div>
-          <Button 
-            variant="outline" 
-            className="shrink-0 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border-none shadow-sm text-xs font-bold transition-all px-3 py-1.5 h-8 rounded-xl" 
-            onClick={() => {
-              window.open("/admin/cooker", "_blank");
-            }}
-          >
-            요리 섹션
-          </Button>
         </div>
 
         {/* Scrollable Orders Area */}
         <div className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] p-4 space-y-4">
-          
+
           {/* 입금 확인 필요 Section */}
           {reviewTransactions.length > 0 && (
             <div className="rounded-2xl border border-amber-200/60 dark:border-amber-900/30 bg-amber-50/40 dark:bg-amber-950/10 p-3.5 space-y-3.5 animate-fade-in">
@@ -113,8 +104,8 @@ export default function Orders() {
               </div>
               <div className="space-y-3">
                 {reviewTransactions.map((transaction) => (
-                  <div 
-                    key={transaction.id} 
+                  <div
+                    key={transaction.id}
                     className="bg-slate-50/60 dark:bg-slate-900/60 hover:bg-white dark:hover:bg-slate-900 border border-slate-200/50 dark:border-slate-800/80 border-l-4 border-l-amber-500 dark:border-l-amber-500 p-3.5 rounded-2xl shadow-sm hover:shadow-[0_8px_20px_rgba(245,158,11,0.08)] hover:border-amber-400/50 dark:hover:border-amber-500/30 transition-all duration-300 flex flex-col gap-3 group relative"
                   >
                     {/* Header Block */}
@@ -151,7 +142,7 @@ export default function Orders() {
                           {transaction.candidates.map((candidate) => {
                             const isMatchDiff = candidate.diff === 0;
                             return (
-                              <div 
+                              <div
                                 key={candidate.paymentId}
                                 className="flex items-center justify-between p-2 rounded-xl bg-slate-50/80 dark:bg-slate-900/80 border border-slate-100 dark:border-slate-800"
                               >
@@ -166,8 +157,8 @@ export default function Orders() {
                                   </div>
                                   <div className="flex items-center space-x-1 mt-0.5 text-[9px]">
                                     <span className={`font-bold ${
-                                      isMatchDiff 
-                                        ? "text-emerald-600 dark:text-emerald-400" 
+                                      isMatchDiff
+                                        ? "text-emerald-600 dark:text-emerald-400"
                                         : "text-amber-600 dark:text-amber-400"
                                     }`}>
                                       {candidateReasonLabel(candidate.reason)}
@@ -181,8 +172,8 @@ export default function Orders() {
                                 <Button
                                   size="sm"
                                   className={`h-6 px-2.5 rounded-lg text-[10px] font-extrabold transition-all shadow-sm flex-shrink-0 ${
-                                    isMatchDiff 
-                                      ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/10" 
+                                    isMatchDiff
+                                      ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/10"
                                       : "bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/10"
                                   }`}
                                   onClick={() => useTableStore.getState().adminConfirmBankTransaction({
@@ -220,8 +211,8 @@ export default function Orders() {
           <div className="space-y-3">
             {/* 1. Refund Pending Orders (Styled with red left edge!) */}
             {refundPendingOrders.map(({ tableName, order }) => (
-              <div 
-                key={order.id} 
+              <div
+                key={order.id}
                 className="bg-slate-50/60 dark:bg-slate-900/60 hover:bg-white dark:hover:bg-slate-900 border border-slate-200/50 dark:border-slate-800/80 border-l-4 border-l-rose-500 dark:border-l-rose-500 p-3.5 rounded-2xl shadow-sm hover:shadow-[0_8px_20px_rgba(244,63,94,0.08)] hover:border-rose-400/50 dark:hover:border-rose-500/30 transition-all duration-300 flex flex-col gap-3 group relative cursor-pointer"
                 onClick={() => {
                   setOrderDetail(order);
@@ -264,10 +255,10 @@ export default function Orders() {
             ))}
 
             {/* 2. In-Progress/Active Orders */}
-            {inProgressOrders.map((order) => 
-              <OrderInstance 
-                key={order.id} 
-                order={order} 
+            {inProgressOrders.map((order) =>
+              <OrderInstance
+                key={order.id}
+                order={order}
                 onClick={() => {
                   setOrderDetail(order);
                   setOrderDetailModalOpenState(true);
