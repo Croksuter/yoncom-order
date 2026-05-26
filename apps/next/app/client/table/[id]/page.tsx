@@ -110,7 +110,7 @@ async function getTableAccessFailureCopy(error: unknown) {
 export default function ClientTablePage({ params }: ClientTablePageProps) {
   const { id } = use(params);
   const { clientTable, clientNoticeSettings } = useTableStore();
-  const { clientMenuCategories } = useMenuStore();
+  const { clientMenuCategories, error: menuLoadError } = useMenuStore();
   const { t, language } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [tableAccessMessage, setTableAccessMessage] = useState<string | null>(null);
@@ -346,7 +346,14 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
       });
   }, [clientMenuCategories]);
 
-  if (loading) {
+  const isClientContentPending = (
+    isValidTableId
+    && !tableAccessMessage
+    && tableAccessState !== "BLOCKED"
+    && (!clientTable || (!clientMenuCategories && !menuLoadError))
+  );
+
+  if (loading || isClientContentPending) {
     return (
       <main className="h-screen w-screen items-center justify-center overflow-hidden fc p-4">
         <div className="w-full max-w-[600px] flex-1 overflow-hidden px-2 fc gap-4">
@@ -433,10 +440,22 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
       ) : (
         <div className="p-6 text-center">
           <h1 className="text-xl font-bold">
-            {isValidTableId ? (tableAccessMessage ? t(tableAccessMessage as any) : t("table_not_found")) : t("invalid_table_url")}
+            {isValidTableId
+              ? tableAccessMessage
+                ? t(tableAccessMessage as any)
+                : menuLoadError
+                  ? t("menu_load_failed")
+                  : t("table_not_found")
+              : t("invalid_table_url")}
           </h1>
           <p className="mt-2 text-sm text-slate-500">
-            {isValidTableId && tableAccessMessage ? t(tableAccessDescription as any) : `tableId: ${id}`}
+            {isValidTableId
+              ? tableAccessMessage
+                ? t(tableAccessDescription as any)
+                : menuLoadError
+                  ? t("menu_load_failed_desc")
+                  : `tableId: ${id}`
+              : `tableId: ${id}`}
           </p>
         </div>
       )}
