@@ -30,7 +30,7 @@ export default function OrderHistoryModal({
       if (!menu) return null;
       return {
         menuId: menuOrder.menuId,
-        menuName: menu.name,
+        menuName: language === "en" && menu.nameEn ? menu.nameEn : menu.name,
         menuPrice: menu.price,
         quantity: menuOrder.quantity,
         totalPrice: menu.price * menuOrder.quantity,

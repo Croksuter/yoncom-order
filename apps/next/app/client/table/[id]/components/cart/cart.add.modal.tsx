@@ -28,7 +28,7 @@ export default function CartAddModal({
   const { addMenuOrder, removeMenuOrder, updateMenuOrder, menuOrders } = useCartStore();
   const { clientTable } = useTableStore();
   const validateOrder = useValidateOrder();
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
 
   const recentOrderedQuantity = menuOrders.find((m) => m.menuId === menu.id)?.quantity ?? 0;
   const maxQuantity = menu.quantity;
@@ -112,7 +112,7 @@ export default function CartAddModal({
         <div className="w-full h-56 rounded-2xl overflow-hidden relative shadow-sm mb-6 bg-slate-50 dark:bg-slate-800">
           <img
             src={menu.image || "/favicon.ico"}
-            alt={menu.name}
+            alt={language === "en" && menu.nameEn ? menu.nameEn : menu.name}
             className="w-full h-full object-cover"
           />
         </div>
@@ -121,14 +121,14 @@ export default function CartAddModal({
         <div className="flex flex-col gap-2 mb-6">
           <div className="flex justify-between items-start gap-4">
             <DialogTitle className="font-extrabold text-xl text-slate-800 dark:text-slate-100 leading-snug">
-              {menu.name}
+              {language === "en" && menu.nameEn ? menu.nameEn : menu.name}
             </DialogTitle>
             <span className="font-extrabold text-lg text-primary dark:text-brand-400 shrink-0">
               ₩ {menu.price.toLocaleString()}
             </span>
           </div>
           <DialogDescription className="text-xs text-slate-400 dark:text-slate-300 font-medium leading-relaxed">
-            {menu.description || t("menu_desc_fallback")}
+            {language === "en" && menu.descriptionEn ? menu.descriptionEn : (menu.description || t("menu_desc_fallback"))}
           </DialogDescription>
         </div>
 

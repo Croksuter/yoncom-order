@@ -11,7 +11,7 @@ import { Plus } from "lucide-react";
 export default function MenuInstance({ menu }: { menu: ClientMenuResponse.Get["result"][number]["menus"][number] }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [isOpening, setIsOpening] = useState(false);
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
 
   const isSoldOut = menu.quantity <= 0 || !menu.available;
 
@@ -60,7 +60,7 @@ export default function MenuInstance({ menu }: { menu: ClientMenuResponse.Get["r
         {/* Menu Image */}
         <div className="w-24 h-full relative overflow-hidden bg-slate-100 dark:bg-slate-800 flex-shrink-0">
           <img
-            alt={menu.name}
+            alt={language === "en" && menu.nameEn ? menu.nameEn : menu.name}
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
             src={menu.image ? menu.image : "/favicon.ico"}
           />
@@ -77,10 +77,10 @@ export default function MenuInstance({ menu }: { menu: ClientMenuResponse.Get["r
         <div className="p-3 flex flex-col flex-grow min-w-0 justify-between">
           <div className="min-w-0">
             <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-100 truncate">
-              {menu.name}
+              {language === "en" && menu.nameEn ? menu.nameEn : menu.name}
             </h3>
             <p className="text-[10px] text-slate-400 dark:text-slate-300 line-clamp-2 mt-1 leading-normal font-medium">
-              {menu.description || t("menu_desc_fallback")}
+              {language === "en" && menu.descriptionEn ? menu.descriptionEn : (menu.description || t("menu_desc_fallback"))}
             </p>
           </div>
 
@@ -93,7 +93,7 @@ export default function MenuInstance({ menu }: { menu: ClientMenuResponse.Get["r
                 aria-label="Add to order"
                 className="w-7 h-7 rounded-full bg-brand-100 dark:bg-brand-900/40 text-primary dark:text-brand-400 flex items-center justify-center transition-all duration-200 hover:bg-primary hover:text-white active:scale-90"
               >
-                <Plus className="h-4 w-4 stroke-[3px]" />
+                <Plus className="h-4 w-4 stroke-[3px] stroke-white" />
               </button>
             )}
           </div>

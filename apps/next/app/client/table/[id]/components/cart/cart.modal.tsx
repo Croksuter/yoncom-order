@@ -33,7 +33,7 @@ export default function CartModal({
   const { menuOrders, purchaseMenuOrders } = useCartStore();
   const { clientTable } = useTableStore();
   const validateOrder = useValidateOrder();
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
 
   const menus = clientMenuCategories?.flatMap((menuCategory) => menuCategory.menus) ?? [];
   const menuOrderInfos: MenuOrderInfo[] = menuOrders.map((menuOrder) => {
@@ -41,7 +41,7 @@ export default function CartModal({
     if (!menu) return null;
     return {
       menuId: menuOrder.menuId,
-      menuName: menu.name,
+      menuName: language === "en" && menu.nameEn ? menu.nameEn : menu.name,
       menuPrice: menu.price,
       quantity: menuOrder.quantity,
       totalPrice: menu.price * menuOrder.quantity,

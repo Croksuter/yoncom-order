@@ -13,6 +13,7 @@ import {
   type PointerEventHandler,
   type UIEventHandler,
 } from "react";
+import { useTranslation } from "~/hooks/use-translation";
 
 type SwipeStart = {
   x: number;
@@ -33,6 +34,7 @@ export default function Menus({
   isHeaderCollapsed: boolean;
   onContentScroll?: UIEventHandler<HTMLDivElement>;
 }) {
+  const { language } = useTranslation();
   const firstCategoryId = menuCategories[0]?.id ?? "";
   const [activeCategoryId, setActiveCategoryId] = useState(firstCategoryId);
   const [categoryTabsHeight, setCategoryTabsHeight] = useState(0);
@@ -171,7 +173,7 @@ export default function Menus({
             value={menuCategory.id}
             className="flex-shrink-0 px-5 py-2 rounded-full text-xs font-bold transition-all duration-200 bg-secondary/80 text-slate-600 hover:bg-secondary hover:text-slate-800 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-md cursor-pointer border-0 shadow-none ring-0 outline-none"
           >
-            {menuCategory.name}
+            {language === "en" && menuCategory.nameEn ? menuCategory.nameEn : menuCategory.name}
           </TabsTrigger>
         ))}
       </TabsList>

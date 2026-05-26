@@ -18,8 +18,10 @@ export default function MenuManageModal({
 
   // Create Form State
   const [menuName, setMenuName] = useState("");
+  const [menuNameEn, setMenuNameEn] = useState("");
   const [menuCategory, setMenuCategory] = useState("");
   const [menuDescription, setMenuDescription] = useState("");
+  const [menuDescriptionEn, setMenuDescriptionEn] = useState("");
   const [menuImage, setMenuImage] = useState("");
   const [menuPrice, setMenuPrice] = useState(0);
   const [menuQuantity, setMenuQuantity] = useState(0);
@@ -36,8 +38,10 @@ export default function MenuManageModal({
 
   const resetCreateForm = useCallback(() => {
     setMenuName("");
+    setMenuNameEn("");
     setMenuCategory("");
     setMenuDescription("");
+    setMenuDescriptionEn("");
     setMenuImage("");
     setMenuPrice(0);
     setMenuQuantity(0);
@@ -86,7 +90,9 @@ export default function MenuManageModal({
         await createMenu({
           menuOptions: {
             name: menuName,
+            nameEn: menuNameEn.trim() || null,
             description: menuDescription,
+            descriptionEn: menuDescriptionEn.trim() || null,
             image: menuImage,
             price: menuPrice,
             quantity: menuQuantity,
@@ -183,11 +189,22 @@ export default function MenuManageModal({
             {/* Left Column inputs */}
             <div className="col-span-1 md:col-span-2 space-y-4">
               <div className="fc gap-1.5">
-                <label className="text-xs uppercase font-bold text-slate-450 dark:text-slate-300 px-0.5">메뉴 이름</label>
+                <label className="text-xs uppercase font-bold text-slate-450 dark:text-slate-300 px-0.5">메뉴 이름 (한국어)</label>
                 <Input
                   value={menuName}
                   onChange={(e) => setMenuName(e.target.value)}
                   placeholder="예: 후라이드 치킨, 타코야끼"
+                  className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-xl h-10 font-medium text-sm"
+                  disabled={isBusy}
+                />
+              </div>
+
+              <div className="fc gap-1.5">
+                <label className="text-xs uppercase font-bold text-slate-450 dark:text-slate-300 px-0.5">Menu Name (English)</label>
+                <Input
+                  value={menuNameEn}
+                  onChange={(e) => setMenuNameEn(e.target.value)}
+                  placeholder="e.g. Fried Chicken, Takoyaki"
                   className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-xl h-10 font-medium text-sm"
                   disabled={isBusy}
                 />
@@ -210,11 +227,22 @@ export default function MenuManageModal({
               </div>
 
               <div className="fc gap-1.5">
-                <label className="text-xs uppercase font-bold text-slate-455 dark:text-slate-300 px-0.5">메뉴 설명</label>
+                <label className="text-xs uppercase font-bold text-slate-455 dark:text-slate-300 px-0.5">메뉴 설명 (한국어)</label>
                 <Input
                   value={menuDescription}
                   onChange={(e) => setMenuDescription(e.target.value)}
                   placeholder="간단한 메뉴 설명을 입력하세요"
+                  className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-xl h-10 font-medium text-sm"
+                  disabled={isBusy}
+                />
+              </div>
+
+              <div className="fc gap-1.5">
+                <label className="text-xs uppercase font-bold text-slate-455 dark:text-slate-300 px-0.5">Menu Description (English)</label>
+                <Input
+                  value={menuDescriptionEn}
+                  onChange={(e) => setMenuDescriptionEn(e.target.value)}
+                  placeholder="Enter a simple description in English"
                   className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-xl h-10 font-medium text-sm"
                   disabled={isBusy}
                 />

@@ -1,9 +1,11 @@
 import useMenuStore from "~/stores/menu.store";
 import useTableStore from "~/stores/table.store";
+import { useTranslation } from "~/hooks/use-translation";
 
 export default function useOrder(orderId: string) {
   const { tables } = useTableStore();
   const { menus } = useMenuStore();
+  const { language } = useTranslation();
 
   const order = tables.flatMap(
     (table) => table.tableContexts.flatMap(
@@ -17,7 +19,7 @@ export default function useOrder(orderId: string) {
     if (!menu) throw new Error(`Menu with menuId(${menuOrder.menuId}) not found`);
     return {
       menuId: menuOrder.menuId,
-      menuName: menu.name,
+      menuName: language === "en" && menu.nameEn ? menu.nameEn : menu.name,
       menuPrice: menu.price,
       quantity: menuOrder.quantity,
       totalPrice: menu.price * menuOrder.quantity,
