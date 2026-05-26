@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import useTableStore from "~/stores/table.store";
 import useMenuStore from "~/stores/menu.store";
+import { api } from "~/lib/query";
 import { 
   Package, 
   LayoutDashboard, 
@@ -12,12 +13,24 @@ import {
   Grid3X3, 
   BarChart3, 
   AlertCircle,
-  ChefHat
+  ChefHat,
+  LogOut
 } from "lucide-react";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    try {
+      await api.post("auth/sign-out");
+      router.push("/auth");
+    } catch (error) {
+      console.error("Sign out failed", error);
+    }
+  };
 
   const { tables, bankTransactions } = useTableStore();
   const { menus } = useMenuStore();
@@ -59,7 +72,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Floating Collapsible Left Sidebar (Stitch Hover Overlay Design) */}
       <aside 
         onMouseEnter={() => setIsSidebarHovered(true)}
-        onMouseLeave={() => setIsSidebarHovered(false)}
+        onMouseLeave={() => {
+          setIsSidebarHovered(false);
+          setIsProfileMenuOpen(false);
+        }}
         className={`hidden md:flex flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800/80 shadow-lg h-full transition-all duration-300 ease-in-out absolute left-0 top-0 z-40 overflow-hidden ${
           isSidebarHovered 
             ? "w-[216px] shadow-[12px_0_30px_rgba(0,0,0,0.08)] dark:shadow-[12px_0_30px_rgba(0,0,0,0.4)]" 
@@ -162,19 +178,47 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
 
           {/* User Profile Info */}
-          <div className={`relative pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center ml-3 flex-shrink-0 transition-all duration-300 h-16 ${
-            isSidebarHovered ? "w-[192px]" : "w-10"
-          }`}>
-            <div className="w-10 h-10 rounded-full bg-brand-100 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400 font-black flex items-center justify-center flex-shrink-0 text-[12px] shadow-inner animate-pulse absolute left-0 top-[18px]">
-              BF
-            </div>
-            <div className={`transition-all duration-300 absolute left-12 top-[18px] ${
-              isSidebarHovered 
-                ? "opacity-100 translate-x-0 pointer-events-auto" 
-                : "opacity-0 -translate-x-3 overflow-hidden pointer-events-none"
-            }`}>
-              <p className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate select-none">Baseball Fan</p>
-              <p className="text-xs text-slate-400 dark:text-slate-500 font-semibold uppercase tracking-wider truncate select-none">Manager</p>
+          <div 
+            onClick={() => {
+              if (isSidebarHovered) {
+                setIsProfileMenuOpen(!isProfileMenuOpen);
+              }
+            }}
+            className={`relative pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-col justify-end ml-3 flex-shrink-0 transition-all duration-300 select-none ${
+              isSidebarHovered ? "w-[192px]" : "w-10"
+            } ${
+              isProfileMenuOpen && isSidebarHovered ? "h-32 cursor-pointer" : "h-16 cursor-pointer"
+            }`}
+          >
+            {/* Smooth Floating Logout Button */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleLogout();
+              }}
+              className={`w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-bold transition-all duration-200 mb-3 select-none active:scale-95 ${
+                isProfileMenuOpen && isSidebarHovered
+                  ? "opacity-100 scale-100 translate-y-0 bg-rose-50 hover:bg-rose-100 text-rose-600 dark:bg-rose-950/20 dark:hover:bg-rose-950/40 dark:text-rose-400"
+                  : "opacity-0 scale-95 translate-y-2 pointer-events-none absolute"
+              }`}
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              <span>로그아웃</span>
+            </button>
+
+            {/* Profile Info Row */}
+            <div className="relative flex items-center h-10 w-full">
+              <div className="w-10 h-10 rounded-full bg-brand-100 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400 font-black flex items-center justify-center flex-shrink-0 text-[12px] shadow-inner absolute left-0 top-0">
+                BF
+              </div>
+              <div className={`transition-all duration-300 absolute left-12 top-0 ${
+                isSidebarHovered 
+                  ? "opacity-100 translate-x-0 pointer-events-auto" 
+                  : "opacity-0 -translate-x-3 overflow-hidden pointer-events-none"
+              }`}>
+                <p className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">Baseball Fan</p>
+                <p className="text-xs text-slate-400 dark:text-slate-500 font-semibold uppercase tracking-wider truncate">Manager</p>
+              </div>
             </div>
           </div>
         </div>

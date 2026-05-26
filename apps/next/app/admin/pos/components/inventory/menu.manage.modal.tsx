@@ -249,7 +249,7 @@ export default function MenuManageModal({
                 </div>
               </div>
 
-              <div className="p-3.5 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-850 flex items-center justify-between gap-3">
+              <label className="p-3.5 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-850 flex items-center justify-between gap-3 cursor-pointer select-none">
                 <div className="fc">
                   <span className="text-xs font-bold text-slate-800 dark:text-slate-200">주문 접수 바로 활성화</span>
                   <span className="text-xs text-slate-450 dark:text-slate-500 font-medium mt-0.5">메뉴 생성 즉시 매장 주문 목록에 노출하도록 설정합니다.</span>
@@ -260,7 +260,7 @@ export default function MenuManageModal({
                   className="h-5 w-5 rounded-md border-slate-300 dark:border-slate-700 data-[state=checked]:bg-brand-500 data-[state=checked]:border-brand-500 transition-colors"
                   disabled={isBusy}
                 />
-              </div>
+              </label>
             </div>
 
             {/* Right Column (Image upload) */}

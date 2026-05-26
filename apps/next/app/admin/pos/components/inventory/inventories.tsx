@@ -68,7 +68,7 @@ export default function Inventories() {
               className="bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs h-8 px-4 flex-1 rounded-xl shadow-sm shadow-brand-500/10 transition-all border-none"
               onClick={() => setCategoryManageModalOpen(true)}
             >
-              카테고리 추가/제거
+              카테고리 추가/수정/제거
             </Button>
           </div>
         </div>
