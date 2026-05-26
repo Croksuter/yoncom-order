@@ -31,6 +31,7 @@ CREATE TABLE `menuBundleItems` (
 CREATE TABLE `clientNoticeSettings` (
 	`id` text PRIMARY KEY NOT NULL,
 	`description` text DEFAULT '' NOT NULL,
+	`descriptionEn` text DEFAULT '' NOT NULL,
 	`createdAt` integer NOT NULL,
 	`updatedAt` integer NOT NULL
 );

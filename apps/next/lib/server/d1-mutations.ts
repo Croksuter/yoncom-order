@@ -167,7 +167,7 @@ type PaymentSettingsInput = Pick<
   "bankName" | "accountNumber" | "accountHolder" | "tossTransferUrlTemplate" | "depositGuide"
 >;
 
-type ClientNoticeSettingsInput = Pick<ClientNoticeSettings, "description">;
+type ClientNoticeSettingsInput = Pick<ClientNoticeSettings, "description" | "descriptionEn">;
 
 const paymentCodeMin = 1;
 const paymentCodeMax = 99;
@@ -401,10 +401,16 @@ async function ensureClientNoticeSettingsTable() {
     CREATE TABLE IF NOT EXISTS clientNoticeSettings (
       id TEXT PRIMARY KEY NOT NULL,
       description TEXT DEFAULT '' NOT NULL,
+      descriptionEn TEXT DEFAULT '' NOT NULL,
       createdAt INTEGER NOT NULL,
       updatedAt INTEGER NOT NULL
     )
   `);
+  const columns = await getD1Columns("clientNoticeSettings");
+  if (!columns.has("descriptionEn")) {
+    await executeD1(`ALTER TABLE ${quoteIdentifier("clientNoticeSettings")} ADD ${quoteIdentifier("descriptionEn")} TEXT DEFAULT '' NOT NULL`);
+    columns.add("descriptionEn");
+  }
   clientNoticeSettingsTableEnsured = true;
 }
 
@@ -420,6 +426,7 @@ function normalizeClientNoticeSettings(settings?: Partial<ClientNoticeSettings> 
   return {
     id: settings?.id ?? clientNoticeSettingsId,
     description: settings?.description ?? "",
+    descriptionEn: settings?.descriptionEn ?? "",
     createdAt: Number(settings?.createdAt ?? timestamp),
     updatedAt: Number(settings?.updatedAt ?? timestamp),
   };
@@ -500,20 +507,23 @@ export async function updateClientNoticeSettings(input: ClientNoticeSettingsInpu
   const settings = normalizeClientNoticeSettings({
     ...current,
     description: input.description.trim(),
+    descriptionEn: input.descriptionEn.trim(),
     createdAt: current.createdAt || timestamp,
     updatedAt: timestamp,
   });
 
   await executeD1(
     `INSERT INTO clientNoticeSettings
-      (id, description, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?)
+      (id, description, descriptionEn, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
       description = excluded.description,
+      descriptionEn = excluded.descriptionEn,
       updatedAt = excluded.updatedAt`,
     [
       settings.id,
       settings.description,
+      settings.descriptionEn,
       settings.createdAt,
       settings.updatedAt,
     ],

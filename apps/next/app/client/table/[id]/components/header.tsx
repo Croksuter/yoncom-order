@@ -15,7 +15,10 @@ export default function Header({ scrollY }: HeaderProps) {
   const { clientTable, clientNoticeSettings } = useTableStore();
   const { theme, toggleTheme, isDark, mounted } = useTheme();
   const { t, language, setLanguage } = useTranslation();
-  const noticeDescription = clientNoticeSettings?.description.trim() ?? "";
+  const noticeDescription = (language === "en"
+    ? clientNoticeSettings?.descriptionEn
+    : clientNoticeSettings?.description
+  )?.trim() ?? "";
   const noticeHeight = noticeDescription ? 32 : 0;
 
   // Interpolation ratio (0 to 1) based on scroll position (0 to 136 pixels)

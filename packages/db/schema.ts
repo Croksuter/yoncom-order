@@ -517,6 +517,7 @@ export type PaymentSettings = typeof paymentSettings.$inferSelect;
 export const clientNoticeSettings = sqliteTable("clientNoticeSettings", {
   id: text("id").primaryKey().notNull(),
   description: text("description").notNull().default(""),
+  descriptionEn: text("descriptionEn").notNull().default(""),
   createdAt: integer("createdAt")
     .notNull()
     .$defaultFn(() => Date.now()),

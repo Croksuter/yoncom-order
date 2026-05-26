@@ -86,6 +86,7 @@ describe("implemented Next API route handlers", () => {
       getClientNoticeSettings: vi.fn(async () => ({
         id: "default",
         description: "중요 공지",
+        descriptionEn: "Important notice",
         createdAt: 1,
         updatedAt: 2,
       })),
@@ -105,6 +106,7 @@ describe("implemented Next API route handlers", () => {
         }),
         clientNoticeSettings: expect.objectContaining({
           description: "중요 공지",
+          descriptionEn: "Important notice",
         }),
       }),
     });
@@ -275,6 +277,15 @@ describe("implemented Next API route handlers", () => {
       if (sql.includes("CREATE TABLE IF NOT EXISTS clientNoticeSettings")) {
         return d1Success([], { duration: 1, changes: 0 });
       }
+      if (sql === "PRAGMA table_info(\"clientNoticeSettings\")") {
+        return d1Success([
+          { name: "id" },
+          { name: "description" },
+          { name: "descriptionEn" },
+          { name: "createdAt" },
+          { name: "updatedAt" },
+        ]);
+      }
       if (sql === "SELECT * FROM clientNoticeSettings WHERE id = ? LIMIT 1") {
         return d1Success([]);
       }
@@ -338,6 +349,15 @@ describe("implemented Next API route handlers", () => {
       }
       if (sql.includes("CREATE TABLE IF NOT EXISTS clientNoticeSettings")) {
         return d1Success([], { duration: 1, changes: 0 });
+      }
+      if (sql === "PRAGMA table_info(\"clientNoticeSettings\")") {
+        return d1Success([
+          { name: "id" },
+          { name: "description" },
+          { name: "descriptionEn" },
+          { name: "createdAt" },
+          { name: "updatedAt" },
+        ]);
       }
       if (sql === "SELECT * FROM clientNoticeSettings WHERE id = ? LIMIT 1") {
         return d1Success([]);
@@ -425,6 +445,7 @@ describe("implemented Next API route handlers", () => {
       getClientNoticeSettings: vi.fn(async () => ({
         id: "default",
         description: "",
+        descriptionEn: "",
         createdAt: 1,
         updatedAt: 1,
       })),

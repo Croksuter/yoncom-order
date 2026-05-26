@@ -1401,6 +1401,9 @@ describe("implemented mutation route handlers", () => {
       if (sql.includes("CREATE TABLE IF NOT EXISTS clientNoticeSettings")) {
         return d1Success([], { duration: 1, changes: 0 });
       }
+      if (sql === "PRAGMA table_info(\"clientNoticeSettings\")") {
+        return tableInfo(["id", "description", "descriptionEn", "createdAt", "updatedAt"]);
+      }
       if (sql === "SELECT * FROM clientNoticeSettings WHERE id = ? LIMIT 1") {
         return d1Success([]);
       }
@@ -1420,6 +1423,7 @@ describe("implemented mutation route handlers", () => {
       {
         clientNoticeSettings: {
           description: "  주문 전 알레르기 유발 재료를 확인해주세요.  ",
+          descriptionEn: "  Please check allergen information before ordering.  ",
         },
       },
     ));
@@ -1428,6 +1432,7 @@ describe("implemented mutation route handlers", () => {
     await expect(response.json()).resolves.toEqual(expect.objectContaining({
       result: expect.objectContaining({
         description: "주문 전 알레르기 유발 재료를 확인해주세요.",
+        descriptionEn: "Please check allergen information before ordering.",
       }),
       affectedScopes: expect.arrayContaining(["venue:default", "table:table_e2e_00001"]),
     }));
@@ -1436,6 +1441,7 @@ describe("implemented mutation route handlers", () => {
     expect(upsert?.params).toEqual(expect.arrayContaining([
       "default",
       "주문 전 알레르기 유발 재료를 확인해주세요.",
+      "Please check allergen information before ordering.",
     ]));
     const domainEventInserts = requests.filter((request) => request.sql.startsWith("INSERT INTO domainEvents"));
     expect(domainEventInserts).toHaveLength(2);

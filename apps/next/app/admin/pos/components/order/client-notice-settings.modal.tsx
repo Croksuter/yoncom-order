@@ -15,31 +15,39 @@ export default function ClientNoticeSettingsModal({
   setOpenState: (open: boolean) => void;
 }) {
   const { clientNoticeSettings } = useTableStore();
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const koTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const enTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [form, setForm] = useState<NoticeSettingsForm>({
     description: clientNoticeSettings?.description ?? "",
+    descriptionEn: clientNoticeSettings?.descriptionEn ?? "",
   });
   const [isSaving, setIsSaving] = useState(false);
-  const previewText = form.description.trim() || "공지 문구를 입력하면 고객 화면에 표시됩니다.";
+  const koPreviewText = form.description.trim() || "공지 문구를 입력하면 고객 화면에 표시됩니다.";
+  const enPreviewText = form.descriptionEn.trim() || "Enter an English notice to show it on the customer screen.";
 
-  const resizeTextarea = () => {
-    const textarea = textareaRef.current;
+  const resizeTextarea = (textarea: HTMLTextAreaElement | null) => {
     if (!textarea) return;
     textarea.style.height = "auto";
     textarea.style.height = `${Math.min(Math.max(textarea.scrollHeight, 112), 224)}px`;
+  };
+
+  const resizeTextareas = () => {
+    resizeTextarea(koTextareaRef.current);
+    resizeTextarea(enTextareaRef.current);
   };
 
   useEffect(() => {
     if (!openState) return;
     setForm({
       description: useTableStore.getState().clientNoticeSettings?.description ?? "",
+      descriptionEn: useTableStore.getState().clientNoticeSettings?.descriptionEn ?? "",
     });
-    requestAnimationFrame(resizeTextarea);
+    requestAnimationFrame(resizeTextareas);
   }, [openState]);
 
   useEffect(() => {
-    resizeTextarea();
-  }, [form.description]);
+    resizeTextareas();
+  }, [form.description, form.descriptionEn]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -73,11 +81,11 @@ export default function ClientNoticeSettingsModal({
 
           <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
             <label className="block space-y-1.5">
-              <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">공지 문구</span>
+              <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">한국어 공지 문구</span>
               <textarea
-                ref={textareaRef}
+                ref={koTextareaRef}
                 value={form.description}
-                onChange={(event) => setForm({ description: event.target.value })}
+                onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
                 className="max-h-56 min-h-28 w-full resize-none whitespace-pre-wrap break-words rounded-xl border border-slate-200 bg-transparent px-3 py-2 text-sm font-semibold leading-relaxed text-slate-700 shadow-sm outline-none transition-colors [overflow-wrap:anywhere] placeholder:text-slate-400 focus:border-rose-400 focus:ring-1 focus:ring-rose-400 dark:border-slate-800 dark:text-slate-200"
                 maxLength={500}
                 placeholder="예: 주문 전 알레르기 유발 재료를 확인해주세요."
@@ -86,10 +94,42 @@ export default function ClientNoticeSettingsModal({
               />
             </label>
 
+            <label className="block space-y-1.5">
+              <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">English Notice</span>
+              <textarea
+                ref={enTextareaRef}
+                value={form.descriptionEn}
+                onChange={(event) => setForm((current) => ({ ...current, descriptionEn: event.target.value }))}
+                className="max-h-56 min-h-28 w-full resize-none whitespace-pre-wrap break-words rounded-xl border border-slate-200 bg-transparent px-3 py-2 text-sm font-semibold leading-relaxed text-slate-700 shadow-sm outline-none transition-colors [overflow-wrap:anywhere] placeholder:text-slate-400 focus:border-rose-400 focus:ring-1 focus:ring-rose-400 dark:border-slate-800 dark:text-slate-200"
+                maxLength={500}
+                placeholder="Example: Please check allergen information before ordering."
+                rows={4}
+                wrap="soft"
+              />
+            </label>
+
             <div className="relative h-10 w-full min-w-0 max-w-full overflow-hidden rounded-2xl border border-rose-200/80 bg-[linear-gradient(90deg,rgba(255,241,242,0.94),rgba(254,205,211,0.98),rgba(255,228,230,0.94))] text-sm text-rose-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_8px_24px_rgba(244,63,94,0.12)]">
               <div className="client-notice-marquee absolute inset-y-0 left-0 flex w-max items-center whitespace-nowrap">
                 {noticePreviewCopies.map((copy) => (
-                  <span key={copy} className="px-6">{previewText}</span>
+                  <span key={copy} className="px-6">{koPreviewText}</span>
+                ))}
+              </div>
+              <style jsx>{`
+                @keyframes client-notice-marquee {
+                  0% { transform: translateX(32rem); }
+                  100% { transform: translateX(-100%); }
+                }
+
+                .client-notice-marquee {
+                  animation: client-notice-marquee 33s linear infinite;
+                }
+              `}</style>
+            </div>
+
+            <div className="relative h-10 w-full min-w-0 max-w-full overflow-hidden rounded-2xl border border-rose-200/80 bg-[linear-gradient(90deg,rgba(255,241,242,0.94),rgba(254,205,211,0.98),rgba(255,228,230,0.94))] text-sm text-rose-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_8px_24px_rgba(244,63,94,0.12)]">
+              <div className="client-notice-marquee absolute inset-y-0 left-0 flex w-max items-center whitespace-nowrap">
+                {noticePreviewCopies.map((copy) => (
+                  <span key={copy} className="px-6">{enPreviewText}</span>
                 ))}
               </div>
               <style jsx>{`

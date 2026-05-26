@@ -111,6 +111,7 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
   const { id } = use(params);
   const { clientTable, clientNoticeSettings } = useTableStore();
   const { clientMenuCategories } = useMenuStore();
+  const { t, language } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [tableAccessMessage, setTableAccessMessage] = useState<string | null>(null);
   const [tableAccessDescription, setTableAccessDescription] = useState<string | null>(null);
@@ -119,13 +120,16 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
   const [scrollY, setScrollY] = useState(0);
   const isValidTableId = id.length === 15;
   const activeUnpaidOrder = clientTable?.tableContexts[0]?.orders.find(isPaymentInstructionOrder);
-  const hasClientNotice = Boolean(clientNoticeSettings?.description.trim());
+  const activeNoticeDescription = (language === "en"
+    ? clientNoticeSettings?.descriptionEn
+    : clientNoticeSettings?.description
+  )?.trim() ?? "";
+  const hasClientNotice = Boolean(activeNoticeDescription);
   const expandedHeaderHeight = baseExpandedHeaderHeight + (hasClientNotice ? noticeHeaderHeight : 0);
   const collapsedHeaderHeight = baseCollapsedHeaderHeight + (hasClientNotice ? noticeHeaderHeight : 0);
   const headerCollapseDistance = expandedHeaderHeight - collapsedHeaderHeight;
   const collapsedHeaderOffset = headerCollapseDistance;
   const [isVerified, setIsVerified] = useState(false);
-  const { t } = useTranslation();
   const tableScope =
     isValidTableId && clientTable?.id === id && tableAccessState === "RESUMED" && !tableAccessMessage
       ? `table:${id}`
