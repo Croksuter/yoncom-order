@@ -22,7 +22,7 @@ export default function OrderUpdateModal({
   const [invalid, setInvalid] = useState(false);
   const [duringConfirm, setDuringConfirm] = useState(false);
   const validateOrder = useValidateOrder();
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
 
   const { updateMenuOrder } = useCartStore();
   const { menus } = useMenuStore();
@@ -77,7 +77,7 @@ export default function OrderUpdateModal({
         {/* Header */}
         <div className="space-y-1 text-center mb-6">
           <DialogTitle className="text-2xl font-black text-slate-800 dark:text-slate-100">
-            {menu.name}
+            {language === "en" && menu.nameEn ? menu.nameEn : menu.name}
           </DialogTitle>
           <DialogDescription className="text-xs text-slate-400 font-medium">
             {t("order_update_select_qty")}

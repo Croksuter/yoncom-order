@@ -2,6 +2,31 @@ import { useEffect } from "react";
 import useLanguageStore, { type Language } from "~/stores/language.store";
 import { translations } from "~/lib/i18n/translations";
 
+export type TranslationKey = keyof typeof translations.ko;
+type TranslationReplacements = Record<string, string | number>;
+
+function applyReplacements(text: string, replacements?: TranslationReplacements) {
+  if (!replacements) return text;
+
+  let nextText = text;
+  Object.entries(replacements).forEach(([key, value]) => {
+    nextText = nextText.replace(`{${key}}`, String(value));
+  });
+  return nextText;
+}
+
+export function translate(
+  key: TranslationKey,
+  replacements?: TranslationReplacements,
+  languageOverride?: Language,
+) {
+  const state = useLanguageStore.getState();
+  const currentLang = languageOverride ?? (state.mounted ? state.language : "ko");
+  const group = translations[currentLang];
+  const text = group[key] || translations.ko[key] || String(key);
+  return applyReplacements(text, replacements);
+}
+
 export function useTranslation() {
   const { language, setLanguage, mounted, setMounted } = useLanguageStore();
 
@@ -21,19 +46,9 @@ export function useTranslation() {
     }
   }, [mounted, setLanguage, setMounted]);
 
-  const t = (key: keyof typeof translations.ko, replacements?: Record<string, string | number>) => {
-    const currentLang = mounted ? language : "ko";
-    const group = translations[currentLang];
-    let text = group[key] || translations.ko[key] || String(key);
-
-    if (replacements) {
-      Object.entries(replacements).forEach(([k, v]) => {
-        text = text.replace(`{${k}}`, String(v));
-      });
-    }
-
-    return text;
-  };
+  const t = (key: TranslationKey, replacements?: TranslationReplacements) => (
+    translate(key, replacements, mounted ? language : "ko")
+  );
 
   return {
     t,

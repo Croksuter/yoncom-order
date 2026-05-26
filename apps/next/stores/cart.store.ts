@@ -4,6 +4,7 @@ import * as ClientOrderResponse from "shared/types/responses/client/order";
 import queryStore from "~/lib/query";
 import useTableStore from "./table.store";
 import { toast } from "~/hooks/use-toast";
+import { translate } from "~/hooks/use-translation";
 
 type MenuOrderQuery = ClientOrderRequest.Create["menuOrders"][number];
 
@@ -60,7 +61,7 @@ const useCartStore = create<CartState>((set, get) => ({
 
     if (!table || nonZeroMenuOrders.length === 0) {
       toast({
-        title: "올바르지 않은 주문 요청입니다.",
+        title: translate("cart_invalid_order"),
         variant: "destructive",
         duration: 3000,
       });
@@ -78,7 +79,7 @@ const useCartStore = create<CartState>((set, get) => ({
       },
       onSuccess: () => {
         toast({
-          title: "주문이 완료되었습니다.",
+          title: translate("cart_order_complete_toast"),
           duration: 3000,
         });
       },
