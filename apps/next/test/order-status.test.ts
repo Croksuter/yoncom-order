@@ -35,8 +35,8 @@ describe("order status display helpers", () => {
     };
 
     expect(isKitchenOrder(paidOrder)).toBe(true);
-    expect(getOrderStatusLabel(paidOrder)).toBe("조리 대기");
-    expect(getMenuOrderStatusLabel(paidOrder.menuOrders[0], paidOrder)).toBe("조리 대기");
+    expect(getOrderStatusLabel(paidOrder)).toBe("조리 중");
+    expect(getMenuOrderStatusLabel(paidOrder.menuOrders[0], paidOrder)).toBe("조리 중");
   });
 
   it("keeps manual review orders blocking but not payment-instruction eligible", () => {

@@ -1,10 +1,10 @@
-"use client";
-
 import { useState, type UIEventHandler } from "react";
 import useMenuStore from "~/stores/menu.store";
 import useTableStore from "~/stores/table.store";
 import OrderDetailModal from "./order.detail.modal";
 import { getOrderStatusLabel } from "~/lib/order-status";
+import { useTranslation } from "~/hooks/use-translation";
+import { getStatusTranslationKey } from "~/lib/i18n/status-translator";
 import { History, ArrowRight } from "lucide-react";
 import * as ClientTableResponse from "shared/types/responses/client/table";
 
@@ -18,6 +18,7 @@ export default function OrderHistoryPanel({
 
   const { menus } = useMenuStore();
   const { clientTable } = useTableStore();
+  const { t, language } = useTranslation();
 
   const orders = clientTable?.tableContexts[0]?.orders ?? [];
   const orderHistories = orders.map((order) => {
@@ -53,10 +54,10 @@ export default function OrderHistoryPanel({
             </div>
             <div className="space-y-1">
               <h3 className="text-lg font-extrabold text-slate-800 dark:text-slate-100">
-                주문 내역이 없습니다
+                {t("order_history_empty")}
               </h3>
               <p className="text-xs text-slate-400">
-                아직 주문하신 내역이 존재하지 않습니다.
+                {t("order_history_empty_desc")}
               </p>
             </div>
           </div>
@@ -66,10 +67,10 @@ export default function OrderHistoryPanel({
             <div className="space-y-1 text-center mb-6">
               <h2 className="text-xl font-black text-slate-800 dark:text-slate-100 flex items-center justify-center gap-1.5 font-sans">
                 <History className="h-5 w-5 text-primary" />
-                이전 주문 내역
+                {t("order_history_prev")}
               </h2>
               <p className="text-xs text-slate-400 font-medium">
-                주문을 터치하시면 상세 내역을 확인할 수 있습니다.
+                {t("order_history_touch_desc")}
               </p>
             </div>
 
@@ -91,7 +92,7 @@ export default function OrderHistoryPanel({
                   >
                     <div className="fc gap-1 min-w-0">
                       <span className="text-[10px] text-slate-400 dark:text-slate-300 font-bold">
-                        {new Date(orderHistory.orderDate).toLocaleString("ko-KR", {
+                        {new Date(orderHistory.orderDate).toLocaleString(language === "ko" ? "ko-KR" : "en-US", {
                           year: "numeric",
                           month: "2-digit",
                           day: "2-digit",
@@ -102,7 +103,7 @@ export default function OrderHistoryPanel({
                       </span>
                       <span className="font-extrabold text-sm text-slate-800 dark:text-slate-100 truncate">
                         {orderHistory.menuOrders[0]?.menuName}
-                        {orderHistory.menuOrders.length > 1 && ` 외 ${orderHistory.menuOrders.length - 1}개`}
+                        {orderHistory.menuOrders.length > 1 && t("order_history_items_count", { count: orderHistory.menuOrders.length - 1 })}
                       </span>
                     </div>
 
@@ -115,7 +116,7 @@ export default function OrderHistoryPanel({
                               ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400"
                               : "bg-amber-50 text-amber-600 dark:bg-amber-950/30 dark:text-amber-400"
                         }`}>
-                          {statusLabel}
+                          {t(getStatusTranslationKey(statusLabel) as any)}
                         </span>
                         <span className="font-extrabold text-xs text-slate-800 dark:text-slate-100 mt-1">
                           ₩ {orderHistory.totalPrice.toLocaleString()}
@@ -130,7 +131,7 @@ export default function OrderHistoryPanel({
 
             {/* Cumulative Summary Row */}
             <div className="flex justify-between items-center p-4 rounded-2xl bg-slate-50 dark:bg-slate-950/30 border border-slate-100 dark:border-slate-800">
-              <span className="text-xs text-slate-400 dark:text-slate-300 font-bold">누적 총 주문금액</span>
+              <span className="text-xs text-slate-400 dark:text-slate-300 font-bold">{t("order_history_accumulated")}</span>
               <span className="text-lg font-black text-primary dark:text-brand-400">
                 ₩ {orderHistories.filter((oh) => oh.order.deletedAt === null).reduce((acc, oh) => acc + oh.totalPrice, 0).toLocaleString()}
               </span>

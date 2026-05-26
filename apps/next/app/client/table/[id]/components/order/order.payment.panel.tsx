@@ -7,6 +7,7 @@ import useTableStore from "~/stores/table.store";
 import useMenuStore from "~/stores/menu.store";
 import { runWithBlockingLoading } from "~/lib/blocking-loading";
 import * as ClientTableResponse from "shared/types/responses/client/table";
+import { useTranslation } from "~/hooks/use-translation";
 import { Copy, Check, Clock, AlertTriangle, Trash2, ArrowRight } from "lucide-react";
 
 type ClientOrder = ClientTableResponse.Get["result"]["tableContexts"][number]["orders"][number];
@@ -22,6 +23,7 @@ export default function OrderPaymentPanel({
   const [copiedAmount, setCopiedAmount] = useState(false);
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [isBusy, setIsBusy] = useState(false);
+  const { t, language } = useTranslation();
 
   const totalDurationRef = useRef<number>(0);
   const copiedAccountTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -100,8 +102,8 @@ export default function OrderPaymentPanel({
     setIsBusy(true);
 
     toast({
-      title: "입금 기한이 만료되었습니다.",
-      description: "주문이 자동으로 취소되었습니다. 다시 주문해 주세요.",
+      title: t("pay_expired_title"),
+      description: t("pay_expired_desc"),
       variant: "destructive",
     });
 
@@ -134,16 +136,16 @@ export default function OrderPaymentPanel({
         });
         if (!cancelled) {
           toast({
-            title: "주문 취소에 실패했습니다.",
-            description: "직원에게 문의해 주세요.",
+            title: t("order_cancel_failed"),
+            description: t("order_cancel_failed_desc"),
             variant: "destructive",
           });
           return;
         }
 
         toast({
-          title: "주문이 취소되었습니다.",
-          description: "메뉴 탐색 화면으로 돌아갑니다.",
+          title: t("pay_cancel_success"),
+          description: t("pay_cancel_success_desc"),
         });
 
         if (clearTableContextIfLastOrder()) {
@@ -168,8 +170,8 @@ export default function OrderPaymentPanel({
       await navigator.clipboard.writeText("1000-1234-5678");
     } catch {
       toast({
-        title: "계좌정보를 복사하지 못했습니다.",
-        description: "다시 시도해주세요.",
+        title: t("pay_bank_copy_failed"),
+        description: t("pay_bank_copy_failed_desc"),
         variant: "destructive",
       });
       return;
@@ -177,7 +179,7 @@ export default function OrderPaymentPanel({
 
     setCopiedAccount(true);
     toast({
-      title: "계좌번호가 복사되었습니다.",
+      title: t("pay_bank_copy_success"),
       description: "토스뱅크 1000-1234-5678",
     });
     if (copiedAccountTimerRef.current) clearTimeout(copiedAccountTimerRef.current);
@@ -192,8 +194,8 @@ export default function OrderPaymentPanel({
       await navigator.clipboard.writeText(expectedTransferAmount.toString());
     } catch {
       toast({
-        title: "입금액을 복사하지 못했습니다.",
-        description: "다시 시도해주세요.",
+        title: t("pay_amount_copy_failed"),
+        description: t("pay_bank_copy_failed_desc"),
         variant: "destructive",
       });
       return;
@@ -201,8 +203,8 @@ export default function OrderPaymentPanel({
 
     setCopiedAmount(true);
     toast({
-      title: "입금액이 복사되었습니다.",
-      description: `${expectedTransferAmount.toLocaleString()}원`,
+      title: t("pay_amount_copy_success"),
+      description: `₩ ${expectedTransferAmount.toLocaleString()}`,
     });
     if (copiedAmountTimerRef.current) clearTimeout(copiedAmountTimerRef.current);
     copiedAmountTimerRef.current = setTimeout(() => {
@@ -229,11 +231,11 @@ export default function OrderPaymentPanel({
       <div>
         {/* Header */}
         <div className="space-y-1 text-center mb-6 pt-4">
-          <h2 className="text-2xl font-black text-slate-800 dark:text-slate-100">
-            결제 및 입금 대기 중
+          <h2 className="text-2xl font-black text-slate-800 dark:text-slate-100 font-sans">
+            {t("pay_waiting_title")}
           </h2>
           <p className="text-xs text-slate-400 font-bold">
-            아래 정보를 확인하고 이체를 완료해 주세요.
+            {t("pay_waiting_desc")}
           </p>
         </div>
 
@@ -243,7 +245,7 @@ export default function OrderPaymentPanel({
             <div className="flex items-center space-x-2">
               <Clock className={`h-4 w-4 ${isLowTime || isExpired ? "text-destructive animate-pulse" : "text-primary"}`} />
               <span className={`text-xs font-bold ${isExpired ? "text-destructive" : "text-slate-500"}`}>
-                {isExpired ? "입금 기한 만료" : "남은 입금 기한"}
+                {isExpired ? t("pay_expired_status") : t("pay_time_remaining")}
               </span>
             </div>
             <span className={`text-4xl font-black tracking-wider ${
@@ -270,17 +272,17 @@ export default function OrderPaymentPanel({
         <div className="bg-slate-50 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-850 rounded-2xl p-5 mb-6 flex flex-col gap-4 relative overflow-hidden">
           {/* Itemized Table */}
           <div className="grid w-full grid-cols-2 gap-y-2.5 pb-4 border-b border-dashed border-slate-200 dark:border-slate-800 text-xs font-semibold">
-            <span className="text-slate-400 dark:text-slate-300 font-bold">주문금액</span>
-            <span className="text-right text-slate-800 dark:text-slate-100">{originalAmount.toLocaleString()}원</span>
+            <span className="text-slate-400 dark:text-slate-300 font-bold">{t("order_amount")}</span>
+            <span className="text-right text-slate-800 dark:text-slate-100">₩ {originalAmount.toLocaleString()}</span>
 
-            <span className="text-slate-400 dark:text-slate-300 font-bold">결제코드 차감</span>
-            <span className="text-right text-red-500">
-              {paymentCode !== null ? `-${paymentCode.toLocaleString()}원` : "0원"}
+            <span className="text-slate-400 dark:text-slate-300 font-bold">{t("pay_code_deduction")}</span>
+            <span className="text-right text-red-500 font-bold">
+              {paymentCode !== null ? `- ₩ ${paymentCode.toLocaleString()}` : "₩ 0"}
             </span>
 
-            <span className="text-slate-400 dark:text-slate-300 font-bold">입금 예정 시각</span>
+            <span className="text-slate-400 dark:text-slate-300 font-bold">{t("pay_expected_time")}</span>
             <span className="text-right text-slate-800 dark:text-slate-100">
-              {expiresAt ? new Date(expiresAt).toLocaleTimeString("ko-KR", {
+              {expiresAt ? new Date(expiresAt).toLocaleTimeString(language === "ko" ? "ko-KR" : "en-US", {
                 hour: "2-digit",
                 minute: "2-digit",
                 second: "2-digit",
@@ -292,21 +294,21 @@ export default function OrderPaymentPanel({
           {/* Account Box */}
           <div className="space-y-1.5 pt-1">
             <span className="block text-[11px] font-bold text-slate-400 dark:text-slate-300 pl-0.5 uppercase tracking-wider">
-              ⋅ 입금 계좌
+              {t("pay_account_info")}
             </span>
             <button
               onClick={copyAccount}
               className="flex w-full items-center justify-between overflow-hidden rounded-xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 transition-all hover:bg-slate-50 dark:hover:bg-slate-800/60 active:scale-[0.99] shadow-sm cursor-pointer"
             >
               <div className="flex flex-col text-left">
-                <span className="text-xs text-slate-400 font-bold leading-none mb-1">토스뱅크</span>
+                <span className="text-xs text-slate-400 font-bold leading-none mb-1">{t("pay_bank_name")}</span>
                 <span className="text-base font-black text-slate-800 dark:text-slate-100 leading-tight">
                   1000-1234-5678
                 </span>
-                <span className="text-[10px] text-slate-400 mt-1 leading-none">예금주: 연컴 홈런포차</span>
+                <span className="text-[10px] text-slate-400 mt-1 leading-none">{t("pay_account_holder")}</span>
               </div>
               <div className="flex items-center space-x-1 text-slate-400 hover:text-primary transition-colors shrink-0 pl-4 border-l border-slate-100 dark:border-slate-800 h-8">
-                <span className="text-xs font-bold">{copiedAccount ? "복사 완료" : "복사"}</span>
+                <span className="text-xs font-bold">{copiedAccount ? t("pay_copied") : t("pay_copy")}</span>
                 {copiedAccount ? (
                   <Check className="h-4 w-4 text-emerald-500 stroke-[3px]" />
                 ) : (
@@ -319,17 +321,17 @@ export default function OrderPaymentPanel({
           {/* Target Amount Box */}
           <div className="space-y-1.5">
             <span className="block text-[11px] font-bold text-slate-400 dark:text-slate-300 pl-0.5 uppercase tracking-wider">
-              ⋅ 정확히 보낼 금액
+              {t("pay_exact_amount")}
             </span>
             <button
               onClick={copyAmount}
               className="flex w-full items-center justify-between overflow-hidden rounded-xl border border-brand-100 dark:border-brand-900 bg-brand-50/40 dark:bg-brand-950/20 p-4 transition-all hover:bg-brand-50 dark:hover:bg-brand-950/30 active:scale-[0.99] shadow-sm cursor-pointer"
             >
               <span className="text-2xl font-black text-primary dark:text-brand-400">
-                {expectedTransferAmount.toLocaleString()}원
+                ₩ {expectedTransferAmount.toLocaleString()}
               </span>
               <div className="flex items-center space-x-1 text-primary dark:text-brand-400 shrink-0 pl-4 border-l border-brand-100 dark:border-brand-900 h-8">
-                <span className="text-xs font-bold">{copiedAmount ? "복사 완료" : "복사"}</span>
+                <span className="text-xs font-bold">{copiedAmount ? t("pay_copied") : t("pay_copy")}</span>
                 {copiedAmount ? (
                   <Check className="h-4 w-4 text-emerald-500 stroke-[3px]" />
                 ) : (
@@ -344,7 +346,7 @@ export default function OrderPaymentPanel({
         <div className="bg-red-50 dark:bg-red-950/20 border border-red-100/50 dark:border-red-900/30 text-destructive dark:text-rose-500 rounded-2xl p-4 flex items-start gap-3 text-xs leading-relaxed font-semibold mb-6">
           <AlertTriangle className="h-5 w-5 shrink-0 text-destructive" />
           <p>
-            주문금액이 아니라 결제코드가 차감된 <strong className="underline decoration-2">입금액을 1원 단위까지 정확하게</strong> 이체해 주세요. 입금액이 다를 경우 입금 자동 확인이 지연되거나 지불 취소 처리가 필요할 수 있습니다.
+            {t("pay_warning_guideline")}
           </p>
         </div>
       </div>
@@ -356,7 +358,7 @@ export default function OrderPaymentPanel({
           disabled={isBusy}
           className="w-full py-4 h-auto rounded-xl bg-primary hover:bg-brand-600 text-white font-extrabold text-sm shadow-[0_8px_20px_rgba(0,61,155,0.2)] hover:shadow-[0_12px_28px_rgba(0,61,155,0.3)] transition-all duration-300 active:scale-[0.98] cursor-pointer flex justify-center items-center gap-2"
         >
-          <span>토스 앱으로 간편 송금</span>
+          <span>{t("pay_toss_btn")}</span>
           <ArrowRight className="h-4 w-4 stroke-[3px]" />
         </Button>
         <Button
@@ -366,7 +368,7 @@ export default function OrderPaymentPanel({
           className="w-full py-4 h-auto rounded-xl border-destructive/20 text-destructive dark:text-rose-500 hover:bg-destructive/5 dark:hover:bg-rose-950/25 font-bold cursor-pointer transition-colors flex justify-center items-center gap-2"
         >
           <Trash2 className="h-4 w-4" />
-          <span>주문 취소하기</span>
+          <span>{t("pay_cancel_btn")}</span>
         </Button>
       </div>
     </div>

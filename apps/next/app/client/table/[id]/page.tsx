@@ -14,6 +14,7 @@ import OrderPaymentPanel from "./components/order/order.payment.panel";
 import { Skeleton } from "~/components/ui/skeleton";
 import { isPaymentInstructionOrder } from "~/lib/order-status";
 import { useRealtimeSync } from "~/hooks/use-realtime-sync";
+import { useTranslation } from "~/hooks/use-translation";
 import { api } from "~/lib/query";
 import type * as ClientTableResponse from "shared/types/responses/client/table";
 import { traceEvent } from "~/lib/verification-trace";
@@ -44,10 +45,10 @@ type TableSessionResponse = {
   };
 };
 
-const TABLE_UNAVAILABLE_MESSAGE = "현재 이용할 수 없는 테이블입니다.";
-const TABLE_UNAVAILABLE_DESCRIPTION = "직원에게 테이블 활성화를 요청해주세요.";
-const TABLE_IN_USE_MESSAGE = "이미 사용 중인 테이블입니다.";
-const TABLE_IN_USE_DESCRIPTION = "직원에게 문의해주세요.";
+const TABLE_UNAVAILABLE_MESSAGE = "table_unavailable";
+const TABLE_UNAVAILABLE_DESCRIPTION = "table_unavailable_desc";
+const TABLE_IN_USE_MESSAGE = "table_in_use";
+const TABLE_IN_USE_DESCRIPTION = "table_in_use_desc";
 const tableAccessFailureStatuses = new Set([401, 403, 404, 409]);
 const expandedHeaderHeight = 196;
 const collapsedHeaderHeight = 60;
@@ -89,8 +90,8 @@ async function getTableAccessFailureCopy(error: unknown) {
   }
   if (body?.error === "Table Not Found") {
     return {
-      message: "존재하지 않는 테이블입니다.",
-      description: "테이블 주소를 다시 확인해주세요.",
+      message: "table_not_found",
+      description: "table_not_found_desc",
     };
   }
 
@@ -113,6 +114,7 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
   const isValidTableId = id.length === 15;
   const activeUnpaidOrder = clientTable?.tableContexts[0]?.orders.find(isPaymentInstructionOrder);
   const [isVerified, setIsVerified] = useState(false);
+  const { t } = useTranslation();
   const tableScope =
     isValidTableId && clientTable?.id === id && tableAccessState === "RESUMED" && !tableAccessMessage
       ? `table:${id}`
@@ -207,11 +209,11 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
 
   useEffect(() => {
     if (clientTable?.name) {
-      document.title = `${clientTable.name} | 첨크크`;
+      document.title = `${clientTable.name} | ${t("brand_title")}`;
     } else {
-      document.title = "고객 주문 | 첨크크";
+      document.title = `${t("brand_title")}`;
     }
-  }, [clientTable]);
+  }, [clientTable, t]);
 
   useEffect(() => {
     if (tableAccessState === "INACTIVE" && clientTable?.tableContexts.some((context) => context.deletedAt === null)) {
@@ -376,10 +378,10 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
       ) : (
         <div className="p-6 text-center">
           <h1 className="text-xl font-bold">
-            {isValidTableId ? tableAccessMessage ?? "존재하지 않는 테이블입니다." : "올바르지 않은 테이블 주소입니다."}
+            {isValidTableId ? (tableAccessMessage ? t(tableAccessMessage as any) : t("table_not_found")) : t("invalid_table_url")}
           </h1>
           <p className="mt-2 text-sm text-slate-500">
-            {isValidTableId && tableAccessMessage ? tableAccessDescription : `tableId: ${id}`}
+            {isValidTableId && tableAccessMessage ? t(tableAccessDescription as any) : `tableId: ${id}`}
           </p>
         </div>
       )}
