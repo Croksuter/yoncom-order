@@ -6,12 +6,12 @@ import Link from "next/link";
 import useTableStore from "~/stores/table.store";
 import useMenuStore from "~/stores/menu.store";
 import { api } from "~/lib/query";
-import { 
-  Package, 
-  LayoutDashboard, 
-  Receipt, 
-  Grid3X3, 
-  BarChart3, 
+import {
+  Package,
+  LayoutDashboard,
+  Receipt,
+  Grid3X3,
+  BarChart3,
   AlertCircle,
   ChefHat,
   LogOut
@@ -70,15 +70,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-slate-50 dark:bg-slate-950 font-sans transition-colors duration-300 relative">
       {/* Floating Collapsible Left Sidebar (Stitch Hover Overlay Design) */}
-      <aside 
+      <aside
         onMouseEnter={() => setIsSidebarHovered(true)}
         onMouseLeave={() => {
           setIsSidebarHovered(false);
           setIsProfileMenuOpen(false);
         }}
         className={`hidden md:flex flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800/80 shadow-lg h-full transition-all duration-300 ease-in-out absolute left-0 top-0 z-40 overflow-hidden ${
-          isSidebarHovered 
-            ? "w-[216px] shadow-[12px_0_30px_rgba(0,0,0,0.08)] dark:shadow-[12px_0_30px_rgba(0,0,0,0.4)]" 
+          isSidebarHovered
+            ? "w-[216px] shadow-[12px_0_30px_rgba(0,0,0,0.08)] dark:shadow-[12px_0_30px_rgba(0,0,0,0.4)]"
             : "w-16 shadow-[4px_0_12px_rgba(0,0,0,0.02)] dark:shadow-[4px_0_12px_rgba(0,0,0,0.15)]"
         }`}
       >
@@ -89,15 +89,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               isSidebarHovered ? "w-[192px]" : "w-10"
             }`}>
               <div className="w-10 h-10 rounded-2xl overflow-hidden flex items-center justify-center shadow-lg border border-slate-200 dark:border-slate-800/80 active:scale-95 transition-all duration-300 flex-shrink-0 bg-[#0b1326] absolute left-0 top-1/2 -translate-y-1/2">
-                <img 
+                <img
                   src="https://lh3.googleusercontent.com/aida-public/AB6AXuDsA9CPXvcB5VB3yhQlfDRcSBIFDGyk1NrW_ovdSMwPROFXURC7gotOCKORzvdvtG5RXejaeknLBwvCN3KUBCLY8TMos6bjvHooUR0DIuNS26KiQDTFfsTpiPJddu4Bd8EkJlkzb4DuhLg0b41iBc4WhlqdXgt8Hw1zXKoJ4755roRQCN7T8HtLVT-VPodEx9izW9ieD3q4O1p4CU_mVEFfyH0HMiAMWQjES7YYKmAr1esMtL-0W-bNdZxMdgZSNo8Uh__PNNI8Az4C"
                   alt="첨크크"
                   className="w-full h-full object-cover transform rotate-12 scale-125 mix-blend-screen"
                 />
               </div>
               <h1 className={`font-extrabold text-xl text-slate-800 dark:text-white tracking-tight truncate select-none transition-all duration-300 absolute left-12 top-1/2 -translate-y-1/2 ${
-                isSidebarHovered 
-                  ? "opacity-100 translate-x-0 pointer-events-auto" 
+                isSidebarHovered
+                  ? "opacity-100 translate-x-0 pointer-events-auto"
                   : "opacity-0 -translate-x-3 overflow-hidden pointer-events-none"
               }`}>
                 첨크크
@@ -107,20 +107,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {/* Sidebar Navigation */}
             <nav className="flex flex-col gap-2 w-full">
               {/* Dashboard Tab */}
-              <Link 
-                href="/admin/pos" 
+              <Link
+                href="/admin/pos"
                 className={`relative flex items-center h-11 ml-3 rounded-2xl transition-all duration-200 border ${
                   isSidebarHovered ? "w-[192px]" : "w-10"
                 } ${
-                  !isCooker 
-                    ? "bg-brand-50 dark:bg-brand-950/20 text-brand-600 dark:text-brand-400 font-bold border-brand-100 dark:border-brand-900/30" 
+                  !isCooker
+                    ? "bg-brand-50 dark:bg-brand-950/20 text-brand-600 dark:text-brand-400 font-bold border-brand-100 dark:border-brand-900/30"
                     : "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-800 dark:hover:text-slate-200 border-transparent"
                 }`}
               >
                 <LayoutDashboard className="h-5 w-5 absolute left-[10px] top-1/2 -translate-y-1/2 flex-shrink-0" />
                 <span className={`text-sm truncate select-none transition-all duration-300 absolute left-12 top-1/2 -translate-y-1/2 ${
-                  isSidebarHovered 
-                    ? "opacity-100 translate-x-0 pointer-events-auto" 
+                  isSidebarHovered
+                    ? "opacity-100 translate-x-0 pointer-events-auto"
                     : "opacity-0 -translate-x-3 overflow-hidden pointer-events-none"
                 }`}>
                   Dashboard
@@ -128,20 +128,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </Link>
 
               {/* Kitchen Tab */}
-              <Link 
-                href="/admin/cooker" 
+              <Link
+                href="/admin/cooker"
                 className={`relative flex items-center h-11 ml-3 rounded-2xl transition-all duration-200 border ${
                   isSidebarHovered ? "w-[192px]" : "w-10"
                 } ${
-                  isCooker 
-                    ? "bg-brand-50 dark:bg-brand-950/20 text-brand-600 dark:text-brand-400 font-bold border-brand-100 dark:border-brand-900/30" 
+                  isCooker
+                    ? "bg-brand-50 dark:bg-brand-950/20 text-brand-600 dark:text-brand-400 font-bold border-brand-100 dark:border-brand-900/30"
                     : "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-800 dark:hover:text-slate-200 border-transparent"
                 }`}
               >
                 <ChefHat className="h-5 w-5 absolute left-[10px] top-1/2 -translate-y-1/2 flex-shrink-0" />
                 <span className={`text-sm truncate select-none transition-all duration-300 absolute left-12 top-1/2 -translate-y-1/2 ${
-                  isSidebarHovered 
-                    ? "opacity-100 translate-x-0 pointer-events-auto" 
+                  isSidebarHovered
+                    ? "opacity-100 translate-x-0 pointer-events-auto"
                     : "opacity-0 -translate-x-3 overflow-hidden pointer-events-none"
                 }`}>
                   Kitchen
@@ -149,24 +149,24 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </Link>
 
               {[
-                { label: "Orders", icon: Receipt },
-                { label: "Table Management", icon: Grid3X3 },
-                { label: "Inventory", icon: Package },
+                // { label: "Orders", icon: Receipt },
+                // { label: "Table Management", icon: Grid3X3 },
+                // { label: "Inventory", icon: Package },
                 { label: "Sales Analytics", icon: BarChart3 }
               ].map((tab, idx) => {
                 const Icon = tab.icon;
                 return (
-                  <a 
+                  <a
                     key={idx}
-                    href="#" 
+                    href="#"
                     className={`relative flex items-center h-11 ml-3 rounded-2xl border border-transparent transition-all duration-200 ${
                       isSidebarHovered ? "w-[192px]" : "w-10"
                     } text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-800 dark:hover:text-slate-200`}
                   >
                     <Icon className="h-5 w-5 absolute left-[10px] top-1/2 -translate-y-1/2 flex-shrink-0" />
                     <span className={`text-sm truncate select-none transition-all duration-300 absolute left-12 top-1/2 -translate-y-1/2 ${
-                      isSidebarHovered 
-                        ? "opacity-100 translate-x-0 pointer-events-auto" 
+                      isSidebarHovered
+                        ? "opacity-100 translate-x-0 pointer-events-auto"
                         : "opacity-0 -translate-x-3 overflow-hidden pointer-events-none"
                     }`}>
                       {tab.label}
@@ -178,7 +178,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
 
           {/* User Profile Info */}
-          <div 
+          <div
             onClick={() => {
               if (isSidebarHovered) {
                 setIsProfileMenuOpen(!isProfileMenuOpen);
@@ -212,8 +212,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 BF
               </div>
               <div className={`transition-all duration-300 absolute left-12 top-0 ${
-                isSidebarHovered 
-                  ? "opacity-100 translate-x-0 pointer-events-auto" 
+                isSidebarHovered
+                  ? "opacity-100 translate-x-0 pointer-events-auto"
                   : "opacity-0 -translate-x-3 overflow-hidden pointer-events-none"
               }`}>
                 <p className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">Baseball Fan</p>
