@@ -1,6 +1,6 @@
 # yoncom-order 시스템 Mermaid 다이어그램 모음집
 
-이 문서는 현재 `apps/next` 코드베이스 기준으로 연컴 오더(yoncom-order)의 **화면/모달 전환 흐름**, **데이터 상태 수명 주기**, **실시간 동기화 경계**, **최단 검증 시퀀스**를 정리한 Mermaid 소스 모음입니다.
+이 문서는 현재 `apps/next` 코드베이스 기준으로 연컴 오더(yoncom-order)의 **화면/모달 전환 흐름**, **데이터 상태 수명 주기**, **실시간 동기화 경계**, **최단 검증 시퀀스**를 정리한 Mermaid 소스 모음입니다. 고객 화면은 `useTranslation`과 `language.store`로 한국어/영어 런타임 전환을 지원하고, 메뉴/카테고리는 기본 한국어 필드와 선택 영문 필드를 함께 사용합니다.
 
 공통 색상 규칙:
 
@@ -27,10 +27,13 @@ flowchart TD
     Loading[로딩 스켈레톤 화면]:::page --> StartSession["POST /api/table/session<br/>테이블 세션 시작"]:::loading
     StartSession -->|활성 tableContext 없음| InvalidTable["존재하지 않거나<br/>활성화되지 않은 테이블"]:::error
     StartSession -->|세션 쿠키 발급| SyncSnapshot["GET /api/sync/table?afterRevision=0<br/>초기 스냅샷 동기화"]:::loading
-    SyncSnapshot --> LoadMenu["GET /api/menu<br/>메뉴 로드"]:::loading
+    SyncSnapshot --> HydrateLanguage["language.store localStorage<br/>ko/en 선호값 로드"]:::state
+    HydrateLanguage --> LoadMenu["GET /api/menu<br/>메뉴 로드"]:::loading
     LoadMenu --> DecisionOrder{활성 미해결 결제 주문?}:::state
 
     DecisionOrder -->|없음| MenuTab["메뉴 탐색 화면 <Menus>"]:::page
+    MenuTab -->|헤더 언어 버튼| LanguageToggle["언어 전환<br/>useTranslation + language.store"]:::state
+    LanguageToggle --> MenuTab
     DecisionOrder -->|PENDING + 금액 확인 전| AmountVerify["입금 금액 확인 모달 <OrderModal>"]:::modal
     DecisionOrder -->|PENDING + 금액 확인 완료| PayPanel["결제 안내 화면 <OrderPaymentPanel><br/>⏱️#2"]:::page
     DecisionOrder -->|MANUAL_REVIEW| ReviewState["메뉴/주문내역 화면<br/>하단 '입금 확인 중' 표시"]:::page
@@ -80,7 +83,7 @@ flowchart TD
 
 ## 2. 관리자용 화면 및 모달 전환 흐름도 (Admin-Side Transitions)
 
-`/admin`은 독립 대시보드가 아니라 `/admin/pos`로 리다이렉트됩니다. POS에서 주방 화면(`/admin/cooker`)을 새 창으로 열 수 있고, 수동 입금 매칭은 별도 `ManualMatchModal`이 아니라 POS의 주문 현황 패널 내 “입금 확인 필요” 리스트에서 후보를 확정합니다.
+`/admin`은 독립 대시보드가 아니라 `/admin/pos`로 리다이렉트됩니다. POS에서 주방 화면(`/admin/cooker`)을 새 창으로 열 수 있고, 수동 입금 매칭은 별도 `ManualMatchModal`이 아니라 POS의 주문 현황 패널 내 “입금 확인 필요” 리스트에서 후보를 확정합니다. 재고 패널은 메뉴뿐 아니라 카테고리 관리와 한국어/영어 표시 메타데이터를 함께 관리합니다.
 
 ```mermaid
 flowchart TD
@@ -147,11 +150,16 @@ flowchart TD
     RefundApi --> RefundOk["환불 완료 토스트"]:::success
     RefundApi --> RefundFail["환불 실패 토스트"]:::error
 
-    InventoryPanel -->|메뉴 추가| MenuCreate["메뉴 등록 모달 <InventoryCreateModal>"]:::modal
+    InventoryPanel -->|카테고리 관리| CategoryManage["카테고리 관리 모달 <CategoryManageModal><br/>ko/en 이름/설명"]:::modal
+    CategoryManage --> CategoryManageApi["POST/PUT/DELETE /api/admin/menuCategory"]:::loading
+    CategoryManageApi --> CategoryManageOk["카테고리 변경 완료 토스트"]:::success
+    CategoryManageApi --> CategoryManageFail["카테고리 변경 실패 토스트"]:::error
+
+    InventoryPanel -->|메뉴 추가| MenuCreate["메뉴 등록 모달 <MenuManageModal><br/>ko/en 이름/설명"]:::modal
     MenuCreate --> CreateMenuApi["POST /api/admin/menu"]:::loading
     CreateMenuApi --> CreateMenuOk["메뉴 생성 완료 토스트"]:::success
     CreateMenuApi --> CreateMenuFail["메뉴 생성 실패 토스트"]:::error
-    InventoryPanel -->|메뉴 카드 클릭| MenuDetail["메뉴 수정 모달 <InventoryDetailModal>"]:::modal
+    InventoryPanel -->|메뉴 카드 클릭| MenuDetail["메뉴 수정 모달 <InventoryDetailModal><br/>ko/en 이름/설명"]:::modal
     MenuDetail --> UpdateMenuApi["PUT /api/admin/menu"]:::loading
     UpdateMenuApi --> UpdateMenuOk["메뉴 수정 완료 토스트"]:::success
     UpdateMenuApi --> UpdateMenuFail["메뉴 수정 실패 토스트"]:::error
@@ -172,6 +180,8 @@ flowchart TD
 ## 3. 데이터 무결성 상태 전이도 (State Transition Diagram)
 
 백엔드 상태 머신은 테이블 컨텍스트, 주문, 결제, 메뉴 주문 상태가 분리되어 있습니다. 고객 QR 입장은 세션만 발급받으며, 현재 고객 페이지의 `table/session`은 활성 컨텍스트가 없으면 실패합니다. 운영 UI에서는 관리자가 먼저 테이블을 활성화해야 합니다.
+
+메뉴/카테고리의 `nameEn`/`descriptionEn`은 주문 상태 전이가 아니라 렌더링 메타데이터입니다. 영어 값이 없으면 고객 화면은 기본 한국어 `name`/`description`을 fallback으로 사용합니다.
 
 ```mermaid
 stateDiagram-v2

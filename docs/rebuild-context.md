@@ -5,6 +5,7 @@
 - `apps/next`: Next.js App Router application, API routes, UI, tests, and dummy seed script.
 - `packages/db`: Drizzle schema and migration SQL.
 - `packages/shared`: request/response contracts shared by the Next app.
+- `docs/verification/realtime-verification-pipeline.*`: canonical structured verification pipeline and operator checklist.
 
 The previous Worker API and Remix UI implementations have been removed from the active workspace. New work should be implemented in `apps/next` unless it is a shared schema/type change.
 
@@ -35,6 +36,14 @@ DB-backed routes and seed scripts require:
 - Paid cancellation creates `REFUND_PENDING`; refund completion changes the payment to `REFUNDED`.
 - `REFUND_PENDING` blocks table vacate until refund completion.
 - Admin API routes and `/admin/*` pages require an admin session.
+- Inventory management covers menu CRUD, category CRUD, and Korean/English menu/category display metadata.
+- Customer table UI supports Korean/English runtime switching through `useTranslation` and `language.store`; menu/category English values fallback to Korean when missing.
+
+## Verification
+
+- Core local gates: `pnpm typecheck`, `pnpm test`, `pnpm build`, `git diff --check`.
+- Realtime/browser operator flow: `pnpm verify:realtime` plus the Browser workflow in `docs/verification/realtime-verification-pipeline.md`.
+- Browser workflow should cover `/auth`, `/admin/pos`, `/admin/cooker`, `/client/table/:tableId`, table activation, order/payment, kitchen ready, pickup, vacate, and customer language toggle.
 
 ## Current Known Non-Core Features
 

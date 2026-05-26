@@ -71,9 +71,10 @@ Browser sequence:
 5. Open `/admin/pos`.
 6. Open `/admin/cooker` in same Browser surface or second Browser tab.
 7. Open `/client/table/{tableId}` in same Browser surface or third Browser tab.
-8. Drive POS occupy, client order, deposit/payment, Kitchen ready, POS pickup, vacate.
-9. Collect Browser console logs with `tab.dev.logs`.
-10. Compare Browser console trace order with server terminal trace order.
+8. Toggle customer language between Korean and English; assert visible client chrome, menu/order labels, and fallback labels remain coherent.
+9. Drive POS occupy, client order, deposit/payment, Kitchen ready, POS pickup, vacate.
+10. Collect Browser console logs with `tab.dev.logs`.
+11. Compare Browser console trace order with server terminal trace order.
 
 Use DOM snapshots and visible URL/state text for assertions. Do not score visual layout.
 
