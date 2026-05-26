@@ -68,10 +68,10 @@ export default function Orders() {
         <div className="h-[76px] bg-slate-50/50 dark:bg-slate-800/30 border-b border-slate-200/60 dark:border-slate-800/60 flex justify-between items-center px-4 shrink-0">
           <div className="flex flex-col gap-1">
             <h3 className="font-extrabold text-base text-slate-800 dark:text-white leading-none">
-              주문 대기열 <span className="text-slate-400 dark:text-slate-500 font-bold text-sm">({inProgressOrders.length + refundPendingOrdersCount})</span>
+              주문 대기열 <span className="text-slate-400 dark:text-slate-300 font-bold text-sm">({inProgressOrders.length + refundPendingOrdersCount})</span>
             </h3>
             {/* Status indicators */}
-            <div className="flex gap-3 text-xs font-black text-slate-500 dark:text-slate-400 mt-1">
+            <div className="flex gap-3 text-xs font-black text-slate-500 dark:text-slate-200 mt-1">
               <span className="flex items-center gap-1.5" title="입금대기">
                 <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
                 <span>{pendingPaymentOrdersCount}</span>
@@ -114,7 +114,7 @@ export default function Orders() {
                         <span className="font-extrabold text-sm text-slate-800 dark:text-slate-100 group-hover:text-amber-500 dark:group-hover:text-amber-400 transition-colors">
                           {transaction.depositor}
                         </span>
-                        <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold mt-0.5">
+                        <span className="text-[10px] text-slate-400 dark:text-slate-300 font-bold mt-0.5">
                           은행 실시간 입금
                         </span>
                       </div>
@@ -126,7 +126,7 @@ export default function Orders() {
                     {/* Body Block */}
                     <div className="space-y-2.5 border-t border-slate-100 dark:border-slate-850 pt-2.5">
                       <div className="flex justify-between items-center text-xs font-semibold text-slate-600 dark:text-slate-300">
-                        <span className="text-slate-500 dark:text-slate-400">실제 입금액</span>
+                        <span className="text-slate-500 dark:text-slate-200">실제 입금액</span>
                         <span className="text-slate-800 dark:text-slate-100 font-extrabold">
                           {transaction.amount.toLocaleString()}원
                         </span>
@@ -134,7 +134,7 @@ export default function Orders() {
 
                       {/* Candidates Sub-list */}
                       {transaction.candidates.length === 0 ? (
-                        <div className="text-[10px] text-slate-400 dark:text-slate-500 block text-center py-1.5 font-medium bg-slate-50/50 dark:bg-slate-900/40 rounded-lg">
+                        <div className="text-[10px] text-slate-400 dark:text-slate-300 block text-center py-1.5 font-medium bg-slate-50/50 dark:bg-slate-900/40 rounded-lg">
                           🔍 매칭 후보 없음 · 직접 확인 필요
                         </div>
                       ) : (
@@ -164,7 +164,7 @@ export default function Orders() {
                                       {candidateReasonLabel(candidate.reason)}
                                     </span>
                                     <span className="text-slate-300 dark:text-slate-700">·</span>
-                                    <span className="text-slate-400 dark:text-slate-500 font-semibold truncate">
+                                    <span className="text-slate-400 dark:text-slate-300 font-semibold truncate">
                                       차액: {candidate.diff.toLocaleString()}원
                                     </span>
                                   </div>
@@ -225,7 +225,7 @@ export default function Orders() {
                     <span className="font-extrabold text-sm text-slate-800 dark:text-slate-100 group-hover:text-rose-500 dark:group-hover:text-rose-400 transition-colors">
                       {tableName}
                     </span>
-                    <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold mt-0.5">
+                    <span className="text-[10px] text-slate-400 dark:text-slate-300 font-bold mt-0.5">
                       #{order.displayNumber ?? "-"} · {order.cancelledAt ? new Date(order.cancelledAt).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }) : "-"}
                     </span>
                   </div>
@@ -237,13 +237,13 @@ export default function Orders() {
                 {/* Body Block */}
                 <div className="space-y-1.5 border-t border-slate-150 dark:border-slate-850 pt-2.5 text-xs font-semibold text-slate-650 dark:text-slate-350">
                   <div className="flex justify-between items-center">
-                    <span className="text-slate-500 dark:text-slate-400">환불 예정 금액</span>
+                    <span className="text-slate-500 dark:text-slate-200">환불 예정 금액</span>
                     <span className="text-rose-600 dark:text-rose-400 font-extrabold">
                       {(order.payment.refundAmount ?? order.payment.expectedTransferAmount ?? order.payment.amount).toLocaleString()}원
                     </span>
                   </div>
                   <div className="flex justify-between items-start">
-                    <span className="text-slate-500 dark:text-slate-400">취소 사유</span>
+                    <span className="text-slate-500 dark:text-slate-200">취소 사유</span>
                     <span className="text-slate-700 dark:text-slate-300 font-bold truncate max-w-[130px]">
                       {order.cancelReason ?? "사유 없음"}
                     </span>
@@ -270,7 +270,7 @@ export default function Orders() {
             {inProgressOrders.length === 0 && refundPendingOrders.length === 0 && (
               <div className="py-12 flex flex-col items-center justify-center text-center">
                 <span className="text-4xl">🎉</span>
-                <p className="text-sm font-bold text-slate-400 dark:text-slate-500 mt-3">진행 중인 주문이 없습니다</p>
+                <p className="text-sm font-bold text-slate-400 dark:text-slate-300 mt-3">진행 중인 주문이 없습니다</p>
               </div>
             )}
           </div>

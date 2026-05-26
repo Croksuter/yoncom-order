@@ -90,7 +90,7 @@ export default function AdminCookerPage() {
       <div className="flex h-fit w-full flex-wrap justify-between items-center gap-3 bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800/80 p-5 rounded-2xl shadow-sm flex-shrink-0 animate-fade-in">
         <div className="flex flex-col text-left">
           <h4 className="font-extrabold text-base text-slate-800 dark:text-slate-200">모니터링 대상 메뉴 관리</h4>
-          <p className="text-xs text-slate-400 dark:text-slate-500 font-semibold mt-0.5">화면에 실시간으로 모니터링할 메뉴를 추가하거나 제거할 수 있습니다.</p>
+          <p className="text-xs text-slate-400 dark:text-slate-300 font-semibold mt-0.5">화면에 실시간으로 모니터링할 메뉴를 추가하거나 제거할 수 있습니다.</p>
         </div>
         <div className="flex gap-2">
           <Button 
@@ -103,7 +103,7 @@ export default function AdminCookerPage() {
           <Button
             disabled={monitoringMenus.length === 0}
             variant="outline"
-            className="border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 font-bold text-xs h-9.5 px-5 rounded-xl transition-all shrink-0 hover:bg-slate-50 dark:hover:bg-slate-800"
+            className="border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-200 hover:text-slate-700 dark:hover:text-slate-200 font-bold text-xs h-9.5 px-5 rounded-xl transition-all shrink-0 hover:bg-slate-50 dark:hover:bg-slate-800"
             onClick={() => setMenuRemoveModalOpen(true)}
           >
             메뉴 제거
@@ -120,7 +120,7 @@ export default function AdminCookerPage() {
           <div className="flex-1 flex flex-col items-center justify-center text-center py-20 bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800/80 rounded-3xl p-8 shadow-sm h-full w-full">
             <span className="text-6xl animate-bounce">🍳</span>
             <p className="text-lg font-extrabold text-slate-800 dark:text-slate-200 mt-4">모니터링 중인 메뉴가 없습니다</p>
-            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5 font-semibold max-w-sm">
+            <p className="text-xs text-slate-400 dark:text-slate-300 mt-1.5 font-semibold max-w-sm">
               상단의 '메뉴 추가' 버튼을 눌러 화면에 띄울 조리 대기열 메뉴들을 선택해 주세요.
             </p>
           </div>

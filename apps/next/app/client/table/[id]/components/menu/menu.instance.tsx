@@ -77,7 +77,7 @@ export default function MenuInstance({ menu }: { menu: ClientMenuResponse.Get["r
             <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-100 truncate">
               {menu.name}
             </h3>
-            <p className="text-[10px] text-slate-400 dark:text-slate-500 line-clamp-2 mt-1 leading-normal font-medium">
+            <p className="text-[10px] text-slate-400 dark:text-slate-300 line-clamp-2 mt-1 leading-normal font-medium">
               {menu.description || "맛있는 홈런포차 대표 메뉴입니다."}
             </p>
           </div>

@@ -49,14 +49,14 @@ export default function MenuRemoveModal({
             <Trash2 className="h-5 w-5 text-rose-500 shrink-0" />
             <DialogTitle className="text-lg font-black text-slate-800 dark:text-slate-100">모니터링 메뉴 제외</DialogTitle>
           </div>
-          <DialogDescription className="text-xs text-slate-450 dark:text-slate-500 font-semibold mt-1">
+          <DialogDescription className="text-xs text-slate-450 dark:text-slate-300 font-semibold mt-1">
             주방 모니터 화면에서 모니터링을 중단할 메뉴를 선택합니다. (실제 메뉴는 삭제되지 않습니다)
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 my-4 fc">
           <div className="fc gap-1.5 w-full">
-            <label className="text-xs uppercase font-bold text-slate-450 dark:text-slate-500 px-0.5">제외할 메뉴 선택</label>
+            <label className="text-xs uppercase font-bold text-slate-450 dark:text-slate-300 px-0.5">제외할 메뉴 선택</label>
             <Select value={monitoringMenu} onValueChange={setMonitoringMenu}>
               <SelectTrigger className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-xl h-10 font-medium text-sm focus:ring-rose-500">
                 <SelectValue placeholder="모니터링에서 제외할 메뉴를 선택하세요" />

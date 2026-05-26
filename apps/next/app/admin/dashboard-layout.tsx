@@ -6,6 +6,7 @@ import Link from "next/link";
 import useTableStore from "~/stores/table.store";
 import useMenuStore from "~/stores/menu.store";
 import { api } from "~/lib/query";
+import { useTheme } from "~/hooks/use-theme";
 import {
   Package,
   LayoutDashboard,
@@ -14,10 +15,13 @@ import {
   BarChart3,
   AlertCircle,
   ChefHat,
-  LogOut
+  LogOut,
+  Sun,
+  Moon
 } from "lucide-react";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const { theme, toggleTheme, isDark, mounted } = useTheme();
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const pathname = usePathname();
@@ -113,8 +117,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   isSidebarHovered ? "w-[192px]" : "w-10"
                 } ${
                   !isCooker
-                    ? "bg-brand-50 dark:bg-brand-950/20 text-brand-600 dark:text-brand-400 font-bold border-brand-100 dark:border-brand-900/30"
-                    : "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-800 dark:hover:text-slate-200 border-transparent"
+                    ? "bg-brand-50 dark:bg-brand-950/20 text-brand-600 dark:text-white font-bold border-brand-100 dark:border-brand-900/30"
+                    : "text-slate-500 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-800 dark:hover:text-slate-200 border-transparent"
                 }`}
               >
                 <LayoutDashboard className="h-5 w-5 absolute left-[10px] top-1/2 -translate-y-1/2 flex-shrink-0" />
@@ -134,8 +138,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   isSidebarHovered ? "w-[192px]" : "w-10"
                 } ${
                   isCooker
-                    ? "bg-brand-50 dark:bg-brand-950/20 text-brand-600 dark:text-brand-400 font-bold border-brand-100 dark:border-brand-900/30"
-                    : "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-800 dark:hover:text-slate-200 border-transparent"
+                    ? "bg-brand-50 dark:bg-brand-950/20 text-brand-600 dark:text-white font-bold border-brand-100 dark:border-brand-900/30"
+                    : "text-slate-500 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-800 dark:hover:text-slate-200 border-transparent"
                 }`}
               >
                 <ChefHat className="h-5 w-5 absolute left-[10px] top-1/2 -translate-y-1/2 flex-shrink-0" />
@@ -161,7 +165,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     href="#"
                     className={`relative flex items-center h-11 ml-3 rounded-2xl border border-transparent transition-all duration-200 ${
                       isSidebarHovered ? "w-[192px]" : "w-10"
-                    } text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-800 dark:hover:text-slate-200`}
+                    } text-slate-500 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-800 dark:hover:text-slate-200`}
                   >
                     <Icon className="h-5 w-5 absolute left-[10px] top-1/2 -translate-y-1/2 flex-shrink-0" />
                     <span className={`text-sm truncate select-none transition-all duration-300 absolute left-12 top-1/2 -translate-y-1/2 ${
@@ -217,7 +221,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   : "opacity-0 -translate-x-3 overflow-hidden pointer-events-none"
               }`}>
                 <p className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">Baseball Fan</p>
-                <p className="text-xs text-slate-400 dark:text-slate-500 font-semibold uppercase tracking-wider truncate">Manager</p>
+                <p className="text-xs text-slate-400 dark:text-slate-300 font-semibold uppercase tracking-wider truncate">Manager</p>
               </div>
             </div>
           </div>
@@ -232,12 +236,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <h2 className="font-extrabold text-xl sm:text-2xl text-slate-800 dark:text-white tracking-tight">
               {title}
             </h2>
-            <p className="text-xs text-slate-400 dark:text-slate-500 font-medium">{subtitle}</p>
+            <p className="text-xs text-slate-400 dark:text-slate-300 font-medium">{subtitle}</p>
           </div>
 
           <div className="flex items-center gap-4 sm:gap-6">
             <div className="flex flex-col items-end">
-              <span className="text-xs sm:text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Total Sales</span>
+              <span className="text-xs sm:text-sm font-bold text-slate-400 dark:text-slate-300 uppercase tracking-wider">Total Sales</span>
               <span className="text-lg sm:text-xl font-black text-brand-600 dark:text-brand-400">
                 ₩{totalRevenue.toLocaleString()}
               </span>
@@ -245,7 +249,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <div className="h-8 w-px bg-slate-200 dark:bg-slate-800"></div>
 
             <div className="flex flex-col items-end">
-              <span className="text-xs sm:text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Pending Payments</span>
+              <span className="text-xs sm:text-sm font-bold text-slate-400 dark:text-slate-300 uppercase tracking-wider">Pending Payments</span>
               <span className="text-lg sm:text-xl font-black text-slate-800 dark:text-slate-200">
                 {pendingPaymentsCount}
               </span>
@@ -255,12 +259,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <div className="flex flex-col items-end">
               <span className="text-xs sm:text-sm font-bold text-rose-500 dark:text-rose-400 uppercase tracking-wider">Issues</span>
               <span className={`text-lg sm:text-xl font-black flex items-center gap-1.5 ${
-                issuesCount > 0 ? "text-rose-600 dark:text-rose-400" : "text-slate-400 dark:text-slate-500"
+                issuesCount > 0 ? "text-rose-600 dark:text-rose-400" : "text-slate-400 dark:text-slate-300"
               }`}>
                 {issuesCount}
                 {issuesCount > 0 && <AlertCircle className="h-4 w-4 text-rose-500 animate-pulse" />}
               </span>
             </div>
+
+            {mounted && (
+              <>
+                <div className="h-8 w-px bg-slate-200 dark:bg-slate-800"></div>
+                <button
+                  type="button"
+                  onClick={toggleTheme}
+                  className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-750 border border-slate-200/80 dark:border-slate-800 text-slate-600 dark:text-slate-200 transition-all duration-200 flex items-center justify-center active:scale-95 shadow-sm shrink-0"
+                  title={isDark ? "라이트 모드로 변경" : "다크 모드로 변경"}
+                >
+                  {isDark ? <Sun className="h-4.5 w-4.5 text-amber-500" /> : <Moon className="h-4.5 w-4.5 text-slate-500" />}
+                </button>
+              </>
+            )}
           </div>
         </header>
 

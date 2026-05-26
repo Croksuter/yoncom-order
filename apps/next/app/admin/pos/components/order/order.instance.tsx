@@ -33,7 +33,7 @@ export default function OrderInstance({
   const statusLabel = getOrderStatusLabel(order);
 
   let borderClass = "border-l-4 border-l-slate-300 dark:border-l-slate-700";
-  let badgeClass = "bg-slate-50 dark:bg-slate-900/20 text-slate-650 dark:text-slate-400 border-slate-200 dark:border-slate-800";
+  let badgeClass = "bg-slate-50 dark:bg-slate-900/20 text-slate-650 dark:text-slate-200 border-slate-200 dark:border-slate-800";
   let hoverClass = "hover:border-slate-350 dark:hover:border-slate-600 hover:shadow-[0_8px_20px_rgba(148,163,184,0.06)]";
 
   if (statusLabel.includes("환불 대기") || statusLabel.includes("취소") || statusLabel.includes("만료")) {
@@ -64,7 +64,7 @@ export default function OrderInstance({
           <span className="font-black text-lg text-slate-800 dark:text-slate-100 group-hover:text-brand-500 dark:group-hover:text-brand-400 transition-colors truncate block">
             {table?.name ?? "테이블"}
           </span>
-          <span className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-0.5 truncate">
+          <span className="text-xs text-slate-400 dark:text-slate-300 font-bold mt-0.5 truncate">
             {dateDiffString(now, order.createdAt).startsWith("-") 
               ? "00:00" 
               : dateDiffString(now, order.createdAt)}

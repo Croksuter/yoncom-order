@@ -38,7 +38,7 @@ export default function Inventories() {
               재고 현황
             </h3>
             {/* Status indicators */}
-            <div className="flex gap-3 text-xs font-black text-slate-500 dark:text-slate-400">
+            <div className="flex gap-3 text-xs font-black text-slate-500 dark:text-slate-200">
               <span className="flex items-center gap-1.5" title="좋음">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
                 <span>{goodCount}</span>
@@ -78,9 +78,9 @@ export default function Inventories() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-800/30 border-b border-slate-100 dark:border-slate-800/60">
-                <th className="font-bold text-xs text-slate-400 dark:text-slate-500 px-4 py-3 text-start">메뉴</th>
-                <th className="font-bold text-xs text-slate-400 dark:text-slate-500 px-4 py-3 text-center">카테고리</th>
-                <th className="font-bold text-xs text-slate-400 dark:text-slate-500 px-4 py-3 text-end">재고</th>
+                <th className="font-bold text-xs text-slate-400 dark:text-slate-100 px-4 py-3 text-start">메뉴</th>
+                <th className="font-bold text-xs text-slate-400 dark:text-slate-100 px-4 py-3 text-center">카테고리</th>
+                <th className="font-bold text-xs text-slate-400 dark:text-slate-100 px-4 py-3 text-end">재고</th>
               </tr>
             </thead>
             <tbody>
@@ -103,11 +103,11 @@ export default function Inventories() {
                         opacity: isOutOfStock ? 0.35 : 1,
                       }}
                     >
-                      <td className="px-4 py-3.5 text-start text-xs font-bold text-slate-700 dark:text-slate-200 max-w-[120px]">
+                      <td className="px-4 py-3.5 text-start text-xs font-bold text-slate-700 dark:text-white max-w-[120px]">
                         <span className="truncate block w-full">{menu.name}</span>
                       </td>
                       <td className="px-4 py-3.5 text-center">
-                        <span className="bg-slate-100 dark:bg-slate-850 text-slate-600 dark:text-slate-400 text-xs font-bold px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-750">
+                        <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-white text-xs font-bold px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700">
                           {menuCategories.find((category) => category.id === menu.menuCategoryId)?.name ?? "기타"}
                         </span>
                       </td>

@@ -37,7 +37,7 @@ export default function MenuInstance({
   const elapsedSec = Math.floor(elapsedMs / 1000);
 
   // Time-based warning colors: normal (slate), delayed > 5m (amber), critical > 10m (rose)
-  let timerClass = "text-slate-400 dark:text-slate-500 font-semibold";
+  let timerClass = "text-slate-400 dark:text-slate-300 font-semibold";
   if (elapsedSec >= 600) {
     timerClass = "text-rose-500 font-bold animate-pulse flex items-center gap-1";
   } else if (elapsedSec >= 300) {

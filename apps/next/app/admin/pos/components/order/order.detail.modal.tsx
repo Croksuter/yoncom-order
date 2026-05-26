@@ -85,21 +85,21 @@ export default function OrderDetailModal({
           <DialogHeader className="w-full">
             <DialogTitle className="text-2xl font-black text-slate-800 dark:text-slate-100 flex items-center justify-between">
               <span>주문 상세 정보</span>
-              <span className="text-xs font-semibold text-slate-400 dark:text-slate-500">#{order.id.slice(-6).toUpperCase()}</span>
+              <span className="text-xs font-semibold text-slate-400 dark:text-slate-300">#{order.id.slice(-6).toUpperCase()}</span>
             </DialogTitle>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-850">
               <div className="fc gap-1 bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-150/40 dark:border-slate-800 shadow-sm">
-                <span className="text-xs text-slate-450 dark:text-slate-500 font-semibold uppercase tracking-wider">표시 번호</span>
+                <span className="text-xs text-slate-450 dark:text-slate-300 font-semibold uppercase tracking-wider">표시 번호</span>
                 <span className="text-sm font-bold text-slate-850 dark:text-slate-150">#{order.displayNumber ?? "-"}</span>
               </div>
               <div className="fc gap-1 bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-150/40 dark:border-slate-800 shadow-sm">
-                <span className="text-xs text-slate-450 dark:text-slate-500 font-semibold uppercase tracking-wider">주문 일시</span>
+                <span className="text-xs text-slate-450 dark:text-slate-300 font-semibold uppercase tracking-wider">주문 일시</span>
                 <span className="text-sm font-bold text-slate-700 dark:text-slate-200 truncate">
                   {new Date(order.createdAt).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
                 </span>
               </div>
               <div className="fc gap-1 bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-150/40 dark:border-slate-800 shadow-sm">
-                <span className="text-xs text-slate-450 dark:text-slate-500 font-semibold uppercase tracking-wider">결제 상태</span>
+                <span className="text-xs text-slate-450 dark:text-slate-300 font-semibold uppercase tracking-wider">결제 상태</span>
                 <span className={`text-sm font-bold ${
                   isRefundPending ? "text-rose-500" : isRefunded ? "text-slate-400" : isPaidActive ? "text-emerald-500" : "text-amber-500"
                 }`}>
@@ -107,15 +107,15 @@ export default function OrderDetailModal({
                 </span>
               </div>
               <div className="fc gap-1 bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-150/40 dark:border-slate-800 shadow-sm">
-                <span className="text-xs text-slate-450 dark:text-slate-500 font-semibold uppercase tracking-wider">결제 코드</span>
+                <span className="text-xs text-slate-450 dark:text-slate-300 font-semibold uppercase tracking-wider">결제 코드</span>
                 <span className="text-sm font-bold text-slate-700 dark:text-slate-200 truncate">{order.payment.paymentCode ?? "-"}</span>
               </div>
             </div>
 
             <div className="mt-3.5 space-y-1 px-1">
-              {isPaidActive && <p className="text-xs text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1">💡 결제 완료 주문을 취소하면 환불 대기 상태로 남습니다.</p>}
+              {isPaidActive && <p className="text-xs text-slate-500 dark:text-slate-200 font-medium flex items-center gap-1">💡 결제 완료 주문을 취소하면 환불 대기 상태로 남습니다.</p>}
               {isRefundPending && <p className="text-xs text-rose-500 dark:text-rose-450 font-medium flex items-center gap-1">⚠️ 환불 완료 처리 전에는 테이블을 비울 수 없습니다.</p>}
-              {hasPickedUp && <p className="text-xs text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1">🚫 수령 완료된 주문은 시스템에서 취소할 수 없습니다.</p>}
+              {hasPickedUp && <p className="text-xs text-slate-500 dark:text-slate-200 font-medium flex items-center gap-1">🚫 수령 완료된 주문은 시스템에서 취소할 수 없습니다.</p>}
             </div>
           </DialogHeader>
 
@@ -124,12 +124,12 @@ export default function OrderDetailModal({
             <Table className="w-full">
               <TableHeader className="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200/60 dark:border-slate-800">
                 <TableRow className="hover:bg-transparent">
-                  <TableHead className="!text-left font-bold text-xs text-slate-400 dark:text-slate-500 px-4 h-10">메뉴</TableHead>
-                  <TableHead className="!text-right font-bold text-xs text-slate-400 dark:text-slate-500 px-4 h-10">단가</TableHead>
-                  <TableHead className="!text-right font-bold text-xs text-slate-400 dark:text-slate-500 px-4 h-10">수량</TableHead>
-                  <TableHead className="!text-right font-bold text-xs text-slate-400 dark:text-slate-500 px-4 h-10">가격</TableHead>
-                  <TableHead className="!text-center font-bold text-xs text-slate-400 dark:text-slate-500 px-4 h-10">상태</TableHead>
-                  <TableHead className="!text-center font-bold text-xs text-slate-400 dark:text-slate-500 px-4 h-10">처리</TableHead>
+                  <TableHead className="!text-left font-bold text-xs text-slate-400 dark:text-slate-300 px-4 h-10">메뉴</TableHead>
+                  <TableHead className="!text-right font-bold text-xs text-slate-400 dark:text-slate-300 px-4 h-10">단가</TableHead>
+                  <TableHead className="!text-right font-bold text-xs text-slate-400 dark:text-slate-300 px-4 h-10">수량</TableHead>
+                  <TableHead className="!text-right font-bold text-xs text-slate-400 dark:text-slate-300 px-4 h-10">가격</TableHead>
+                  <TableHead className="!text-center font-bold text-xs text-slate-400 dark:text-slate-300 px-4 h-10">상태</TableHead>
+                  <TableHead className="!text-center font-bold text-xs text-slate-400 dark:text-slate-300 px-4 h-10">처리</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -142,11 +142,11 @@ export default function OrderDetailModal({
                       className="h-12 hover:bg-slate-50/40 dark:hover:bg-slate-900/40 border-b border-slate-100 dark:border-slate-850/50 last:border-b-0 *:text-sm"
                     >
                       <TableCell className="text-left font-bold text-slate-800 dark:text-slate-150 px-4 py-3 truncate max-w-[150px]">{menuOrderInfo!.menuName}</TableCell>
-                      <TableCell className="text-right text-slate-500 dark:text-slate-400 px-4 py-3 font-normal">{menuOrderInfo!.menuPrice.toLocaleString()}원</TableCell>
+                      <TableCell className="text-right text-slate-500 dark:text-slate-200 px-4 py-3 font-normal">{menuOrderInfo!.menuPrice.toLocaleString()}원</TableCell>
                       <TableCell className="text-right text-slate-800 dark:text-slate-200 px-4 py-3">x{menuOrderInfo!.quantity}</TableCell>
                       <TableCell className="text-right font-bold text-slate-800 dark:text-slate-100 px-4 py-3">{menuOrderInfo!.totalPrice.toLocaleString()}원</TableCell>
                       <TableCell className="text-center px-4 py-3">
-                        <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+                        <span className="text-xs font-semibold text-slate-600 dark:text-slate-200">
                           {menuOrder ? getMenuOrderStatusLabel(menuOrder, order) : "-"}
                         </span>
                       </TableCell>
@@ -229,7 +229,7 @@ export default function OrderDetailModal({
               <Button
                 onClick={handleClose}
                 variant="outline"
-                className="w-full sm:w-auto border-slate-200 dark:border-slate-800 rounded-xl h-10 px-6 font-bold text-sm hover:bg-slate-50 dark:hover:bg-slate-850 text-slate-600 dark:text-slate-400"
+                className="w-full sm:w-auto border-slate-200 dark:border-slate-800 rounded-xl h-10 px-6 font-bold text-sm hover:bg-slate-50 dark:hover:bg-slate-850 text-slate-600 dark:text-slate-200"
               >
                 닫기
               </Button>

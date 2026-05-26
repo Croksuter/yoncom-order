@@ -25,10 +25,10 @@ export default function Tables({ isInventoriesOpen = true }: { isInventoriesOpen
           <div className="h-[76px] bg-slate-50/50 dark:bg-slate-800/30 border-b border-slate-200/60 dark:border-slate-800/60 flex justify-between items-center px-4 shrink-0">
             <div className="flex flex-col gap-1">
               <h3 className="font-extrabold text-base text-slate-800 dark:text-white">
-                테이블 현황 <span className="text-slate-400 dark:text-slate-500 font-bold text-sm">({occupiedTableCount}/{activeTables.length})</span>
+                테이블 현황 <span className="text-slate-400 dark:text-slate-300 font-bold text-sm">({occupiedTableCount}/{activeTables.length})</span>
               </h3>
               {/* Status Indicators from Stitch */}
-              <div className="flex gap-3 text-xs font-black text-slate-500 dark:text-slate-400 mt-1">
+              <div className="flex gap-3 text-xs font-black text-slate-500 dark:text-slate-200 mt-1">
                 <span className="flex items-center gap-1.5" title="사용 중 (Occupied)">
                   <span className="w-2.5 h-2.5 rounded-full bg-brand-500"></span>
                   <span>{occupiedTableCount}</span>
@@ -51,7 +51,7 @@ export default function Tables({ isInventoriesOpen = true }: { isInventoriesOpen
               <Button 
                 size="sm"
                 variant="outline" 
-                className="border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 font-bold text-xs h-8 px-3 rounded-xl transition-all shrink-0" 
+                className="border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-200 hover:text-slate-700 dark:hover:text-slate-200 font-bold text-xs h-8 px-3 rounded-xl transition-all shrink-0" 
                 onClick={() => setRemoveTableModalOpen(true)}
               >
                 테이블 제거

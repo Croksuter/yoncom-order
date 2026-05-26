@@ -50,13 +50,13 @@ export default function CreateTableModal({
       <DialogContent className="max-w-md bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl shadow-2xl p-6 overflow-hidden">
         <DialogHeader className="w-full">
           <DialogTitle className="text-xl font-black text-slate-800 dark:text-slate-100">테이블 생성</DialogTitle>
-          <DialogDescription className="text-xs text-slate-400 dark:text-slate-500 font-semibold">새롭게 생성할 테이블의 설정 항목을 입력하세요.</DialogDescription>
+          <DialogDescription className="text-xs text-slate-400 dark:text-slate-300 font-semibold">새롭게 생성할 테이블의 설정 항목을 입력하세요.</DialogDescription>
         </DialogHeader>
 
         {/* Input Fields */}
         <div className="space-y-4 my-4">
           <div className="fc gap-1.5">
-            <label className="text-xs uppercase font-bold text-slate-400 dark:text-slate-500 px-0.5">테이블 명칭</label>
+            <label className="text-xs uppercase font-bold text-slate-400 dark:text-slate-300 px-0.5">테이블 명칭</label>
             <Input
               type="text"
               placeholder="예: 테이블 1, 부스 A"
@@ -68,7 +68,7 @@ export default function CreateTableModal({
           </div>
 
           <div className="fc gap-1.5">
-            <label className="text-xs uppercase font-bold text-slate-400 dark:text-slate-500 px-0.5">테이블 좌석 수 (명)</label>
+            <label className="text-xs uppercase font-bold text-slate-400 dark:text-slate-300 px-0.5">테이블 좌석 수 (명)</label>
             <Input
               type="number"
               placeholder="좌석 수를 입력하세요"

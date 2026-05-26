@@ -108,11 +108,11 @@ export default function InventoryDetailModal({
         <DialogHeader className="w-full">
           <DialogTitle className="text-xl font-black text-slate-800 dark:text-slate-100 flex items-center justify-between">
             <span>메뉴 상세 및 재고 설정</span>
-            <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 mr-6">
+            <span className="text-xs font-semibold text-slate-400 dark:text-slate-300 mr-6">
               메뉴 고유코드: <span className="font-mono bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded font-bold">#{menu.id.slice(-6).toUpperCase()}</span>
             </span>
           </DialogTitle>
-          <DialogDescription className="text-xs text-slate-455 dark:text-slate-500 font-semibold">
+          <DialogDescription className="text-xs text-slate-455 dark:text-slate-300 font-semibold">
             메뉴 정보와 실시간 재고 사양을 업데이트하고 활성화 여부를 설정합니다.
           </DialogDescription>
         </DialogHeader>
@@ -123,7 +123,7 @@ export default function InventoryDetailModal({
           {/* Left Column (Inputs) - span-2 */}
           <div className="col-span-1 md:col-span-2 space-y-4">
             <div className="fc gap-1.5">
-              <label className="text-xs uppercase font-bold text-slate-450 dark:text-slate-500 px-0.5">메뉴 이름</label>
+              <label className="text-xs uppercase font-bold text-slate-450 dark:text-slate-300 px-0.5">메뉴 이름</label>
               <Input
                 value={menuName}
                 onChange={(e) => setMenuName(e.target.value)}
@@ -134,7 +134,7 @@ export default function InventoryDetailModal({
             </div>
 
             <div className="fc gap-1.5">
-              <label className="text-xs uppercase font-bold text-slate-450 dark:text-slate-500 px-0.5">카테고리</label>
+              <label className="text-xs uppercase font-bold text-slate-450 dark:text-slate-300 px-0.5">카테고리</label>
               <Select value={menuCategory} onValueChange={setMenuCategory} disabled={isBusy}>
                 <SelectTrigger className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-xl h-10 font-medium text-sm">
                   <SelectValue placeholder="카테고리를 선택하세요" />
@@ -150,7 +150,7 @@ export default function InventoryDetailModal({
             </div>
 
             <div className="fc gap-1.5">
-              <label className="text-xs uppercase font-bold text-slate-455 dark:text-slate-500 px-0.5">메뉴 설명</label>
+              <label className="text-xs uppercase font-bold text-slate-455 dark:text-slate-300 px-0.5">메뉴 설명</label>
               <Input
                 value={menuDescription}
                 onChange={(e) => setMenuDescription(e.target.value)}
@@ -163,7 +163,7 @@ export default function InventoryDetailModal({
             {/* Price & Quantity Row */}
             <div className="grid grid-cols-2 gap-4">
               <div className="fc gap-1.5">
-                <label className="text-xs uppercase font-bold text-slate-455 dark:text-slate-500 px-0.5">단가 (원)</label>
+                <label className="text-xs uppercase font-bold text-slate-455 dark:text-slate-300 px-0.5">단가 (원)</label>
                 <Input
                   type="number"
                   value={menuPrice}
@@ -177,7 +177,7 @@ export default function InventoryDetailModal({
               </div>
 
               <div className="fc gap-1.5">
-                <label className="text-xs uppercase font-bold text-slate-455 dark:text-slate-500 px-0.5">재고 수량</label>
+                <label className="text-xs uppercase font-bold text-slate-455 dark:text-slate-300 px-0.5">재고 수량</label>
                 <Input
                   type="number"
                   value={menuQuantity}
@@ -194,7 +194,7 @@ export default function InventoryDetailModal({
             <label className="p-3.5 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-850 flex items-center justify-between gap-3 cursor-pointer select-none">
               <div className="fc">
                 <span className="text-xs font-bold text-slate-800 dark:text-slate-200">주문 접수 활성화</span>
-                <span className="text-xs text-slate-450 dark:text-slate-500 font-medium mt-0.5">체크 시 고객 주문 목록에 노출되고 접수가 가능해집니다.</span>
+                <span className="text-xs text-slate-450 dark:text-slate-300 font-medium mt-0.5">체크 시 고객 주문 목록에 노출되고 접수가 가능해집니다.</span>
               </div>
               <Checkbox
                 checked={menuAvailable}
@@ -207,7 +207,7 @@ export default function InventoryDetailModal({
 
           {/* Right Column (Image Upload) - span-1 */}
           <div className="col-span-1 flex flex-col gap-3">
-            <label className="text-xs uppercase font-bold text-slate-450 dark:text-slate-500 px-0.5">메뉴 이미지</label>
+            <label className="text-xs uppercase font-bold text-slate-450 dark:text-slate-300 px-0.5">메뉴 이미지</label>
             
             {/* Image Preview Container */}
             <div className="w-full aspect-square border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden bg-slate-50/60 dark:bg-slate-900/40 flex items-center justify-center relative group shadow-inner">
@@ -261,7 +261,7 @@ export default function InventoryDetailModal({
               </div>
             </div>
             
-            <p className="text-xs text-slate-400 dark:text-slate-500 font-medium text-center mt-1 leading-normal">
+            <p className="text-xs text-slate-400 dark:text-slate-300 font-medium text-center mt-1 leading-normal">
               JPG, PNG, GIF 파일 가능 (최대 5MB)
             </p>
           </div>

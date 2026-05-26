@@ -48,7 +48,7 @@ export default function OrderHistoryPanel({
       <div style={{ minHeight: "max(0px, calc(100dvh - var(--client-header-height) - var(--client-footer-height)))" }}>
         {orderHistories.length === 0 ? (
           <div className="fc items-center justify-center py-20 text-center space-y-4">
-            <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-full text-slate-400 dark:text-slate-500">
+            <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-full text-slate-400 dark:text-slate-300">
               <History className="h-10 w-10" />
             </div>
             <div className="space-y-1">
@@ -90,7 +90,7 @@ export default function OrderHistoryPanel({
                     className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900/40 hover:bg-slate-50 dark:hover:bg-slate-900 shadow-[0_2px_8px_rgba(19,27,46,0.02)] hover:shadow-[0_4px_16px_rgba(19,27,46,0.04)] cursor-pointer transition-all active:scale-[0.99]"
                   >
                     <div className="fc gap-1 min-w-0">
-                      <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold">
+                      <span className="text-[10px] text-slate-400 dark:text-slate-300 font-bold">
                         {new Date(orderHistory.orderDate).toLocaleString("ko-KR", {
                           year: "numeric",
                           month: "2-digit",
@@ -130,7 +130,7 @@ export default function OrderHistoryPanel({
 
             {/* Cumulative Summary Row */}
             <div className="flex justify-between items-center p-4 rounded-2xl bg-slate-50 dark:bg-slate-950/30 border border-slate-100 dark:border-slate-800">
-              <span className="text-xs text-slate-400 dark:text-slate-500 font-bold">누적 총 주문금액</span>
+              <span className="text-xs text-slate-400 dark:text-slate-300 font-bold">누적 총 주문금액</span>
               <span className="text-lg font-black text-primary dark:text-brand-400">
                 ₩ {orderHistories.filter((oh) => oh.order.deletedAt === null).reduce((acc, oh) => acc + oh.totalPrice, 0).toLocaleString()}
               </span>

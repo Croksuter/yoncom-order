@@ -51,14 +51,14 @@ export default function RemoveTableModal({
       <DialogContent className="max-w-md bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl shadow-2xl p-6 overflow-hidden">
         <DialogHeader className="w-full">
           <DialogTitle className="text-xl font-black text-slate-800 dark:text-slate-100">테이블 제거</DialogTitle>
-          <DialogDescription className="text-xs text-slate-400 dark:text-slate-500 font-semibold leading-relaxed">
+          <DialogDescription className="text-xs text-slate-400 dark:text-slate-300 font-semibold leading-relaxed">
             제거할 테이블을 선택하세요. 현재 활성화 상태인 (사용 중인) 테이블은 안전을 위해 목록에 노출되지 않으며 제거할 수 없습니다.
           </DialogDescription>
         </DialogHeader>
 
         {/* Select Input Field */}
         <div className="space-y-4 my-4 fc">
-          <label className="text-xs uppercase font-bold text-slate-400 dark:text-slate-500 px-0.5">대상 테이블 선택</label>
+          <label className="text-xs uppercase font-bold text-slate-400 dark:text-slate-300 px-0.5">대상 테이블 선택</label>
           <Select value={tableId} onValueChange={setTableId}>
             <SelectTrigger className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-xl h-10 font-medium text-sm focus:ring-rose-500">
               <SelectValue placeholder="제거할 테이블을 선택하세요" />

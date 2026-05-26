@@ -134,7 +134,7 @@ export default function CategoryManageModal({
                 className={`flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-md transition-all ${
                   activeTab === "create"
                     ? "bg-white dark:bg-slate-900 text-brand-500 shadow-sm"
-                    : "text-slate-400 dark:text-slate-500 hover:text-slate-650"
+                    : "text-slate-400 dark:text-slate-300 hover:text-slate-650"
                 }`}
                 onClick={() => setActiveTab("create")}
                 disabled={isBusy}
@@ -147,7 +147,7 @@ export default function CategoryManageModal({
                 className={`flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-md transition-all ${
                   activeTab === "edit"
                     ? "bg-white dark:bg-slate-900 text-amber-500 shadow-sm"
-                    : "text-slate-400 dark:text-slate-500 hover:text-amber-455"
+                    : "text-slate-400 dark:text-slate-300 hover:text-amber-455"
                 }`}
                 onClick={() => setActiveTab("edit")}
                 disabled={isBusy}
@@ -160,7 +160,7 @@ export default function CategoryManageModal({
                 className={`flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-md transition-all ${
                   activeTab === "remove"
                     ? "bg-white dark:bg-slate-900 text-rose-500 shadow-sm"
-                    : "text-slate-400 dark:text-slate-500 hover:text-rose-455"
+                    : "text-slate-400 dark:text-slate-300 hover:text-rose-455"
                 }`}
                 onClick={() => setActiveTab("remove")}
                 disabled={isBusy}
@@ -170,7 +170,7 @@ export default function CategoryManageModal({
               </button>
             </div>
           </div>
-          <DialogDescription className="text-xs text-slate-400 dark:text-slate-500 font-semibold mt-1">
+          <DialogDescription className="text-xs text-slate-400 dark:text-slate-300 font-semibold mt-1">
             {activeTab === "create"
               ? "새로운 메뉴들을 분류할 카테고리 명칭을 등록합니다."
               : activeTab === "edit"
@@ -184,7 +184,7 @@ export default function CategoryManageModal({
           /* ================== CATEGORY CREATE TAB ================== */
           <div className="space-y-4 my-4">
             <div className="fc gap-1.5">
-              <label className="text-xs uppercase font-bold text-slate-450 dark:text-slate-500 px-0.5">카테고리 이름</label>
+              <label className="text-xs uppercase font-bold text-slate-450 dark:text-slate-300 px-0.5">카테고리 이름</label>
               <Input
                 type="text"
                 placeholder="예: 주류, 사이드 메뉴, 메인 안주"
@@ -199,7 +199,7 @@ export default function CategoryManageModal({
           /* ================== CATEGORY EDIT TAB ================== */
           <div className="space-y-4 my-4 fc">
             <div className="fc gap-1.5 w-full">
-              <label className="text-xs uppercase font-bold text-slate-450 dark:text-slate-500 px-0.5">수정할 카테고리 선택</label>
+              <label className="text-xs uppercase font-bold text-slate-450 dark:text-slate-300 px-0.5">수정할 카테고리 선택</label>
               <Select
                 value={editCategoryId}
                 onValueChange={(id) => {
@@ -228,7 +228,7 @@ export default function CategoryManageModal({
 
             {editCategoryId && (
               <div className="fc gap-1.5 w-full animate-fade-in">
-                <label className="text-xs uppercase font-bold text-slate-450 dark:text-slate-500 px-0.5">새로운 카테고리 이름</label>
+                <label className="text-xs uppercase font-bold text-slate-450 dark:text-slate-300 px-0.5">새로운 카테고리 이름</label>
                 <Input
                   type="text"
                   placeholder="새로운 이름 입력"
@@ -244,7 +244,7 @@ export default function CategoryManageModal({
           /* ================== CATEGORY REMOVE TAB ================== */
           <div className="space-y-4 my-4 fc">
             <div className="fc gap-1.5 w-full">
-              <label className="text-xs uppercase font-bold text-slate-450 dark:text-slate-500 px-0.5">제거 대상 카테고리 선택</label>
+              <label className="text-xs uppercase font-bold text-slate-450 dark:text-slate-300 px-0.5">제거 대상 카테고리 선택</label>
               <Select value={removeCategoryId} onValueChange={setRemoveCategoryId} disabled={isBusy}>
                 <SelectTrigger className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-xl h-10 font-medium text-sm focus:ring-rose-500">
                   <SelectValue placeholder="제거할 카테고리를 선택하세요" />

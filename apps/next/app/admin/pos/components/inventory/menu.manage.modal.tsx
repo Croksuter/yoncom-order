@@ -146,7 +146,7 @@ export default function MenuManageModal({
                 className={`flex items-center gap-1 px-3 py-1 text-xs font-bold rounded-md transition-all ${
                   activeTab === "create"
                     ? "bg-white dark:bg-slate-900 text-brand-500 shadow-sm"
-                    : "text-slate-400 dark:text-slate-500 hover:text-slate-650"
+                    : "text-slate-400 dark:text-slate-300 hover:text-slate-650"
                 }`}
                 onClick={() => setActiveTab("create")}
                 disabled={isBusy}
@@ -159,7 +159,7 @@ export default function MenuManageModal({
                 className={`flex items-center gap-1 px-3 py-1 text-xs font-bold rounded-md transition-all ${
                   activeTab === "remove"
                     ? "bg-white dark:bg-slate-900 text-rose-500 shadow-sm"
-                    : "text-slate-400 dark:text-slate-500 hover:text-rose-450"
+                    : "text-slate-400 dark:text-slate-300 hover:text-rose-450"
                 }`}
                 onClick={() => setActiveTab("remove")}
                 disabled={isBusy}
@@ -169,7 +169,7 @@ export default function MenuManageModal({
               </button>
             </div>
           </div>
-          <DialogDescription className="text-xs text-slate-400 dark:text-slate-500 font-semibold mt-1">
+          <DialogDescription className="text-xs text-slate-400 dark:text-slate-300 font-semibold mt-1">
             {activeTab === "create"
               ? "매장에서 신규 판매할 신규 메뉴와 기본 가격, 재고 정보를 입력합니다."
               : "안전하게 비활성화된 메뉴를 목록에서 영구적으로 제거합니다."}
@@ -183,7 +183,7 @@ export default function MenuManageModal({
             {/* Left Column inputs */}
             <div className="col-span-1 md:col-span-2 space-y-4">
               <div className="fc gap-1.5">
-                <label className="text-xs uppercase font-bold text-slate-450 dark:text-slate-500 px-0.5">메뉴 이름</label>
+                <label className="text-xs uppercase font-bold text-slate-450 dark:text-slate-300 px-0.5">메뉴 이름</label>
                 <Input
                   value={menuName}
                   onChange={(e) => setMenuName(e.target.value)}
@@ -194,7 +194,7 @@ export default function MenuManageModal({
               </div>
 
               <div className="fc gap-1.5">
-                <label className="text-xs uppercase font-bold text-slate-455 dark:text-slate-500 px-0.5">카테고리</label>
+                <label className="text-xs uppercase font-bold text-slate-455 dark:text-slate-300 px-0.5">카테고리</label>
                 <Select value={menuCategory} onValueChange={setMenuCategory} disabled={isBusy}>
                   <SelectTrigger className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-xl h-10 font-medium text-sm">
                     <SelectValue placeholder="카테고리를 선택하세요" />
@@ -210,7 +210,7 @@ export default function MenuManageModal({
               </div>
 
               <div className="fc gap-1.5">
-                <label className="text-xs uppercase font-bold text-slate-455 dark:text-slate-500 px-0.5">메뉴 설명</label>
+                <label className="text-xs uppercase font-bold text-slate-455 dark:text-slate-300 px-0.5">메뉴 설명</label>
                 <Input
                   value={menuDescription}
                   onChange={(e) => setMenuDescription(e.target.value)}
@@ -222,7 +222,7 @@ export default function MenuManageModal({
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="fc gap-1.5">
-                  <label className="text-xs uppercase font-bold text-slate-455 dark:text-slate-500 px-0.5">단가 (원)</label>
+                  <label className="text-xs uppercase font-bold text-slate-455 dark:text-slate-300 px-0.5">단가 (원)</label>
                   <Input
                     type="number"
                     value={menuPrice === 0 ? "" : menuPrice}
@@ -236,7 +236,7 @@ export default function MenuManageModal({
                 </div>
 
                 <div className="fc gap-1.5">
-                  <label className="text-xs uppercase font-bold text-slate-455 dark:text-slate-500 px-0.5">최초 재고 수량</label>
+                  <label className="text-xs uppercase font-bold text-slate-455 dark:text-slate-300 px-0.5">최초 재고 수량</label>
                   <Input
                     type="number"
                     value={menuQuantity === 0 ? "" : menuQuantity}
@@ -252,7 +252,7 @@ export default function MenuManageModal({
               <label className="p-3.5 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-850 flex items-center justify-between gap-3 cursor-pointer select-none">
                 <div className="fc">
                   <span className="text-xs font-bold text-slate-800 dark:text-slate-200">주문 접수 바로 활성화</span>
-                  <span className="text-xs text-slate-450 dark:text-slate-500 font-medium mt-0.5">메뉴 생성 즉시 매장 주문 목록에 노출하도록 설정합니다.</span>
+                  <span className="text-xs text-slate-450 dark:text-slate-300 font-medium mt-0.5">메뉴 생성 즉시 매장 주문 목록에 노출하도록 설정합니다.</span>
                 </div>
                 <Checkbox
                   checked={menuAvailable}
@@ -265,7 +265,7 @@ export default function MenuManageModal({
 
             {/* Right Column (Image upload) */}
             <div className="col-span-1 flex flex-col gap-3">
-              <label className="text-xs uppercase font-bold text-slate-450 dark:text-slate-500 px-0.5">메뉴 이미지</label>
+              <label className="text-xs uppercase font-bold text-slate-450 dark:text-slate-300 px-0.5">메뉴 이미지</label>
 
               <div className="w-full aspect-square border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden bg-slate-50/60 dark:bg-slate-900/40 flex items-center justify-center relative group shadow-inner">
                 {menuImage ? (
@@ -317,7 +317,7 @@ export default function MenuManageModal({
                 </div>
               </div>
 
-              <p className="text-xs text-slate-400 dark:text-slate-500 font-medium text-center mt-1 leading-normal">
+              <p className="text-xs text-slate-400 dark:text-slate-300 font-medium text-center mt-1 leading-normal">
                 JPG, PNG, GIF 파일 가능 (최대 5MB)
               </p>
             </div>
@@ -326,7 +326,7 @@ export default function MenuManageModal({
           /* ================== MENU REMOVE TAB ================== */
           <div className="space-y-4 my-6 fc">
             <div className="fc gap-1.5 w-full">
-              <label className="text-xs uppercase font-bold text-slate-450 dark:text-slate-500 px-0.5">제거 대상 메뉴 선택</label>
+              <label className="text-xs uppercase font-bold text-slate-450 dark:text-slate-300 px-0.5">제거 대상 메뉴 선택</label>
               <Select value={removeMenuId} onValueChange={setRemoveMenuId} disabled={isBusy}>
                 <SelectTrigger className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-xl h-10 font-medium text-sm focus:ring-rose-500">
                   <SelectValue placeholder="제거할 메뉴를 선택하세요" />

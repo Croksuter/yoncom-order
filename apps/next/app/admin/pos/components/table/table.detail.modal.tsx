@@ -86,7 +86,7 @@ export default function TableDetailModal({
             <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
               inUse 
                 ? "bg-brand-50 text-brand-600 dark:bg-brand-950/20 dark:text-brand-400" 
-                : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+                : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-200"
             }`}>
               {inUse ? "사용 중 (활성화)" : "미사용 (비활성화)"}
             </span>
@@ -94,7 +94,7 @@ export default function TableDetailModal({
           <div className="mt-3 p-3 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-850 text-sm font-medium text-slate-500 flex flex-col gap-1.5">
             <div className="flex justify-between items-center">
               <span className="font-semibold text-slate-400">테이블 ID</span>
-              <code className="text-xs text-slate-600 dark:text-slate-400 font-mono font-bold bg-white dark:bg-slate-950 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-850">{table.id.slice(-8).toUpperCase()}</code>
+              <code className="text-xs text-slate-600 dark:text-slate-200 font-mono font-bold bg-white dark:bg-slate-950 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-850">{table.id.slice(-8).toUpperCase()}</code>
             </div>
             <div className="flex justify-between items-center">
               <span className="font-semibold text-slate-400">테이블 명칭</span>
@@ -106,7 +106,7 @@ export default function TableDetailModal({
         {/* Form Fields */}
         <div className="space-y-4 my-4">
           <div className="fc gap-1.5">
-            <label className="text-xs uppercase font-bold text-slate-450 dark:text-slate-500 px-0.5">테이블 이름</label>
+            <label className="text-xs uppercase font-bold text-slate-450 dark:text-slate-300 px-0.5">테이블 이름</label>
             <Input
               type="text"
               placeholder="테이블 이름을 입력하세요"
@@ -118,7 +118,7 @@ export default function TableDetailModal({
           </div>
           
           <div className="fc gap-1.5">
-            <label className="text-xs uppercase font-bold text-slate-450 dark:text-slate-500 px-0.5">테이블 좌석 수 (명)</label>
+            <label className="text-xs uppercase font-bold text-slate-450 dark:text-slate-300 px-0.5">테이블 좌석 수 (명)</label>
             <Input
               type="number"
               placeholder="테이블 좌석 수를 입력하세요"
