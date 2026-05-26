@@ -17,6 +17,7 @@ import { useRealtimeSync } from "~/hooks/use-realtime-sync";
 import { useTranslation } from "~/hooks/use-translation";
 import { api } from "~/lib/query";
 import type * as ClientTableResponse from "shared/types/responses/client/table";
+import type * as AdminClientNoticeSettingsResponse from "shared/types/responses/admin/client-notice-settings";
 import type * as AdminPaymentSettingsResponse from "shared/types/responses/admin/payment-settings";
 import { traceEvent } from "~/lib/verification-trace";
 import kyErrorHandler from "~/lib/ky-error-handler";
@@ -32,6 +33,7 @@ type TableSyncResponse = {
     snapshot: {
       table: ClientTableResponse.Get["result"];
       paymentSettings: AdminPaymentSettingsResponse.Get["result"];
+      clientNoticeSettings: AdminClientNoticeSettingsResponse.Get["result"];
     } | null;
     gap: boolean;
   };
@@ -45,6 +47,7 @@ type TableSessionResponse = {
     tableContextId: string | null;
     expiresAt: number | null;
     paymentSettings: AdminPaymentSettingsResponse.Get["result"];
+    clientNoticeSettings: AdminClientNoticeSettingsResponse.Get["result"];
   };
 };
 
@@ -53,10 +56,9 @@ const TABLE_UNAVAILABLE_DESCRIPTION = "table_unavailable_desc";
 const TABLE_IN_USE_MESSAGE = "table_in_use";
 const TABLE_IN_USE_DESCRIPTION = "table_in_use_desc";
 const tableAccessFailureStatuses = new Set([401, 403, 404, 409]);
-const expandedHeaderHeight = 196;
-const collapsedHeaderHeight = 60;
-const headerCollapseDistance = expandedHeaderHeight - collapsedHeaderHeight;
-const collapsedHeaderOffset = headerCollapseDistance;
+const baseExpandedHeaderHeight = 196;
+const baseCollapsedHeaderHeight = 60;
+const noticeHeaderHeight = 32;
 const clientFooterReservedHeight = 88;
 const paymentSyncIntervalMs = 1000;
 type TableAccessState = "UNKNOWN" | "INACTIVE" | "RESUMED" | "BLOCKED";
@@ -107,7 +109,7 @@ async function getTableAccessFailureCopy(error: unknown) {
 
 export default function ClientTablePage({ params }: ClientTablePageProps) {
   const { id } = use(params);
-  const { clientTable } = useTableStore();
+  const { clientTable, clientNoticeSettings } = useTableStore();
   const { clientMenuCategories } = useMenuStore();
   const [loading, setLoading] = useState(true);
   const [tableAccessMessage, setTableAccessMessage] = useState<string | null>(null);
@@ -117,6 +119,11 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
   const [scrollY, setScrollY] = useState(0);
   const isValidTableId = id.length === 15;
   const activeUnpaidOrder = clientTable?.tableContexts[0]?.orders.find(isPaymentInstructionOrder);
+  const hasClientNotice = Boolean(clientNoticeSettings?.description.trim());
+  const expandedHeaderHeight = baseExpandedHeaderHeight + (hasClientNotice ? noticeHeaderHeight : 0);
+  const collapsedHeaderHeight = baseCollapsedHeaderHeight + (hasClientNotice ? noticeHeaderHeight : 0);
+  const headerCollapseDistance = expandedHeaderHeight - collapsedHeaderHeight;
+  const collapsedHeaderOffset = headerCollapseDistance;
   const [isVerified, setIsVerified] = useState(false);
   const { t } = useTranslation();
   const tableScope =
@@ -136,12 +143,12 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
 
   useEffect(() => {
     setScrollY(activeTab === "orders" ? collapsedHeaderOffset : 0);
-  }, [activeTab]);
+  }, [activeTab, collapsedHeaderOffset]);
 
   const handleContentScroll: UIEventHandler<HTMLDivElement> = useCallback((event) => {
     const nextScrollY = event.currentTarget.scrollTop > 0 ? collapsedHeaderOffset : 0;
     setScrollY((prev) => (prev === nextScrollY ? prev : nextScrollY));
-  }, []);
+  }, [collapsedHeaderOffset]);
 
   const clientLayoutStyle = {
     paddingTop: `${scrollY > 0 ? collapsedHeaderHeight : expandedHeaderHeight}px`,
@@ -178,6 +185,7 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
         useTableStore.setState({
           clientTable: normalizeClientTable(response.result.snapshot.table),
           paymentSettings: response.result.snapshot.paymentSettings,
+          clientNoticeSettings: response.result.snapshot.clientNoticeSettings,
           isLoaded: true,
           error: false,
         });
@@ -286,6 +294,7 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
               tableContexts: [],
             },
             paymentSettings: session.result.paymentSettings,
+            clientNoticeSettings: session.result.clientNoticeSettings,
             isLoaded: true,
             error: false,
           });
@@ -293,7 +302,10 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
         }
 
         setTableAccessState("RESUMED");
-        useTableStore.setState({ paymentSettings: session.result.paymentSettings });
+        useTableStore.setState({
+          paymentSettings: session.result.paymentSettings,
+          clientNoticeSettings: session.result.clientNoticeSettings,
+        });
         revisionRef.current = 0;
         await syncClientTable(0);
       } catch (error) {

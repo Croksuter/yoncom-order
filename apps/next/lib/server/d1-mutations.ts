@@ -1,6 +1,6 @@
 import { generateId } from "lucia";
 import { bankTransactionStatus, menuOrderStatus, orderStatus, paymentStatus } from "db/schema";
-import type { PaymentSettings } from "db/schema";
+import type { ClientNoticeSettings, PaymentSettings } from "db/schema";
 import { executeD1, hasD1Table, queryD1 } from "~/lib/server/db";
 import { defaultPaymentSettings, normalizePaymentSettings } from "~/lib/payment-settings";
 import { revokeTableSessions } from "~/lib/server/table-session";
@@ -167,11 +167,14 @@ type PaymentSettingsInput = Pick<
   "bankName" | "accountNumber" | "accountHolder" | "tossTransferUrlTemplate" | "depositGuide"
 >;
 
+type ClientNoticeSettingsInput = Pick<ClientNoticeSettings, "description">;
+
 const paymentCodeMin = 1;
 const paymentCodeMax = 99;
 const pendingOrderTtlMs = 5 * 60 * 1000;
 const activePaymentStatuses = [paymentStatus.PENDING, paymentStatus.MANUAL_REVIEW];
 const firstOrderRuleId = "default";
+const clientNoticeSettingsId = "default";
 
 let tableContextTableName: string | null = null;
 const columnCache = new Map<string, Set<string>>();
@@ -179,6 +182,7 @@ let defaultUserId: string | null | undefined;
 let paymentSettingsTableEnsured = false;
 let firstOrderRuleTablesEnsured = false;
 let menuBundleTableEnsured = false;
+let clientNoticeSettingsTableEnsured = false;
 
 export function quoteIdentifier(identifier: string) {
   return `"${identifier.replaceAll("\"", "\"\"")}"`;
@@ -388,11 +392,37 @@ async function ensureMenuBundleTable() {
   menuBundleTableEnsured = true;
 }
 
-async function getPaymentSettingsScopes() {
+async function ensureClientNoticeSettingsTable() {
+  if (clientNoticeSettingsTableEnsured) {
+    return;
+  }
+
+  await executeD1(`
+    CREATE TABLE IF NOT EXISTS clientNoticeSettings (
+      id TEXT PRIMARY KEY NOT NULL,
+      description TEXT DEFAULT '' NOT NULL,
+      createdAt INTEGER NOT NULL,
+      updatedAt INTEGER NOT NULL
+    )
+  `);
+  clientNoticeSettingsTableEnsured = true;
+}
+
+async function getVenueAndTableScopes() {
   const tables = await queryD1<{ id: string }>(
     "SELECT id FROM tables WHERE deletedAt IS NULL",
   );
   return [venueScope, ...tables.map((table) => tableScope(table.id))];
+}
+
+function normalizeClientNoticeSettings(settings?: Partial<ClientNoticeSettings> | null): ClientNoticeSettings {
+  const timestamp = now();
+  return {
+    id: settings?.id ?? clientNoticeSettingsId,
+    description: settings?.description ?? "",
+    createdAt: Number(settings?.createdAt ?? timestamp),
+    updatedAt: Number(settings?.updatedAt ?? timestamp),
+  };
 }
 
 export async function getPaymentSettings() {
@@ -444,8 +474,57 @@ export async function updatePaymentSettings(input: PaymentSettingsInput): Promis
     { result: settings, status: 200 },
     {
       type: "paymentSettings.updated",
-      scopes: await getPaymentSettingsScopes(),
+      scopes: await getVenueAndTableScopes(),
       entityType: "paymentSettings",
+      entityId: settings.id,
+      payload: { settings },
+    },
+  );
+}
+
+export async function getClientNoticeSettings() {
+  await ensureClientNoticeSettingsTable();
+  const [settings] = await queryD1<ClientNoticeSettings>(
+    "SELECT * FROM clientNoticeSettings WHERE id = ? LIMIT 1",
+    [clientNoticeSettingsId],
+  );
+
+  return normalizeClientNoticeSettings(settings);
+}
+
+export async function updateClientNoticeSettings(input: ClientNoticeSettingsInput): Promise<MutationResult> {
+  await ensureClientNoticeSettingsTable();
+
+  const current = await getClientNoticeSettings();
+  const timestamp = now();
+  const settings = normalizeClientNoticeSettings({
+    ...current,
+    description: input.description.trim(),
+    createdAt: current.createdAt || timestamp,
+    updatedAt: timestamp,
+  });
+
+  await executeD1(
+    `INSERT INTO clientNoticeSettings
+      (id, description, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET
+      description = excluded.description,
+      updatedAt = excluded.updatedAt`,
+    [
+      settings.id,
+      settings.description,
+      settings.createdAt,
+      settings.updatedAt,
+    ],
+  );
+
+  return await withDomainEvent(
+    { result: settings, status: 200 },
+    {
+      type: "clientNoticeSettings.updated",
+      scopes: await getVenueAndTableScopes(),
+      entityType: "clientNoticeSettings",
       entityId: settings.id,
       payload: { settings },
     },

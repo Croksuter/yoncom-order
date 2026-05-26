@@ -514,6 +514,19 @@ export const paymentSettings = sqliteTable("paymentSettings", {
 
 export type PaymentSettings = typeof paymentSettings.$inferSelect;
 
+export const clientNoticeSettings = sqliteTable("clientNoticeSettings", {
+  id: text("id").primaryKey().notNull(),
+  description: text("description").notNull().default(""),
+  createdAt: integer("createdAt")
+    .notNull()
+    .$defaultFn(() => Date.now()),
+  updatedAt: integer("updatedAt")
+    .notNull()
+    .$defaultFn(() => Date.now()),
+});
+
+export type ClientNoticeSettings = typeof clientNoticeSettings.$inferSelect;
+
 export const menuOrders = sqliteTable("menuOrders", {
   id: text("id")
     .primaryKey()

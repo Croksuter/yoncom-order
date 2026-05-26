@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { fail, ok, parseSearchParams, routeError } from "~/lib/server/api";
-import { getPaymentSettings } from "~/lib/server/d1-mutations";
+import { getClientNoticeSettings, getPaymentSettings } from "~/lib/server/d1-mutations";
 import { getDomainEventsAfter, getScopeRevision, tableScope } from "~/lib/server/sync-events";
 import { requireTableSession } from "~/lib/server/table-session";
 import { getAuthorizedClientTable } from "~/lib/server/table-queries";
@@ -20,7 +20,10 @@ export async function GET(request: Request) {
     const revision = await getScopeRevision(scope);
     const events = await getDomainEventsAfter(scope, afterRevision);
     const hasGap = events.length > 0 && events[0].revision > afterRevision + 1;
-    const settingsChanged = events.some((event) => event.type === "paymentSettings.updated");
+    const settingsChanged = events.some((event) => (
+      event.type === "paymentSettings.updated" ||
+      event.type === "clientNoticeSettings.updated"
+    ));
     const needsSnapshot = afterRevision === 0 || hasGap || settingsChanged;
     const table = needsSnapshot
       ? await getAuthorizedClientTable(tableId, tableSession.session.tableContextId)
@@ -34,7 +37,11 @@ export async function GET(request: Request) {
       scope,
       revision,
       events,
-      snapshot: needsSnapshot ? { table, paymentSettings: await getPaymentSettings() } : null,
+      snapshot: needsSnapshot ? {
+        table,
+        paymentSettings: await getPaymentSettings(),
+        clientNoticeSettings: await getClientNoticeSettings(),
+      } : null,
       gap: hasGap,
     });
   } catch (error) {

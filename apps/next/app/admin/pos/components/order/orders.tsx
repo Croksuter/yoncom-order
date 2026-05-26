@@ -4,15 +4,17 @@ import useTableStore from "~/stores/table.store";
 import OrderInstance from "./order.instance";
 import OrderDetailModal from "./order.detail.modal";
 import PaymentSettingsModal from "./payment-settings.modal";
+import ClientNoticeSettingsModal from "./client-notice-settings.modal";
 import * as AdminTableResponse from "shared/types/responses/admin/table";
 import { Button } from "~/components/ui/button";
 import { isActiveOrder, isKitchenOrder, isUnresolvedPaymentOrder } from "~/lib/order-status";
-import { Settings } from "lucide-react";
+import { Megaphone, Settings } from "lucide-react";
 
 export default function Orders() {
   const [orderDetail, setOrderDetail] = useState<AdminTableResponse.Get["result"][number]["tableContexts"][number]["orders"][number] | null>(null);
   const [orderDetailModalOpenState, setOrderDetailModalOpenState] = useState(false);
   const [paymentSettingsOpenState, setPaymentSettingsOpenState] = useState(false);
+  const [clientNoticeSettingsOpenState, setClientNoticeSettingsOpenState] = useState(false);
 
   const { tables, bankTransactions } = useTableStore();
   const orderRows = tables
@@ -93,15 +95,26 @@ export default function Orders() {
               </span>
             </div>
           </div>
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-8 rounded-xl border-slate-200 px-2.5 text-xs font-extrabold text-slate-500 hover:text-slate-700 dark:border-slate-800 dark:text-slate-200"
-            onClick={() => setPaymentSettingsOpenState(true)}
-          >
-            <Settings className="h-3.5 w-3.5" />
-            입금 설정
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 rounded-xl border-rose-200 bg-rose-50 px-2.5 text-xs font-extrabold text-rose-600 hover:bg-rose-100 hover:text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/20 dark:text-rose-300"
+              onClick={() => setClientNoticeSettingsOpenState(true)}
+            >
+              <Megaphone className="h-3.5 w-3.5" />
+              공지 설정
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 rounded-xl border-slate-200 px-2.5 text-xs font-extrabold text-slate-500 hover:text-slate-700 dark:border-slate-800 dark:text-slate-200"
+              onClick={() => setPaymentSettingsOpenState(true)}
+            >
+              <Settings className="h-3.5 w-3.5" />
+              입금 설정
+            </Button>
+          </div>
         </div>
 
         {/* Scrollable Orders Area */}
@@ -298,6 +311,10 @@ export default function Orders() {
       <PaymentSettingsModal
         openState={paymentSettingsOpenState}
         setOpenState={setPaymentSettingsOpenState}
+      />
+      <ClientNoticeSettingsModal
+        openState={clientNoticeSettingsOpenState}
+        setOpenState={setClientNoticeSettingsOpenState}
       />
     </div>
   );

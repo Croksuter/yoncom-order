@@ -9,10 +9,14 @@ interface HeaderProps {
   scrollY: number;
 }
 
+const noticeMarqueeCopies = [0, 1];
+
 export default function Header({ scrollY }: HeaderProps) {
-  const { clientTable } = useTableStore();
+  const { clientTable, clientNoticeSettings } = useTableStore();
   const { theme, toggleTheme, isDark, mounted } = useTheme();
   const { t, language, setLanguage } = useTranslation();
+  const noticeDescription = clientNoticeSettings?.description.trim() ?? "";
+  const noticeHeight = noticeDescription ? 32 : 0;
 
   // Interpolation ratio (0 to 1) based on scroll position (0 to 136 pixels)
   const tRatio = Math.min(scrollY / 136, 1);
@@ -21,7 +25,7 @@ export default function Header({ scrollY }: HeaderProps) {
     <header
       className="fixed top-0 left-[50%] translate-x-[-50%] w-full max-w-[600px] z-50 bg-[#0b1326] text-white overflow-hidden transition-all duration-75 ease-out"
       style={{
-        height: `${196 - tRatio * (196 - 60)}px`,
+        height: `${196 + noticeHeight - tRatio * (196 - 60)}px`,
         borderRadius: `0px 0px ${24 * (1 - tRatio)}px ${24 * (1 - tRatio)}px`,
         borderBottom: `1px solid rgba(32, 46, 70, ${1 - tRatio})`,
         boxShadow: tRatio > 0.5 ? "0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.1)" : "0 4px 12px rgba(0,0,0,0.05)",
@@ -115,6 +119,26 @@ export default function Header({ scrollY }: HeaderProps) {
           {t("brand_slogan")}
         </p>
       </div>
+
+      {noticeDescription && (
+        <div className="absolute bottom-0 left-0 right-0 z-20 h-8 overflow-hidden text-rose-100">
+          <div className="client-notice-marquee absolute inset-y-0 left-0 flex w-max items-center whitespace-nowrap text-sm drop-shadow-[0_1px_4px_rgba(0,0,0,0.58)]">
+            {noticeMarqueeCopies.map((copy) => (
+              <span key={copy} className="px-6">{noticeDescription}</span>
+            ))}
+          </div>
+          <style jsx>{`
+            @keyframes client-notice-marquee {
+              0% { transform: translateX(calc(100vw)); }
+              100% { transform: translateX(calc(-100%)); }
+            }
+
+            .client-notice-marquee {
+              animation: client-notice-marquee 33s linear infinite;
+            }
+          `}</style>
+        </div>
+      )}
     </header>
   );
 }

@@ -13,12 +13,15 @@ import * as AdminDepositRequest from "shared/types/requests/admin/deposit";
 import * as AdminDepositResponse from "shared/types/responses/admin/deposit";
 import * as AdminPaymentSettingsRequest from "shared/types/requests/admin/payment-settings";
 import * as AdminPaymentSettingsResponse from "shared/types/responses/admin/payment-settings";
+import * as AdminClientNoticeSettingsRequest from "shared/types/requests/admin/client-notice-settings";
+import * as AdminClientNoticeSettingsResponse from "shared/types/responses/admin/client-notice-settings";
 
 type TableState = {
   clientTable: ClientTableResponse.Get["result"] | null;
   tables: AdminTableResponse.Get["result"];
   bankTransactions: AdminDepositResponse.Get["result"]["transactions"];
   paymentSettings: AdminPaymentSettingsResponse.Get["result"] | null;
+  clientNoticeSettings: AdminClientNoticeSettingsResponse.Get["result"] | null;
   isLoaded: boolean;
   error: boolean;
 
@@ -33,6 +36,7 @@ type TableState = {
       tableContextId: string | null;
       expiresAt: number | null;
       paymentSettings: AdminPaymentSettingsResponse.Get["result"];
+      clientNoticeSettings: AdminClientNoticeSettingsResponse.Get["result"];
     };
   } | null>;
 
@@ -54,6 +58,8 @@ type TableState = {
   loadBankTransactions: () => Promise<AdminDepositResponse.Get | null>;
   loadPaymentSettings: () => Promise<AdminPaymentSettingsResponse.Get | null>;
   updatePaymentSettings: (query: AdminPaymentSettingsRequest.Update) => Promise<AdminPaymentSettingsResponse.Update | null>;
+  loadClientNoticeSettings: () => Promise<AdminClientNoticeSettingsResponse.Get | null>;
+  updateClientNoticeSettings: (query: AdminClientNoticeSettingsRequest.Update) => Promise<AdminClientNoticeSettingsResponse.Update | null>;
   adminConfirmBankTransaction: (query: AdminDepositRequest.Confirm) => Promise<AdminDepositResponse.Confirm | null>;
   adminIgnoreBankTransaction: (query: AdminDepositRequest.Ignore) => Promise<AdminDepositResponse.Ignore | null>;
 
@@ -69,6 +75,7 @@ const useTableStore = create<TableState>((set, get) => ({
   tables: [],
   bankTransactions: [],
   paymentSettings: null,
+  clientNoticeSettings: null,
   isLoaded: false,
   error: false,
 
@@ -97,6 +104,7 @@ const useTableStore = create<TableState>((set, get) => ({
         tableContextId: string | null;
         expiresAt: number | null;
         paymentSettings: AdminPaymentSettingsResponse.Get["result"];
+        clientNoticeSettings: AdminClientNoticeSettingsResponse.Get["result"];
       };
     }
   >({
@@ -193,7 +201,10 @@ const useTableStore = create<TableState>((set, get) => ({
           ...tableContext,
           orders: tableContext.orders.sort((a, b) => b.createdAt - a.createdAt),
         })),
-    }, paymentSettings: res.result.paymentSettings ?? get().paymentSettings }),
+    },
+    paymentSettings: res.result.paymentSettings ?? get().paymentSettings,
+    clientNoticeSettings: res.result.clientNoticeSettings ?? get().clientNoticeSettings,
+  }),
   }),
 
   clientCancelOrder: async (query: ClientOrderRequest.Remove) => await queryStore<ClientOrderRequest.Remove, ClientOrderResponse.Remove>({
@@ -334,6 +345,31 @@ const useTableStore = create<TableState>((set, get) => ({
       toast({
         title: "입금 안내 수정 완료",
         description: "계좌 정보와 송금 안내가 실시간으로 반영됩니다.",
+        duration: 3000,
+      });
+    },
+  }),
+
+  loadClientNoticeSettings: async () => await queryStore<{}, AdminClientNoticeSettingsResponse.Get>({
+    route: "admin/client-notice-settings",
+    method: "get",
+    query: {},
+    onSuccess: (res) => set({ clientNoticeSettings: res.result }),
+  }),
+
+  updateClientNoticeSettings: async (query: AdminClientNoticeSettingsRequest.Update) => await queryStore<
+    AdminClientNoticeSettingsRequest.Update,
+    AdminClientNoticeSettingsResponse.Update
+  >({
+    route: "admin/client-notice-settings",
+    method: "put",
+    query,
+    setter: set,
+    onSuccess: (res) => {
+      set({ clientNoticeSettings: res.result });
+      toast({
+        title: "고객 공지 저장 완료",
+        description: "고객 주문 화면 헤더 공지가 실시간으로 반영됩니다.",
         duration: 3000,
       });
     },

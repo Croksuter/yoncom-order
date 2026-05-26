@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogTitle, BottomSheetContent } from "~/components/ui/dialog";
+import { Dialog, DialogDescription, DialogTitle, BottomSheetContent } from "~/components/ui/dialog";
 import useCartStore, { CartState } from "~/stores/cart.store";
 import useMenuStore from "~/stores/menu.store";
 import useTableStore from "~/stores/table.store";
@@ -25,7 +25,6 @@ export default function CartModal({
   openState: boolean;
   setOpenState: (open: boolean) => void;
 }) {
-  const [startVisitConfirmOpen, setStartVisitConfirmOpen] = useState(false);
   const [duringPurchase, setDuringPurchase] = useState(false);
   const [checkoutMenuOrderInfos, setCheckoutMenuOrderInfos] = useState<MenuOrderInfo[] | null>(null);
 
@@ -109,13 +108,7 @@ export default function CartModal({
   }
 
   const handleConfirm = async () => {
-    if (isInactiveTable) {
-      setOpenState(false);
-      setStartVisitConfirmOpen(true);
-      return;
-    }
-
-    await submitOrder(false);
+    await submitOrder(Boolean(isInactiveTable));
   }
 
   const handleClose = () => {
@@ -271,41 +264,6 @@ export default function CartModal({
             </>
           )}
         </BottomSheetContent>
-      </Dialog>
-      <Dialog open={startVisitConfirmOpen} onOpenChange={setStartVisitConfirmOpen}>
-        <DialogContent className="w-[calc(100%-2rem)] max-w-sm rounded-2xl">
-          <div className="space-y-3 text-center">
-            <DialogTitle className="text-xl font-extrabold text-slate-800 dark:text-slate-100">
-              {t("cart_new_customer_title")}
-            </DialogTitle>
-            <DialogDescription className="text-sm leading-relaxed">
-              {t("cart_new_customer_desc")}
-            </DialogDescription>
-          </div>
-          <div className="flex gap-3 pt-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setStartVisitConfirmOpen(false);
-                setOpenState(true);
-              }}
-              disabled={duringPurchase}
-              className="flex-1 h-12 rounded-xl font-bold"
-            >
-              {t("cart_check_more")}
-            </Button>
-            <Button
-              onClick={() => {
-                setStartVisitConfirmOpen(false);
-                void submitOrder(true);
-              }}
-              disabled={duringPurchase}
-              className="flex-[2] h-12 rounded-xl bg-primary hover:bg-brand-600 text-white font-extrabold"
-            >
-              {t("cart_start_btn")}
-            </Button>
-          </div>
-        </DialogContent>
       </Dialog>
     </>
   );

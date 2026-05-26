@@ -27,3 +27,10 @@ CREATE TABLE `menuBundleItems` (
 	FOREIGN KEY (`bundleMenuId`) REFERENCES `menus`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`componentMenuId`) REFERENCES `menus`(`id`) ON UPDATE no action ON DELETE cascade
 );
+--> statement-breakpoint
+CREATE TABLE `clientNoticeSettings` (
+	`id` text PRIMARY KEY NOT NULL,
+	`description` text DEFAULT '' NOT NULL,
+	`createdAt` integer NOT NULL,
+	`updatedAt` integer NOT NULL
+);

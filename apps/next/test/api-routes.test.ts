@@ -83,6 +83,12 @@ describe("implemented Next API route handlers", () => {
         createdAt: 1,
         updatedAt: 2,
       })),
+      getClientNoticeSettings: vi.fn(async () => ({
+        id: "default",
+        description: "중요 공지",
+        createdAt: 1,
+        updatedAt: 2,
+      })),
     }));
 
     const { GET } = await import("~/app/api/table/route");
@@ -96,6 +102,9 @@ describe("implemented Next API route handlers", () => {
           bankName: "테스트은행",
           accountNumber: "123-456-7890",
           depositGuide: "테스트 입금 안내",
+        }),
+        clientNoticeSettings: expect.objectContaining({
+          description: "중요 공지",
         }),
       }),
     });
@@ -263,6 +272,12 @@ describe("implemented Next API route handlers", () => {
       if (sql === "SELECT * FROM paymentSettings WHERE id = ? LIMIT 1") {
         return d1Success([]);
       }
+      if (sql.includes("CREATE TABLE IF NOT EXISTS clientNoticeSettings")) {
+        return d1Success([], { duration: 1, changes: 0 });
+      }
+      if (sql === "SELECT * FROM clientNoticeSettings WHERE id = ? LIMIT 1") {
+        return d1Success([]);
+      }
       throw new Error(`Unexpected SQL: ${sql}`);
     });
 
@@ -319,6 +334,12 @@ describe("implemented Next API route handlers", () => {
         return d1Success([], { duration: 1, changes: 0 });
       }
       if (sql === "SELECT * FROM paymentSettings WHERE id = ? LIMIT 1") {
+        return d1Success([]);
+      }
+      if (sql.includes("CREATE TABLE IF NOT EXISTS clientNoticeSettings")) {
+        return d1Success([], { duration: 1, changes: 0 });
+      }
+      if (sql === "SELECT * FROM clientNoticeSettings WHERE id = ? LIMIT 1") {
         return d1Success([]);
       }
       throw new Error(`Unexpected SQL: ${sql}`);
@@ -400,6 +421,12 @@ describe("implemented Next API route handlers", () => {
         accountNumber: "123-456-7890",
         accountHolder: "연컴 테스트",
         enabled: true,
+      })),
+      getClientNoticeSettings: vi.fn(async () => ({
+        id: "default",
+        description: "",
+        createdAt: 1,
+        updatedAt: 1,
       })),
     }));
 

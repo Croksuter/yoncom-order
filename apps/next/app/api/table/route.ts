@@ -1,6 +1,6 @@
 import { getValidation } from "shared/types/requests/client/table";
 import { fail, ok, parseSearchParams, routeError } from "~/lib/server/api";
-import { getPaymentSettings } from "~/lib/server/d1-mutations";
+import { getClientNoticeSettings, getPaymentSettings } from "~/lib/server/d1-mutations";
 import { requireTableSession } from "~/lib/server/table-session";
 import { getAuthorizedClientTable } from "~/lib/server/table-queries";
 
@@ -19,6 +19,7 @@ export async function GET(request: Request) {
     return ok({
       ...table,
       paymentSettings: await getPaymentSettings(),
+      clientNoticeSettings: await getClientNoticeSettings(),
     });
   } catch (error) {
     return routeError(error);

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { guardUnsafeRequest, parseJsonBody, routeError, tableSessionRouteRateLimit } from "~/lib/server/api";
-import { getPaymentSettings } from "~/lib/server/d1-mutations";
+import { getClientNoticeSettings, getPaymentSettings } from "~/lib/server/d1-mutations";
 import { resolveTableSessionAccess } from "~/lib/server/table-session";
 
 const sessionValidation = z.object({
@@ -32,6 +32,7 @@ export async function POST(request: Request) {
         result: {
           ...body.result,
           paymentSettings: await getPaymentSettings(),
+          clientNoticeSettings: await getClientNoticeSettings(),
         },
       },
       {

@@ -1394,6 +1394,61 @@ describe("implemented mutation route handlers", () => {
     ]));
   });
 
+  it("PUT /api/admin/client-notice-settings stores the customer header notice and emits table sync events", async () => {
+    const { requests } = installD1FetchMock(({ sql }) => {
+      const realtime = handleRealtimeSql(sql);
+      if (realtime) return realtime;
+      if (sql.includes("CREATE TABLE IF NOT EXISTS clientNoticeSettings")) {
+        return d1Success([], { duration: 1, changes: 0 });
+      }
+      if (sql === "SELECT * FROM clientNoticeSettings WHERE id = ? LIMIT 1") {
+        return d1Success([]);
+      }
+      if (sql.startsWith("INSERT INTO clientNoticeSettings")) {
+        return d1Success([], { duration: 1, changes: 1 });
+      }
+      if (sql === "SELECT id FROM tables WHERE deletedAt IS NULL") {
+        return d1Success([{ id: "table_e2e_00001" }]);
+      }
+      throw new Error(`Unexpected SQL: ${sql}`);
+    });
+
+    const { PUT } = await import("~/app/api/admin/client-notice-settings/route");
+    const response = await PUT(guardedJsonRequest(
+      "http://order.test/api/admin/client-notice-settings",
+      "PUT",
+      {
+        clientNoticeSettings: {
+          description: "  주문 전 알레르기 유발 재료를 확인해주세요.  ",
+        },
+      },
+    ));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual(expect.objectContaining({
+      result: expect.objectContaining({
+        description: "주문 전 알레르기 유발 재료를 확인해주세요.",
+      }),
+      affectedScopes: expect.arrayContaining(["venue:default", "table:table_e2e_00001"]),
+    }));
+
+    const upsert = requests.find((request) => request.sql.startsWith("INSERT INTO clientNoticeSettings"));
+    expect(upsert?.params).toEqual(expect.arrayContaining([
+      "default",
+      "주문 전 알레르기 유발 재료를 확인해주세요.",
+    ]));
+    const domainEventInserts = requests.filter((request) => request.sql.startsWith("INSERT INTO domainEvents"));
+    expect(domainEventInserts).toHaveLength(2);
+    expect(domainEventInserts.map((request) => request.params[3])).toEqual([
+      "clientNoticeSettings.updated",
+      "clientNoticeSettings.updated",
+    ]);
+    expect(domainEventInserts.map((request) => request.params[1])).toEqual(expect.arrayContaining([
+      "venue:default",
+      "table:table_e2e_00001",
+    ]));
+  });
+
   it("admin mutation routes reject requests when requireAdmin fails", async () => {
     vi.resetModules();
     vi.doMock("~/lib/server/auth-session", () => ({
