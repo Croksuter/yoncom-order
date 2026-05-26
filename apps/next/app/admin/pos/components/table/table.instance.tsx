@@ -65,7 +65,7 @@ export default function TableInstance({
                   ({table.seats})
                 </p>
               </div>
-              {/* <span className="bg-brand-50 dark:bg-brand-950/20 text-brand-600 dark:text-brand-400 text-xs font-black px-2 py-0.5 rounded-full uppercase tracking-wider flex-shrink-0">
+              {/* <span className="bg-brand-50 dark:bg-brand-950/20 text-brand-600 dark:text-brand-600 text-xs font-black px-2 py-0.5 rounded-full uppercase tracking-wider flex-shrink-0">
                 Occupied
               </span> */}
             </div>

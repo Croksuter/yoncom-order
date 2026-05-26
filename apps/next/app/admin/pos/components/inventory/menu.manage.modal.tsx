@@ -337,7 +337,7 @@ export default function MenuManageModal({
                   ) : (
                     <>
                       <UploadCloud className="h-4.5 w-4.5 text-brand-500" />
-                      <span className="text-xs font-bold text-brand-650 dark:text-brand-400">
+                      <span className="text-xs font-bold text-brand-650 dark:text-brand-600">
                         {menuImage ? '이미지 변경하기' : '이미지 업로드'}
                       </span>
                     </>

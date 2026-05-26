@@ -132,7 +132,7 @@ export default function OrderHistoryPanel({
             {/* Cumulative Summary Row */}
             <div className="flex justify-between items-center p-4 rounded-2xl bg-slate-50 dark:bg-slate-950/30 border border-slate-100 dark:border-slate-800">
               <span className="text-xs text-slate-400 dark:text-slate-300 font-bold">{t("order_history_accumulated")}</span>
-              <span className="text-lg font-black text-primary dark:text-brand-400">
+              <span className="text-lg font-black text-primary dark:text-brand-600">
                 ₩ {orderHistories.filter((oh) => oh.order.deletedAt === null).reduce((acc, oh) => acc + oh.totalPrice, 0).toLocaleString()}
               </span>
             </div>

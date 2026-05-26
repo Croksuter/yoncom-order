@@ -84,7 +84,7 @@ export default function OrderPaymentPanel({
     const timer = setInterval(() => {
       const diff = calculateTimeLeft();
       setTimeLeft(diff);
-      
+
       if (diff <= 0) {
         clearInterval(timer);
         if (!hasTriggeredCancelRef.current) {
@@ -337,10 +337,10 @@ export default function OrderPaymentPanel({
               onClick={copyAmount}
               className="flex w-full items-center justify-between overflow-hidden rounded-xl border border-brand-100 dark:border-brand-900 bg-brand-50/40 dark:bg-brand-950/20 p-4 transition-all hover:bg-brand-50 dark:hover:bg-brand-950/30 active:scale-[0.99] shadow-sm cursor-pointer"
             >
-              <span className="text-2xl font-black text-primary dark:text-brand-400">
+              <span className="text-2xl font-black text-primary dark:text-brand-600">
                 ₩ {expectedTransferAmount.toLocaleString()}
               </span>
-              <div className="flex items-center space-x-1 text-primary dark:text-brand-400 shrink-0 pl-4 border-l border-brand-100 dark:border-brand-900 h-8">
+              <div className="flex items-center space-x-1 text-primary dark:text-brand-600 shrink-0 pl-4 border-l border-brand-100 dark:border-brand-900 h-8">
                 <span className="text-xs font-bold">{copiedAmount ? t("pay_copied") : t("pay_copy")}</span>
                 {copiedAmount ? (
                   <Check className="h-4 w-4 text-emerald-500 stroke-[3px]" />

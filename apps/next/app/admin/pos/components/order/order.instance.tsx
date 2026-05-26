@@ -7,10 +7,10 @@ import { dateDiffString } from "~/lib/date";
 import { useEffect, useState } from "react";
 import { getMenuOrderStatusIcon, getOrderStatusLabel } from "~/lib/order-status";
 
-export default function OrderInstance({ 
+export default function OrderInstance({
   order,
   onClick,
-}: { 
+}: {
   order: AdminTableResponse.Get["result"][number]["tableContexts"][number]["orders"][number];
   onClick: () => void;
 }) {
@@ -46,7 +46,7 @@ export default function OrderInstance({
     hoverClass = "hover:border-amber-400/50 dark:hover:border-amber-500/30 hover:shadow-[0_8px_20px_rgba(245,158,11,0.08)]";
   } else if (statusLabel.includes("조리 중") || statusLabel.includes("조리 대기")) {
     borderClass = "border-l-4 border-l-brand-500 dark:border-l-brand-500";
-    badgeClass = "bg-brand-50 dark:bg-brand-950/20 text-brand-600 dark:text-brand-400 border-brand-100 dark:border-brand-900/30";
+    badgeClass = "bg-brand-50 dark:bg-brand-950/20 text-brand-600 dark:text-brand-600 border-brand-100 dark:border-brand-900/30";
     hoverClass = "hover:border-brand-400/50 dark:hover:border-brand-500/30 hover:shadow-[0_8px_20px_rgba(99,102,241,0.08)]";
   } else if (statusLabel.includes("조리 완료") || statusLabel.includes("준비 완료") || statusLabel.includes("수령 완료") || statusLabel.includes("결제 완료")) {
     borderClass = "border-l-4 border-l-emerald-500 dark:border-l-emerald-500";
@@ -55,7 +55,7 @@ export default function OrderInstance({
   }
 
   return (
-    <div 
+    <div
       className={`bg-slate-50/60 dark:bg-slate-900/60 hover:bg-white dark:hover:bg-slate-900 border border-slate-200/50 dark:border-slate-800/80 ${borderClass} ${hoverClass} p-3.5 rounded-2xl transition-all duration-300 cursor-pointer flex flex-col gap-3 group`}
       onClick={onClick}
     >
@@ -65,8 +65,8 @@ export default function OrderInstance({
             {table?.name ?? "테이블"}
           </span>
           <span className="text-xs text-slate-400 dark:text-slate-300 font-bold mt-0.5 truncate">
-            {dateDiffString(now, order.createdAt).startsWith("-") 
-              ? "00:00" 
+            {dateDiffString(now, order.createdAt).startsWith("-")
+              ? "00:00"
               : dateDiffString(now, order.createdAt)}
           </span>
         </div>
@@ -80,8 +80,8 @@ export default function OrderInstance({
           const menu = menus.find((menu) => menu.id === menuOrder.menuId);
 
           return (
-            <div 
-              key={menuOrder.menuId} 
+            <div
+              key={menuOrder.menuId}
               className="flex justify-between items-center text-sm font-semibold text-slate-650 dark:text-slate-350"
             >
               <span className="flex items-center gap-1.5">

@@ -163,7 +163,7 @@ export default function Orders() {
                                     <span className="text-[10.5px] font-bold text-slate-700 dark:text-slate-200 truncate">
                                       {candidate.tableName}
                                     </span>
-                                    <span className="text-[9px] font-extrabold bg-brand-50 dark:bg-brand-950/30 text-brand-600 dark:text-brand-400 px-1 rounded">
+                                    <span className="text-[9px] font-extrabold bg-brand-50 dark:bg-brand-950/30 text-brand-600 dark:text-brand-600 px-1 rounded">
                                       #{candidate.displayNumber ?? "-"}
                                     </span>
                                   </div>

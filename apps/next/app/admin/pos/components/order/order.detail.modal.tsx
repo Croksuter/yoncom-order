@@ -172,10 +172,10 @@ export default function OrderDetailModal({
           <div className="flex justify-between items-center bg-slate-50 dark:bg-slate-900/40 p-4 rounded-2xl border border-slate-150/40 dark:border-slate-800/80 mt-4">
             <span className="text-black dark:text-white font-bold text-sm">주문 합계 금액</span>
             <div className="fr items-end gap-1">
-              <span className="text-2xl font-black text-slate-500 dark:text-brand-400">
+              <span className="text-2xl font-black text-slate-500 dark:text-brand-600">
                 {expectedTransferAmount.toLocaleString()} /
               </span>
-              <span className="text-2xl font-black text-brand-500 dark:text-brand-400">
+              <span className="text-2xl font-black text-brand-500 dark:text-brand-600">
                 {menuOrderInfos.reduce((acc, menuOrderInfo) => acc + menuOrderInfo!.totalPrice, 0).toLocaleString()}
               </span>
               <span className="text-sm font-bold text-slate-450">원</span>

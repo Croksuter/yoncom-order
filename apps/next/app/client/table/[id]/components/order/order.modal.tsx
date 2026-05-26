@@ -158,7 +158,7 @@ export default function OrderModal({
               <div className="border-t border-slate-100 dark:border-slate-800 my-1"></div>
               <div className="flex justify-between items-center text-slate-800 dark:text-slate-100 font-extrabold text-base">
                 <span>{t("order_final_amount")}</span>
-                <span className="text-primary dark:text-brand-400 text-lg">₩ {expectedTransferAmount.toLocaleString()}</span>
+                <span className="text-primary dark:text-brand-600 text-lg">₩ {expectedTransferAmount.toLocaleString()}</span>
               </div>
             </div>
 

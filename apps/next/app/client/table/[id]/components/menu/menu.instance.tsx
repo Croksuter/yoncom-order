@@ -91,7 +91,7 @@ export default function MenuInstance({ menu }: { menu: ClientMenuResponse.Get["r
             {!isSoldOut && (
               <button
                 aria-label="Add to order"
-                className="w-7 h-7 rounded-full bg-brand-100 dark:bg-brand-900/40 text-primary dark:text-brand-400 flex items-center justify-center transition-all duration-200 hover:bg-primary hover:text-white active:scale-90"
+                className="w-7 h-7 rounded-full bg-brand-100 dark:bg-brand-900/40 text-primary dark:text-brand-600 flex items-center justify-center transition-all duration-200 hover:bg-primary hover:text-white active:scale-90"
               >
                 <Plus className="h-4 w-4 stroke-[3px] stroke-white" />
               </button>

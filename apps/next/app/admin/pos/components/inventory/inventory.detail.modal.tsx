@@ -125,7 +125,7 @@ export default function InventoryDetailModal({
 
         {/* Layout Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 my-4">
-          
+
           {/* Left Column (Inputs) - span-2 */}
           <div className="col-span-1 md:col-span-2 space-y-4">
             <div className="fc gap-1.5">
@@ -236,7 +236,7 @@ export default function InventoryDetailModal({
           {/* Right Column (Image Upload) - span-1 */}
           <div className="col-span-1 flex flex-col gap-3">
             <label className="text-xs uppercase font-bold text-slate-450 dark:text-slate-300 px-0.5">메뉴 이미지</label>
-            
+
             {/* Image Preview Container */}
             <div className="w-full aspect-square border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden bg-slate-50/60 dark:bg-slate-900/40 flex items-center justify-center relative group shadow-inner">
               {menuImage ? (
@@ -281,14 +281,14 @@ export default function InventoryDetailModal({
                 ) : (
                   <>
                     <UploadCloud className="h-4.5 w-4.5 text-brand-500" />
-                    <span className="text-xs font-bold text-brand-650 dark:text-brand-400">
+                    <span className="text-xs font-bold text-brand-650 dark:text-brand-600">
                       {menuImage ? '이미지 변경하기' : '신규 이미지 업로드'}
                     </span>
                   </>
                 )}
               </div>
             </div>
-            
+
             <p className="text-xs text-slate-400 dark:text-slate-300 font-medium text-center mt-1 leading-normal">
               JPG, PNG, GIF 파일 가능 (최대 5MB)
             </p>
@@ -303,16 +303,16 @@ export default function InventoryDetailModal({
 
         {/* Footer Actions */}
         <DialogFooter className="border-t border-slate-100 dark:border-slate-850 pt-4 flex gap-2">
-          <Button 
-            onClick={handleClose} 
-            variant="outline" 
+          <Button
+            onClick={handleClose}
+            variant="outline"
             disabled={isBusy}
             className="border-slate-200 dark:border-slate-800 rounded-xl font-bold text-sm px-5 h-10 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-850"
           >
             취소
           </Button>
-          <Button 
-            onClick={handleConfirm} 
+          <Button
+            onClick={handleConfirm}
             disabled={isBusy}
             className="bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-bold text-sm px-6 h-10 transition-all shadow-sm border-none shadow-emerald-500/10"
           >

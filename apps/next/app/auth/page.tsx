@@ -40,7 +40,7 @@ export default function AuthPage() {
             </div>
             <div>
               <h1 className="text-base font-black tracking-tight text-slate-900 dark:text-white">첨크크</h1>
-              <p className="text-xs font-semibold text-brand-600 dark:text-brand-400">POS Admin</p>
+              <p className="text-xs font-semibold text-brand-600 dark:text-brand-600">POS Admin</p>
             </div>
           </div>
 

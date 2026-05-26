@@ -123,7 +123,7 @@ export default function CartAddModal({
             <DialogTitle className="font-extrabold text-xl text-slate-800 dark:text-slate-100 leading-snug">
               {language === "en" && menu.nameEn ? menu.nameEn : menu.name}
             </DialogTitle>
-            <span className="font-extrabold text-lg text-primary dark:text-brand-400 shrink-0">
+            <span className="font-extrabold text-lg text-primary dark:text-brand-600 shrink-0">
               ₩ {menu.price.toLocaleString()}
             </span>
           </div>

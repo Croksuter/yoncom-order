@@ -27,14 +27,14 @@ export default function OrderPaymentModal({
   const { paymentSettings } = useTableStore();
   const { t, language } = useTranslation();
   const activePaymentSettings = normalizePaymentSettings(paymentSettings);
-  
+
   const totalDurationRef = useRef<number>(0);
   const copiedAccountTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const copiedAmountTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!expiresAt) return;
-    
+
     const calculateTimeLeft = () => {
       const diff = expiresAt - Date.now();
       return Math.max(0, diff);
@@ -170,7 +170,7 @@ export default function OrderPaymentModal({
             </div>
             <span className={`text-4xl font-black tracking-wider ${
               isExpired || isLowTime
-                ? "text-destructive animate-pulse" 
+                ? "text-destructive animate-pulse"
                 : "text-primary"
             }`}>
               {isExpired ? "00:00" : formatTime(timeLeft)}
@@ -194,7 +194,7 @@ export default function OrderPaymentModal({
           <div className="grid w-full grid-cols-2 gap-y-2.5 pb-4 border-b border-dashed border-slate-200 dark:border-slate-800 text-xs">
             <span className="font-bold text-slate-400 dark:text-slate-300">{t("order_amount")}</span>
             <span className="text-right font-bold text-slate-800 dark:text-slate-100">₩ {originalAmount.toLocaleString()}</span>
-            
+
             <span className="font-bold text-slate-400 dark:text-slate-300">{t("order_payment_code")}</span>
             <span className="text-right font-bold text-slate-500 dark:text-slate-200 font-bold">
               {paymentCode !== null ? `- ₩ ${paymentCode.toLocaleString()}` : "-"}
@@ -249,10 +249,10 @@ export default function OrderPaymentModal({
               onClick={copyAmount}
               className="flex w-full items-center justify-between overflow-hidden rounded-xl border border-brand-100 dark:border-brand-900 bg-brand-50/40 dark:bg-brand-950/20 p-4 transition-all hover:bg-brand-50 dark:hover:bg-brand-950/30 active:scale-[0.99] shadow-sm cursor-pointer"
             >
-              <span className="text-2xl font-black text-primary dark:text-brand-400">
+              <span className="text-2xl font-black text-primary dark:text-brand-600">
                 ₩ {expectedTransferAmount.toLocaleString()}
               </span>
-              <div className="flex items-center space-x-1 text-primary dark:text-brand-400 shrink-0 pl-4 border-l border-brand-100 dark:border-brand-900 h-8">
+              <div className="flex items-center space-x-1 text-primary dark:text-brand-600 shrink-0 pl-4 border-l border-brand-100 dark:border-brand-900 h-8">
                 <span className="text-xs font-bold">{copiedAmount ? t("pay_copied") : t("pay_copy")}</span>
                 {copiedAmount ? (
                   <Check className="h-4 w-4 text-emerald-500 stroke-[3px]" />
