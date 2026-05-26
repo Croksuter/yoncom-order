@@ -229,9 +229,10 @@ export default function ClientTablePage({ params }: ClientTablePageProps) {
       traceEvent("client", "payment.pending.resync", {
         orderId: activeUnpaidOrder.id,
         tableId: id,
+        mode: "forceSnapshot",
       });
       try {
-        await syncClientTable();
+        await syncClientTable(0);
       } finally {
         paymentSyncInFlightRef.current = false;
       }
