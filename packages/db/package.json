@@ -12,9 +12,9 @@
   "license": "ISC",
   "packageManager": "pnpm@10.8.0",
   "dependencies": {
-    "drizzle-orm": "^0.43.1",
+    "drizzle-orm": "^0.45.2",
     "lucia": "^3.2.2",
-    "sqlite3": "^5.1.7",
+    "sqlite3": "^6.0.1",
     "uuid": "^11.1.0"
   },
   "devDependencies": {

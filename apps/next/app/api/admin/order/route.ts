@@ -1,5 +1,5 @@
 import { paidValidation, removeValidation } from "shared/types/requests/admin/order";
-import { fail, guardUnsafeRequest, mutationOk, parseJsonBody, routeError } from "~/lib/server/api";
+import { guardUnsafeRequest, idempotentMutationResponse, parseJsonBody, routeError } from "~/lib/server/api";
 import { requireAdmin, requireAdminUser } from "~/lib/server/auth-session";
 import { cancelOrder, markOrderPaid } from "~/lib/server/d1-mutations";
 
@@ -11,13 +11,7 @@ export async function PUT(request: Request) {
 
   try {
     const query = await parseJsonBody(request, paidValidation);
-    const result = await markOrderPaid(query.orderId);
-
-    if (result.error) {
-      return fail(result.error, result.status);
-    }
-
-    return mutationOk(result);
+    return await idempotentMutationResponse(request, "admin:order:paid", query, () => markOrderPaid(query.orderId));
   } catch (error) {
     return routeError(error);
   }
@@ -31,17 +25,13 @@ export async function DELETE(request: Request) {
 
   try {
     const query = await parseJsonBody(request, removeValidation);
-    const result = await cancelOrder(query.orderId, {
-      allowPaid: true,
-      adminUserId: admin.user?.id ?? null,
-      cancelReason: query.cancelReason,
-    });
-
-    if (result.error) {
-      return fail(result.error, result.status);
-    }
-
-    return mutationOk(result);
+    return await idempotentMutationResponse(request, "admin:order:delete", query, () =>
+      cancelOrder(query.orderId, {
+        allowPaid: true,
+        adminUserId: admin.user?.id ?? null,
+        cancelReason: query.cancelReason,
+      }),
+    );
   } catch (error) {
     return routeError(error);
   }

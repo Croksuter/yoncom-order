@@ -1,6 +1,6 @@
 import { menuOrderStatus } from "db/schema";
 import { pickUpValidation } from "shared/types/requests/admin/order";
-import { fail, guardUnsafeRequest, mutationOk, parseJsonBody, routeError } from "~/lib/server/api";
+import { guardUnsafeRequest, idempotentMutationResponse, parseJsonBody, routeError } from "~/lib/server/api";
 import { requireAdmin } from "~/lib/server/auth-session";
 import { setMenuOrderStatus } from "~/lib/server/d1-mutations";
 
@@ -12,13 +12,9 @@ export async function PUT(request: Request) {
 
   try {
     const query = await parseJsonBody(request, pickUpValidation);
-    const result = await setMenuOrderStatus(query.menuOrderId, menuOrderStatus.PICKED_UP);
-
-    if (result.error) {
-      return fail(result.error, result.status);
-    }
-
-    return mutationOk(result);
+    return await idempotentMutationResponse(request, "admin:order:pick-up", query, () =>
+      setMenuOrderStatus(query.menuOrderId, menuOrderStatus.PICKED_UP),
+    );
   } catch (error) {
     return routeError(error);
   }

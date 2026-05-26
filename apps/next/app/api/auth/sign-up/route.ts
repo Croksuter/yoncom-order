@@ -5,10 +5,10 @@ import { userRole, users } from "db/schema";
 import { signUpValidation } from "shared/types/requests/client/auth";
 import { ensureUserEnabledColumn } from "~/lib/server/auth-session";
 import { getDb } from "~/lib/server/db";
-import { guardUnsafeRequest, parseJsonBody, routeError } from "~/lib/server/api";
+import { authRouteRateLimit, guardUnsafeRequest, parseJsonBody, routeError } from "~/lib/server/api";
 
 export async function POST(request: Request) {
-  const guardError = guardUnsafeRequest(request, { csrf: false, idempotency: false });
+  const guardError = guardUnsafeRequest(request, { csrf: false, idempotency: false, rateLimit: authRouteRateLimit });
   if (guardError) return guardError;
 
   try {

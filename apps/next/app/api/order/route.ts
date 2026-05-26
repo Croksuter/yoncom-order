@@ -1,6 +1,6 @@
 import { createValidation, removeValidation } from "shared/types/requests/client/order";
 import { csrfCookieName } from "~/lib/server/auth-session";
-import { fail, getRequestCookie, guardUnsafeRequest, mutationOk, parseJsonBody, routeError } from "~/lib/server/api";
+import { fail, getRequestCookie, guardUnsafeRequest, mutationOk, parseJsonBody, routeError, runIdempotentMutation } from "~/lib/server/api";
 import { cancelOrder, createClientOrder, createClientOrderForNewTableSession } from "~/lib/server/d1-mutations";
 import {
   attachTableSessionCookies,
@@ -31,11 +31,13 @@ export async function POST(request: Request) {
       if (csrfError) return csrfError;
     }
 
-    const result = tableSession
-      ? await createClientOrder(query.tableId, tableSession.tableContextId, query.clientOrderId, query.menuOrders)
-      : query.startNewTableSession
-        ? await createClientOrderForNewTableSession(query.tableId, query.clientOrderId, query.menuOrders)
-        : { error: "Table session required", status: 401 };
+    const result = await runIdempotentMutation(request, `client:order:create:${query.tableId}`, query, async () =>
+      tableSession
+        ? await createClientOrder(query.tableId, tableSession.tableContextId, query.clientOrderId, query.menuOrders)
+        : query.startNewTableSession
+          ? await createClientOrderForNewTableSession(query.tableId, query.clientOrderId, query.menuOrders)
+          : { error: "Table session required", status: 401 },
+    );
 
     if (result.error) {
       return fail(result.error, result.status);
@@ -62,7 +64,9 @@ export async function DELETE(request: Request) {
     const tableSession = await requireTableSessionForOrder(request, query.orderId);
     if (tableSession.response) return tableSession.response;
 
-    const result = await cancelOrder(query.orderId, { allowPaid: false });
+    const result = await runIdempotentMutation(request, `client:order:delete:${query.orderId}`, query, () =>
+      cancelOrder(query.orderId, { allowPaid: false }),
+    );
 
     if (result.error) {
       return fail(result.error, result.status);

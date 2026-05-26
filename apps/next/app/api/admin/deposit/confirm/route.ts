@@ -1,5 +1,5 @@
 import { confirmValidation } from "shared/types/requests/admin/deposit";
-import { fail, guardUnsafeRequest, mutationOk, parseJsonBody, routeError } from "~/lib/server/api";
+import { guardUnsafeRequest, idempotentMutationResponse, parseJsonBody, routeError } from "~/lib/server/api";
 import { requireAdmin } from "~/lib/server/auth-session";
 import { confirmBankTransaction } from "~/lib/server/d1-mutations";
 
@@ -11,13 +11,9 @@ export async function PUT(request: Request) {
 
   try {
     const query = await parseJsonBody(request, confirmValidation);
-    const result = await confirmBankTransaction(query.bankTransactionId, query.paymentId);
-
-    if (result.error) {
-      return fail(result.error, result.status);
-    }
-
-    return mutationOk(result);
+    return await idempotentMutationResponse(request, "admin:deposit:confirm", query, () =>
+      confirmBankTransaction(query.bankTransactionId, query.paymentId),
+    );
   } catch (error) {
     return routeError(error);
   }

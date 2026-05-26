@@ -23,5 +23,11 @@
   "author": "",
   "packageManager": "pnpm@10.8.0",
   "dependencies": {},
-  "devDependencies": {}
+  "devDependencies": {},
+  "pnpm": {
+    "overrides": {
+      "tar-fs": "^2.1.4",
+      "minimatch": "^3.1.4"
+    }
+  }
 }

@@ -381,6 +381,48 @@ describe("implemented Next API route handlers", () => {
     await expect(response.json()).resolves.toEqual({ error: "Table already in use" });
   });
 
+  it("POST /api/table/session returns 429 after the configured table-session limit", async () => {
+    const resolveTableSessionAccess = vi.fn(async () => ({
+      response: Response.json({
+        result: {
+          state: "INACTIVE",
+          tableId: "table_123456789",
+          tableContextId: null,
+          expiresAt: null,
+        },
+      }),
+    }));
+    vi.doMock("~/lib/server/table-session", () => ({ resolveTableSessionAccess }));
+    vi.doMock("~/lib/server/d1-mutations", () => ({
+      getPaymentSettings: vi.fn(async () => ({
+        id: "default",
+        bankName: "테스트은행",
+        accountNumber: "123-456-7890",
+        accountHolder: "연컴 테스트",
+        enabled: true,
+      })),
+    }));
+
+    const { POST } = await import("~/app/api/table/session/route");
+    let response: Response | null = null;
+    for (let attempt = 0; attempt < 31; attempt += 1) {
+      response = await POST(new Request("http://order.test/api/table/session", {
+        method: "POST",
+        headers: {
+          origin: "http://order.test",
+          "content-type": "application/json",
+          "cf-connecting-ip": "203.0.113.30",
+          "x-forwarded-for": `198.51.100.${attempt}`,
+        },
+        body: JSON.stringify({ tableId: "table_123456789" }),
+      }));
+    }
+
+    expect(response?.status).toBe(429);
+    await expect(response?.json()).resolves.toEqual({ error: "Too many requests" });
+    expect(resolveTableSessionAccess).toHaveBeenCalledTimes(30);
+  });
+
   it("all admin API route handlers are wired through requireAdmin", () => {
     const routeFiles: string[] = [];
     const walk = (directory: string) => {

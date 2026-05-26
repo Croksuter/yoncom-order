@@ -1,6 +1,8 @@
+import { createHash, randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z, ZodError } from "zod";
 import { csrfCookieName } from "~/lib/server/auth-session";
+import { executeD1, queryD1 } from "~/lib/server/db";
 import { getTraceHeaderName, summarizePath, traceEvent } from "~/lib/verification-trace";
 
 const unsafeMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
@@ -9,6 +11,32 @@ const idempotencyKeyPattern = /^[A-Za-z0-9._:-]{8,128}$/;
 const rateWindowMs = 60_000;
 const rateMaxRequests = 120;
 const rateBuckets = new Map<string, { count: number; resetAt: number }>();
+
+export const authRouteRateLimit = { scope: "auth", maxRequests: 20, windowMs: rateWindowMs } as const;
+export const tableSessionRouteRateLimit = { scope: "table-session", maxRequests: 30, windowMs: rateWindowMs } as const;
+
+type RateLimitOptions = {
+  key?: string;
+  maxRequests?: number;
+  scope?: string;
+  windowMs?: number;
+};
+
+type IdempotencyRecord = {
+  requestHash: string;
+  status: string;
+  resultJson: string | null;
+  revision: number | null;
+};
+
+type MutationResult = {
+  error?: string;
+  status: number;
+  result?: unknown;
+  mutationId?: string;
+  revision?: number;
+  affectedScopes?: string[];
+};
 
 function firstHeaderValue(value: string | null) {
   return value?.split(",")[0]?.trim() || null;
@@ -179,6 +207,7 @@ export function guardUnsafeRequest(
     csrf?: boolean;
     idempotency?: boolean;
     json?: boolean;
+    rateLimit?: RateLimitOptions;
     rateLimitKey?: string;
   } = {},
 ) {
@@ -197,7 +226,7 @@ export function guardUnsafeRequest(
     requiresJson: options.json !== false,
   });
 
-  const rateError = applyRateLimit(request, options.rateLimitKey);
+  const rateError = applyRateLimit(request, { ...options.rateLimit, key: options.rateLimit?.key ?? options.rateLimitKey });
   if (rateError) {
     traceEvent("server", "api.guard.block", { traceId, method: request.method, path, reason: "rate-limit" });
     return rateError;
@@ -247,22 +276,159 @@ export function getIdempotencyKey(request: Request) {
   return request.headers.get("idempotency-key");
 }
 
-function applyRateLimit(request: Request, overrideKey?: string) {
-  const key = overrideKey ?? request.headers.get("x-forwarded-for") ?? "local";
+function getRateLimitClientKey(request: Request, overrideKey?: string) {
+  return overrideKey
+    ?? firstHeaderValue(request.headers.get("cf-connecting-ip"))
+    ?? firstHeaderValue(request.headers.get("x-forwarded-for"))
+    ?? "local";
+}
+
+function applyRateLimit(request: Request, options: RateLimitOptions = {}) {
+  const scope = options.scope ?? "default";
+  const key = `${scope}:${getRateLimitClientKey(request, options.key)}`;
   const now = Date.now();
+  const windowMs = options.windowMs ?? rateWindowMs;
+  const maxRequests = options.maxRequests ?? rateMaxRequests;
   const bucket = rateBuckets.get(key);
 
   if (!bucket || bucket.resetAt <= now) {
-    rateBuckets.set(key, { count: 1, resetAt: now + rateWindowMs });
+    rateBuckets.set(key, { count: 1, resetAt: now + windowMs });
     return null;
   }
 
   bucket.count += 1;
-  if (bucket.count > rateMaxRequests) {
+  if (bucket.count > maxRequests) {
     return fail("Too many requests", 429);
   }
 
   return null;
+}
+
+export async function runIdempotentMutation<TMutation extends MutationResult>(
+  request: Request,
+  actorScope: string,
+  requestBody: unknown,
+  mutate: () => Promise<TMutation>,
+): Promise<TMutation> {
+  const idempotencyKey = getIdempotencyKey(request);
+  if (!idempotencyKey) {
+    return mutate();
+  }
+
+  const requestHash = hashIdempotencyRequest(requestBody);
+  const inserted = await insertIdempotencyRequest(actorScope, idempotencyKey, requestHash);
+  if (!inserted) {
+    const existing = await getIdempotencyRecord(actorScope, idempotencyKey);
+    if (!existing) {
+      return { error: "Idempotency conflict", status: 409 } as TMutation;
+    }
+    if (existing.requestHash !== requestHash) {
+      return { error: "Idempotency conflict", status: 409 } as TMutation;
+    }
+    if (existing.status === "SUCCEEDED" && existing.resultJson) {
+      return JSON.parse(existing.resultJson) as TMutation;
+    }
+    return { error: "Idempotency request in progress", status: 409 } as TMutation;
+  }
+
+  try {
+    const result = await mutate();
+    if (result.error || result.status < 200 || result.status >= 300) {
+      await deleteIdempotencyRequest(actorScope, idempotencyKey);
+      return result;
+    }
+
+    await executeD1(
+      `UPDATE mutationRequests
+       SET status = ?, resultJson = ?, revision = ?, updatedAt = ?
+       WHERE actorScope = ? AND idempotencyKey = ?`,
+      [
+        "SUCCEEDED",
+        JSON.stringify(result),
+        result.revision ?? null,
+        Date.now(),
+        actorScope,
+        idempotencyKey,
+      ],
+    );
+    return result;
+  } catch (error) {
+    await deleteIdempotencyRequest(actorScope, idempotencyKey).catch(() => null);
+    throw error;
+  }
+}
+
+export async function idempotentMutationResponse<TMutation extends MutationResult>(
+  request: Request,
+  actorScope: string,
+  requestBody: unknown,
+  mutate: () => Promise<TMutation>,
+) {
+  const result = await runIdempotentMutation(request, actorScope, requestBody, mutate);
+  if (result.error) {
+    return fail(result.error, result.status);
+  }
+  return mutationOk(result);
+}
+
+function hashIdempotencyRequest(value: unknown) {
+  return createHash("sha256").update(stableStringify(value)).digest("hex");
+}
+
+function stableStringify(value: unknown): string {
+  return JSON.stringify(normalizeForStableStringify(value));
+}
+
+function normalizeForStableStringify(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(normalizeForStableStringify);
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([, entryValue]) => entryValue !== undefined)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, entryValue]) => [key, normalizeForStableStringify(entryValue)]),
+    );
+  }
+  return value;
+}
+
+async function insertIdempotencyRequest(actorScope: string, idempotencyKey: string, requestHash: string) {
+  const now = Date.now();
+  try {
+    await executeD1(
+      `INSERT INTO mutationRequests
+        (id, actorScope, idempotencyKey, requestHash, status, resultJson, revision, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, NULL, NULL, ?, ?)`,
+      [randomUUID(), actorScope, idempotencyKey, requestHash, "IN_PROGRESS", now, now],
+    );
+    return true;
+  } catch (error) {
+    const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+    if (message.includes("unique") || message.includes("constraint")) {
+      return false;
+    }
+    throw error;
+  }
+}
+
+async function getIdempotencyRecord(actorScope: string, idempotencyKey: string) {
+  const [record] = await queryD1<IdempotencyRecord>(
+    `SELECT requestHash, status, resultJson, revision
+     FROM mutationRequests
+     WHERE actorScope = ? AND idempotencyKey = ?
+     LIMIT 1`,
+    [actorScope, idempotencyKey],
+  );
+  return record ?? null;
+}
+
+async function deleteIdempotencyRequest(actorScope: string, idempotencyKey: string) {
+  await executeD1("DELETE FROM mutationRequests WHERE actorScope = ? AND idempotencyKey = ?", [
+    actorScope,
+    idempotencyKey,
+  ]);
 }
 
 export function routeError(error: unknown) {

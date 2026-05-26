@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { guardUnsafeRequest, parseJsonBody, routeError } from "~/lib/server/api";
+import { guardUnsafeRequest, parseJsonBody, routeError, tableSessionRouteRateLimit } from "~/lib/server/api";
 import { getPaymentSettings } from "~/lib/server/d1-mutations";
 import { resolveTableSessionAccess } from "~/lib/server/table-session";
 
@@ -8,7 +8,11 @@ const sessionValidation = z.object({
 }).strict();
 
 export async function POST(request: Request) {
-  const guardError = guardUnsafeRequest(request, { csrf: false, idempotency: false });
+  const guardError = guardUnsafeRequest(request, {
+    csrf: false,
+    idempotency: false,
+    rateLimit: tableSessionRouteRateLimit,
+  });
   if (guardError) return guardError;
 
   try {

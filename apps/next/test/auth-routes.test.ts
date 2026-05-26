@@ -50,6 +50,41 @@ describe("implemented auth route handlers", () => {
     expect(findFirst).toHaveBeenCalledTimes(1);
   });
 
+  it("POST /api/auth/sign-in returns 429 after the configured auth limit", async () => {
+    const findFirst = vi.fn(async () => null);
+    vi.doMock("~/lib/server/db", () => ({
+      executeD1: vi.fn(),
+      queryD1: vi.fn(async () => [{ name: "enabled" }]),
+      getDb: () => ({
+        query: {
+          users: {
+            findFirst,
+          },
+        },
+      }),
+    }));
+
+    const { POST } = await import("~/app/api/auth/sign-in/route");
+    let response: Response | null = null;
+    for (let attempt = 0; attempt < 21; attempt += 1) {
+      response = await POST(guardedPost(
+        "http://order.test/api/auth/sign-in",
+        {
+          email: "missing@example.com",
+          password: "demo-admin-1234",
+        },
+        {
+          "cf-connecting-ip": "203.0.113.20",
+          "x-forwarded-for": `198.51.100.${attempt}`,
+        },
+      ));
+    }
+
+    expect(response?.status).toBe(429);
+    await expect(response?.json()).resolves.toEqual({ error: "Too many requests" });
+    expect(findFirst).toHaveBeenCalledTimes(20);
+  });
+
   it("POST /api/auth/sign-in rejects disabled admin users without revealing activation state", async () => {
     const password = "demo-admin-1234";
     const executeD1 = vi.fn();
@@ -159,6 +194,45 @@ describe("implemented auth route handlers", () => {
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ error: "User with that email already exists." });
     expect(findFirst).toHaveBeenCalledTimes(1);
+  });
+
+  it("POST /api/auth/sign-up returns 429 after the configured auth limit", async () => {
+    const findFirst = vi.fn(async () => ({
+      id: "demo_user_admin",
+      email: "demo.admin@yoncom.local",
+    }));
+    vi.doMock("~/lib/server/db", () => ({
+      executeD1: vi.fn(),
+      queryD1: vi.fn(async () => [{ name: "enabled" }]),
+      getDb: () => ({
+        query: {
+          users: {
+            findFirst,
+          },
+        },
+      }),
+    }));
+
+    const { POST } = await import("~/app/api/auth/sign-up/route");
+    let response: Response | null = null;
+    for (let attempt = 0; attempt < 21; attempt += 1) {
+      response = await POST(guardedPost(
+        "http://order.test/api/auth/sign-up",
+        {
+          name: "Demo Admin",
+          email: "demo.admin@yoncom.local",
+          password: "demo-admin-1234",
+        },
+        {
+          "cf-connecting-ip": "203.0.113.21",
+          "x-forwarded-for": `198.51.100.${attempt}`,
+        },
+      ));
+    }
+
+    expect(response?.status).toBe(429);
+    await expect(response?.json()).resolves.toEqual({ error: "Too many requests" });
+    expect(findFirst).toHaveBeenCalledTimes(20);
   });
 
   it("POST /api/auth/sign-up creates disabled admin candidates", async () => {
