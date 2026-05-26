@@ -1,8 +1,13 @@
 import type { Config } from 'drizzle-kit';
 import { config } from 'dotenv';
+import { existsSync } from 'fs';
 import { resolve } from 'path';
 
-config({ path: resolve(__dirname, "../../.env") });
+const envPath = existsSync(resolve(__dirname, "../../.env.local"))
+  ? resolve(__dirname, "../../.env.local")
+  : resolve(__dirname, "../../.env");
+
+config({ path: envPath });
 
 export default {
   schema: "./schema.ts",

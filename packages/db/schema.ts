@@ -95,7 +95,9 @@ export const menuCategories = sqliteTable("menuCategories", {
     .notNull()
     .$defaultFn(() => generateId(15)),
   name: text("name").notNull(),
+  nameEn: text("nameEn"),
   description: text("description").notNull(),
+  descriptionEn: text("descriptionEn"),
 
   createdAt: integer("createdAt")
     .notNull()
@@ -121,8 +123,10 @@ export const menus = sqliteTable("menus", {
     .notNull()
     .$defaultFn(() => generateId(15)),
   name: text("name").notNull(),
+  nameEn: text("nameEn"),
   image: text("image").notNull(),
   description: text("description").notNull(),
+  descriptionEn: text("descriptionEn"),
   price: integer("price").notNull(),
   quantity: integer("quantity").notNull(),
   available: integer("available", { mode: "boolean" }).notNull().default(true),

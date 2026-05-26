@@ -17,10 +17,12 @@ export default function CategoryManageModal({
 
   // Create Form State
   const [categoryName, setCategoryName] = useState<string>("");
+  const [categoryNameEn, setCategoryNameEn] = useState<string>("");
 
   // Edit Form State
   const [editCategoryId, setEditCategoryId] = useState<string>("");
   const [editCategoryName, setEditCategoryName] = useState<string>("");
+  const [editCategoryNameEn, setEditCategoryNameEn] = useState<string>("");
 
   // Remove Form State
   const [removeCategoryId, setRemoveCategoryId] = useState<string>("");
@@ -50,10 +52,13 @@ export default function CategoryManageModal({
         await createMenuCategory({
           menuCategoryOptions: {
             name: categoryName.trim(),
-            description: "", // default empty description
+            nameEn: categoryNameEn.trim() || null,
+            description: "",
+            descriptionEn: "",
           }
         });
         setCategoryName("");
+        setCategoryNameEn("");
         setInvalid(false);
         setOpenState(false);
       } finally {
@@ -71,11 +76,14 @@ export default function CategoryManageModal({
           menuCategoryId: editCategoryId,
           menuCategoryOptions: {
             name: editCategoryName.trim(),
+            nameEn: editCategoryNameEn.trim() || null,
             description: "",
+            descriptionEn: "",
           }
         });
         setEditCategoryId("");
         setEditCategoryName("");
+        setEditCategoryNameEn("");
         setInvalid(false);
         setOpenState(false);
       } finally {
@@ -108,9 +116,11 @@ export default function CategoryManageModal({
   const handleClose = () => {
     if (isBusy) return;
     setCategoryName("");
+    setCategoryNameEn("");
     setRemoveCategoryId("");
     setEditCategoryId("");
     setEditCategoryName("");
+    setEditCategoryNameEn("");
     setInvalid(false);
     setOpenState(false);
   };
@@ -184,12 +194,23 @@ export default function CategoryManageModal({
           /* ================== CATEGORY CREATE TAB ================== */
           <div className="space-y-4 my-4">
             <div className="fc gap-1.5">
-              <label className="text-xs uppercase font-bold text-slate-450 dark:text-slate-300 px-0.5">카테고리 이름</label>
+              <label className="text-xs uppercase font-bold text-slate-450 dark:text-slate-300 px-0.5">카테고리 이름 (한국어)</label>
               <Input
                 type="text"
                 placeholder="예: 주류, 사이드 메뉴, 메인 안주"
                 value={categoryName}
                 onChange={(e) => setCategoryName(e.target.value)}
+                className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-xl h-10 font-medium text-sm"
+                disabled={isBusy}
+              />
+            </div>
+            <div className="fc gap-1.5">
+              <label className="text-xs uppercase font-bold text-slate-450 dark:text-slate-300 px-0.5">Category Name (English)</label>
+              <Input
+                type="text"
+                placeholder="e.g. Drinks, Side Dishes, Main Menu"
+                value={categoryNameEn}
+                onChange={(e) => setCategoryNameEn(e.target.value)}
                 className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-xl h-10 font-medium text-sm"
                 disabled={isBusy}
               />
@@ -206,6 +227,7 @@ export default function CategoryManageModal({
                   setEditCategoryId(id);
                   const cat = menuCategories.find(c => c.id === id);
                   setEditCategoryName(cat ? cat.name : "");
+                  setEditCategoryNameEn(cat ? (cat.nameEn || "") : "");
                 }}
                 disabled={isBusy}
               >
@@ -227,17 +249,30 @@ export default function CategoryManageModal({
             </div>
 
             {editCategoryId && (
-              <div className="fc gap-1.5 w-full animate-fade-in">
-                <label className="text-xs uppercase font-bold text-slate-450 dark:text-slate-300 px-0.5">새로운 카테고리 이름</label>
-                <Input
-                  type="text"
-                  placeholder="새로운 이름 입력"
-                  value={editCategoryName}
-                  onChange={(e) => setEditCategoryName(e.target.value)}
-                  className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-xl h-10 font-medium text-sm focus:border-amber-500 focus:ring-amber-500"
-                  disabled={isBusy}
-                />
-              </div>
+              <>
+                <div className="fc gap-1.5 w-full animate-fade-in">
+                  <label className="text-xs uppercase font-bold text-slate-455 dark:text-slate-300 px-0.5">새로운 카테고리 이름 (한국어)</label>
+                  <Input
+                    type="text"
+                    placeholder="새로운 이름 입력"
+                    value={editCategoryName}
+                    onChange={(e) => setEditCategoryName(e.target.value)}
+                    className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-xl h-10 font-medium text-sm focus:border-amber-500 focus:ring-amber-500"
+                    disabled={isBusy}
+                  />
+                </div>
+                <div className="fc gap-1.5 w-full animate-fade-in">
+                  <label className="text-xs uppercase font-bold text-slate-455 dark:text-slate-300 px-0.5">New Category Name (English)</label>
+                  <Input
+                    type="text"
+                    placeholder="Enter new English name"
+                    value={editCategoryNameEn}
+                    onChange={(e) => setEditCategoryNameEn(e.target.value)}
+                    className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-xl h-10 font-medium text-sm focus:border-amber-500 focus:ring-amber-500"
+                    disabled={isBusy}
+                  />
+                </div>
+              </>
             )}
           </div>
         ) : (

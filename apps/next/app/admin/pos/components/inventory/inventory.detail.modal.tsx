@@ -19,8 +19,10 @@ export default function InventoryDetailModal({
   const { menuCategories } = useMenuStore();
 
   const [menuName, setMenuName] = useState(menu.name || "");
+  const [menuNameEn, setMenuNameEn] = useState(menu.nameEn || "");
   const [menuCategory, setMenuCategory] = useState(menu.menuCategoryId || "");
   const [menuDescription, setMenuDescription] = useState(menu.description || "");
+  const [menuDescriptionEn, setMenuDescriptionEn] = useState(menu.descriptionEn || "");
   const [menuImage, setMenuImage] = useState(menu.image || "");
   const [menuPrice, setMenuPrice] = useState(menu.price || 0);
   const [menuQuantity, setMenuQuantity] = useState(menu.quantity || 0);
@@ -32,8 +34,10 @@ export default function InventoryDetailModal({
 
   const resetForm = useCallback(() => {
     setMenuName(menu.name || "");
+    setMenuNameEn(menu.nameEn || "");
     setMenuCategory(menu.menuCategoryId || "");
     setMenuDescription(menu.description || "");
+    setMenuDescriptionEn(menu.descriptionEn || "");
     setMenuImage(menu.image || "");
     setMenuPrice(menu.price || 0);
     setMenuQuantity(menu.quantity || 0);
@@ -74,8 +78,10 @@ export default function InventoryDetailModal({
       await useMenuStore.getState().updateMenu({
         menuOptions: {
           name: menuName,
+          nameEn: menuNameEn.trim() || null,
           menuCategoryId: menuCategory,
           description: menuDescription,
+          descriptionEn: menuDescriptionEn.trim() || null,
           image: menuImage,
           price: menuPrice,
           quantity: menuQuantity,
@@ -123,11 +129,22 @@ export default function InventoryDetailModal({
           {/* Left Column (Inputs) - span-2 */}
           <div className="col-span-1 md:col-span-2 space-y-4">
             <div className="fc gap-1.5">
-              <label className="text-xs uppercase font-bold text-slate-450 dark:text-slate-300 px-0.5">메뉴 이름</label>
+              <label className="text-xs uppercase font-bold text-slate-450 dark:text-slate-300 px-0.5">메뉴 이름 (한국어)</label>
               <Input
                 value={menuName}
                 onChange={(e) => setMenuName(e.target.value)}
                 placeholder="메뉴 이름을 입력하세요"
+                className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-xl h-10 font-medium text-sm"
+                disabled={isBusy}
+              />
+            </div>
+
+            <div className="fc gap-1.5">
+              <label className="text-xs uppercase font-bold text-slate-450 dark:text-slate-300 px-0.5">Menu Name (English)</label>
+              <Input
+                value={menuNameEn}
+                onChange={(e) => setMenuNameEn(e.target.value)}
+                placeholder="Enter menu name in English"
                 className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-xl h-10 font-medium text-sm"
                 disabled={isBusy}
               />
@@ -150,11 +167,22 @@ export default function InventoryDetailModal({
             </div>
 
             <div className="fc gap-1.5">
-              <label className="text-xs uppercase font-bold text-slate-455 dark:text-slate-300 px-0.5">메뉴 설명</label>
+              <label className="text-xs uppercase font-bold text-slate-455 dark:text-slate-300 px-0.5">메뉴 설명 (한국어)</label>
               <Input
                 value={menuDescription}
                 onChange={(e) => setMenuDescription(e.target.value)}
                 placeholder="간단한 메뉴 설명을 입력하세요"
+                className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-xl h-10 font-medium text-sm"
+                disabled={isBusy}
+              />
+            </div>
+
+            <div className="fc gap-1.5">
+              <label className="text-xs uppercase font-bold text-slate-455 dark:text-slate-300 px-0.5">Menu Description (English)</label>
+              <Input
+                value={menuDescriptionEn}
+                onChange={(e) => setMenuDescriptionEn(e.target.value)}
+                placeholder="Enter menu description in English"
                 className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-xl h-10 font-medium text-sm"
                 disabled={isBusy}
               />

@@ -5,11 +5,13 @@ import { useState } from "react";
 import CartAddModal from "../cart/cart.add.modal";
 import useMenuStore from "~/stores/menu.store";
 import { toast } from "~/hooks/use-toast";
+import { useTranslation } from "~/hooks/use-translation";
 import { Plus } from "lucide-react";
 
 export default function MenuInstance({ menu }: { menu: ClientMenuResponse.Get["result"][number]["menus"][number] }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [isOpening, setIsOpening] = useState(false);
+  const { t, language } = useTranslation();
 
   const isSoldOut = menu.quantity <= 0 || !menu.available;
 
@@ -21,8 +23,8 @@ export default function MenuInstance({ menu }: { menu: ClientMenuResponse.Get["r
       const res = await useMenuStore.getState().clientLoad({});
       if (!res) {
         toast({
-          title: "메뉴 정보를 불러오는데 실패했습니다.",
-          description: "다시 시도해주세요.",
+          title: t("menu_load_failed"),
+          description: t("menu_load_failed_desc"),
           variant: "destructive",
         });
         return;
@@ -31,8 +33,8 @@ export default function MenuInstance({ menu }: { menu: ClientMenuResponse.Get["r
       const updatedMenuState = updatedMenuCategories?.flatMap((m) => m.menus).find((m) => m.id === menu.id);
       if (!updatedMenuState?.available || updatedMenuState.quantity <= 0) {
         toast({
-          title: "메뉴가 품절 또는 비활성화 되었습니다.",
-          description: "다른 메뉴를 주문해주세요.",
+          title: t("menu_sold_out_alert"),
+          description: t("menu_sold_out_alert_desc"),
           variant: "destructive",
         });
         return;
@@ -58,14 +60,14 @@ export default function MenuInstance({ menu }: { menu: ClientMenuResponse.Get["r
         {/* Menu Image */}
         <div className="w-24 h-full relative overflow-hidden bg-slate-100 dark:bg-slate-800 flex-shrink-0">
           <img
-            alt={menu.name}
+            alt={language === "en" && menu.nameEn ? menu.nameEn : menu.name}
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
             src={menu.image ? menu.image : "/favicon.ico"}
           />
           {isSoldOut && (
             <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center">
               <span className="text-white text-xs font-black tracking-widest border border-white/50 px-2 py-0.5 rounded-md bg-black/25">
-                품절
+                {t("sold_out")}
               </span>
             </div>
           )}
@@ -75,10 +77,10 @@ export default function MenuInstance({ menu }: { menu: ClientMenuResponse.Get["r
         <div className="p-3 flex flex-col flex-grow min-w-0 justify-between">
           <div className="min-w-0">
             <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-100 truncate">
-              {menu.name}
+              {language === "en" && menu.nameEn ? menu.nameEn : menu.name}
             </h3>
             <p className="text-[10px] text-slate-400 dark:text-slate-300 line-clamp-2 mt-1 leading-normal font-medium">
-              {menu.description || "맛있는 홈런포차 대표 메뉴입니다."}
+              {language === "en" && menu.descriptionEn ? menu.descriptionEn : (menu.description || t("menu_desc_fallback"))}
             </p>
           </div>
 
@@ -91,7 +93,7 @@ export default function MenuInstance({ menu }: { menu: ClientMenuResponse.Get["r
                 aria-label="Add to order"
                 className="w-7 h-7 rounded-full bg-brand-100 dark:bg-brand-900/40 text-primary dark:text-brand-400 flex items-center justify-center transition-all duration-200 hover:bg-primary hover:text-white active:scale-90"
               >
-                <Plus className="h-4 w-4 stroke-[3px]" />
+                <Plus className="h-4 w-4 stroke-[3px] stroke-white" />
               </button>
             )}
           </div>

@@ -4,8 +4,10 @@ import { Dialog, DialogDescription, DialogHeader, DialogTitle, BottomSheetConten
 import useMenuStore from "~/stores/menu.store";
 import useTableStore from "~/stores/table.store";
 import OrderDetailModal from "./order.detail.modal";
-import * as ClientTableResponse from "shared/types/responses/client/table"
+import * as ClientTableResponse from "shared/types/responses/client/table";
 import { getOrderStatusLabel } from "~/lib/order-status";
+import { useTranslation } from "~/hooks/use-translation";
+import { getStatusTranslationKey } from "~/lib/i18n/status-translator";
 import { History, Receipt, ArrowRight } from "lucide-react";
 
 export default function OrderHistoryModal({
@@ -19,6 +21,7 @@ export default function OrderHistoryModal({
 
   const { menus } = useMenuStore();
   const { clientTable } = useTableStore();
+  const { t, language } = useTranslation();
 
   const orders = clientTable?.tableContexts[0]?.orders ?? [];
   const orderHistories = orders.map((order) => {
@@ -27,11 +30,11 @@ export default function OrderHistoryModal({
       if (!menu) return null;
       return {
         menuId: menuOrder.menuId,
-        menuName: menu.name,
+        menuName: language === "en" && menu.nameEn ? menu.nameEn : menu.name,
         menuPrice: menu.price,
         quantity: menuOrder.quantity,
         totalPrice: menu.price * menuOrder.quantity,
-      }
+      };
     }).filter((menuOrder) => menuOrder !== null);
 
     return {
@@ -41,12 +44,12 @@ export default function OrderHistoryModal({
       totalPrice: menuOrders.reduce((acc, menuOrder) => acc + menuOrder.totalPrice, 0),
       payment: order.payment,
       order: order,
-    }
-  })
+    };
+  });
 
   const handleClose = () => {
     setOpenState(false);
-  }
+  };
 
   return (
     <>
@@ -59,17 +62,17 @@ export default function OrderHistoryModal({
               </div>
               <div className="space-y-1">
                 <DialogTitle className="text-xl font-extrabold text-slate-800 dark:text-slate-100">
-                  주문 내역이 없습니다
+                  {t("order_history_empty")}
                 </DialogTitle>
                 <DialogDescription className="text-xs text-slate-400">
-                  아직 주문하신 내역이 존재하지 않습니다.
+                  {t("order_history_empty_desc")}
                 </DialogDescription>
               </div>
               <Button
                 onClick={handleClose}
                 className="mt-4 px-6 py-2.5 rounded-full bg-primary hover:bg-brand-600 text-white font-bold text-xs"
               >
-                닫기
+                {t("close")}
               </Button>
             </div>
           ) : (
@@ -82,10 +85,10 @@ export default function OrderHistoryModal({
               {/* Header */}
               <div className="space-y-1 text-center mb-6">
                 <DialogTitle className="text-2xl font-black text-slate-800 dark:text-slate-100">
-                  주문 내역
+                  {t("nav_orders")}
                 </DialogTitle>
                 <DialogDescription className="text-xs text-slate-400 font-medium">
-                  주문을 터치하시면 상세 정보를 확인하실 수 있습니다.
+                  {t("order_history_touch_desc")}
                 </DialogDescription>
               </div>
 
@@ -95,7 +98,7 @@ export default function OrderHistoryModal({
                   const statusLabel = getOrderStatusLabel(orderHistory.order);
                   const isCancelled = orderHistory.order.deletedAt !== null;
                   const isPaid = orderHistory.order.payment?.status === "PAID";
-                  
+
                   return (
                     <div
                       key={orderHistory.orderId}
@@ -107,7 +110,7 @@ export default function OrderHistoryModal({
                     >
                       <div className="fc gap-1 min-w-0">
                         <span className="text-[10px] text-slate-400 dark:text-slate-300 font-bold">
-                          {new Date(orderHistory.orderDate).toLocaleString("ko-KR", {
+                          {new Date(orderHistory.orderDate).toLocaleString(language === "ko" ? "ko-KR" : "en-US", {
                             year: "numeric",
                             month: "2-digit",
                             day: "2-digit",
@@ -118,8 +121,8 @@ export default function OrderHistoryModal({
                         </span>
                         <div className="flex items-center gap-2">
                           <span className="font-extrabold text-sm text-slate-800 dark:text-slate-100 truncate">
-                            {orderHistory.menuOrders[0]?.menuName} 
-                            {orderHistory.menuOrders.length > 1 && ` 외 ${orderHistory.menuOrders.length - 1}개`}
+                            {orderHistory.menuOrders[0]?.menuName}
+                            {orderHistory.menuOrders.length > 1 && t("order_history_items_count", { count: orderHistory.menuOrders.length - 1 })}
                           </span>
                         </div>
                       </div>
@@ -127,13 +130,13 @@ export default function OrderHistoryModal({
                       <div className="flex items-center gap-3">
                         <div className="fc items-end">
                           <span className={`px-2 py-0.5 rounded-md text-[10px] font-black tracking-wider ${
-                            isCancelled 
+                            isCancelled
                               ? "bg-red-50 text-red-500 dark:bg-red-950/30 dark:text-rose-400"
                               : isPaid
                                 ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400"
                                 : "bg-amber-50 text-amber-600 dark:bg-amber-950/30 dark:text-amber-400"
                           }`}>
-                            {statusLabel}
+                            {t(getStatusTranslationKey(statusLabel) as any)}
                           </span>
                           <span className="font-extrabold text-xs text-slate-800 dark:text-slate-100 mt-1">
                             ₩ {orderHistory.totalPrice.toLocaleString()}
@@ -148,7 +151,7 @@ export default function OrderHistoryModal({
 
               {/* Total Summary Row */}
               <div className="flex justify-between items-center py-4 border-t border-slate-100 dark:border-slate-800 mt-2">
-                <span className="text-sm text-slate-400 dark:text-slate-300 font-bold">누적 총 주문금액</span>
+                <span className="text-sm text-slate-400 dark:text-slate-300 font-bold">{t("order_history_accumulated")}</span>
                 <span className="text-2xl font-black text-primary dark:text-brand-400">
                   ₩ {orderHistories.filter((oh) => oh.order.deletedAt === null).reduce((acc, oh) => acc + oh.totalPrice, 0).toLocaleString()}
                 </span>
@@ -159,7 +162,7 @@ export default function OrderHistoryModal({
                 className="w-full py-4 h-auto rounded-xl bg-primary hover:bg-brand-600 text-white font-extrabold text-sm shadow-[0_8px_20px_rgba(0,61,155,0.2)] hover:shadow-[0_12px_28px_rgba(0,61,155,0.3)] transition-all duration-300 active:scale-[0.98] cursor-pointer"
                 onClick={handleClose}
               >
-                닫기
+                {t("close")}
               </Button>
             </>
           )}
@@ -171,5 +174,5 @@ export default function OrderHistoryModal({
         orderDetail={orderDetail}
       />
     </>
-  )
+  );
 }

@@ -8,6 +8,7 @@ import { toast } from "~/hooks/use-toast";
 import { useValidateOrder } from "~/hooks/validate-order";
 import { runWithBlockingLoading } from "~/lib/blocking-loading";
 import { isPaymentInstructionOrder } from "~/lib/order-status";
+import { useTranslation } from "~/hooks/use-translation";
 import { MinusIcon, PlusIcon, ArrowRight, ShoppingCart } from "lucide-react";
 
 type MenuOrderInfo = {
@@ -32,6 +33,7 @@ export default function CartModal({
   const { menuOrders, purchaseMenuOrders } = useCartStore();
   const { clientTable } = useTableStore();
   const validateOrder = useValidateOrder();
+  const { t, language } = useTranslation();
 
   const menus = clientMenuCategories?.flatMap((menuCategory) => menuCategory.menus) ?? [];
   const menuOrderInfos: MenuOrderInfo[] = menuOrders.map((menuOrder) => {
@@ -39,7 +41,7 @@ export default function CartModal({
     if (!menu) return null;
     return {
       menuId: menuOrder.menuId,
-      menuName: menu.name,
+      menuName: language === "en" && menu.nameEn ? menu.nameEn : menu.name,
       menuPrice: menu.price,
       quantity: menuOrder.quantity,
       totalPrice: menu.price * menuOrder.quantity,
@@ -87,8 +89,8 @@ export default function CartModal({
         const latestPaymentOrder = tableResponse.result.tableContexts[0]?.orders.find(isPaymentInstructionOrder);
         if (!latestPaymentOrder) {
           toast({
-            title: "결제 안내를 확인할 수 없습니다.",
-            description: "주문 내역을 다시 확인해주세요.",
+            title: t("order_pay_info_unavailable"),
+            description: t("order_pay_info_unavailable_desc"),
             variant: "destructive",
           });
           restoreCartModal();
@@ -139,7 +141,7 @@ export default function CartModal({
       });
     } else {
       toast({
-        title: `주문 가능한 최대 수량은 ${targetMenu.quantity}개입니다.`,
+        title: t("cart_max_qty_toast", { qty: targetMenu.quantity }),
         variant: "destructive",
       });
     }
@@ -156,17 +158,17 @@ export default function CartModal({
               </div>
               <div className="space-y-1">
                 <DialogTitle className="text-xl font-extrabold text-slate-800 dark:text-slate-100">
-                  장바구니가 비어 있습니다
+                  {t("cart_empty")}
                 </DialogTitle>
                 <DialogDescription className="text-xs text-slate-400">
-                  원하는 메뉴를 먼저 장바구니에 담아주세요.
+                  {t("cart_empty_desc")}
                 </DialogDescription>
               </div>
               <Button
                 onClick={handleClose}
                 className="mt-4 px-6 py-2.5 rounded-full bg-primary hover:bg-brand-600 text-white font-bold text-xs"
               >
-                메뉴 보러 가기
+                {t("cart_go_to_menu")}
               </Button>
             </div>
           ) : (
@@ -179,10 +181,10 @@ export default function CartModal({
               {/* Header */}
               <div className="space-y-1 text-center mb-4">
                 <DialogTitle className="text-2xl font-black text-slate-800 dark:text-slate-100">
-                  장바구니
+                  {t("cart_title")}
                 </DialogTitle>
                 <DialogDescription className="text-xs text-slate-400 font-medium">
-                  주문할 품목과 수량을 확인해 주세요.
+                  {t("cart_confirm_qty")}
                 </DialogDescription>
               </div>
 
@@ -238,7 +240,7 @@ export default function CartModal({
 
               {/* Total Summary Row */}
               <div className="flex justify-between items-center py-4 border-t border-slate-100 dark:border-slate-800 mt-2">
-                <span className="text-sm text-slate-400 dark:text-slate-300 font-bold">최종 결제 금액</span>
+                <span className="text-sm text-slate-400 dark:text-slate-300 font-bold">{t("cart_total_price")}</span>
                 <span className="text-2xl font-black text-primary dark:text-brand-400">
                   ₩ {visibleMenuOrderInfos.reduce((acc, item) => acc + item!.totalPrice, 0).toLocaleString()}
                 </span>
@@ -252,14 +254,14 @@ export default function CartModal({
                   disabled={duringPurchase}
                   className="flex-1 py-4 h-auto rounded-xl border-slate-200 dark:border-slate-800 font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900 cursor-pointer"
                 >
-                  더 담기
+                  {t("cart_add_more")}
                 </Button>
                 <Button
                   onClick={handleConfirm}
                   disabled={duringPurchase}
                   className="flex-[2] py-4 h-auto rounded-xl bg-primary hover:bg-brand-600 text-white font-extrabold text-sm shadow-[0_8px_20px_rgba(0,61,155,0.2)] hover:shadow-[0_12px_28px_rgba(0,61,155,0.3)] transition-all duration-300 active:scale-[0.98] cursor-pointer flex justify-center items-center gap-2"
                 >
-                  <span>주문 완료하기</span>
+                  <span>{t("cart_complete_order_btn")}</span>
                   <ArrowRight className="h-4 w-4 stroke-[3px]" />
                 </Button>
               </div>
@@ -271,10 +273,10 @@ export default function CartModal({
         <DialogContent className="w-[calc(100%-2rem)] max-w-sm rounded-2xl">
           <div className="space-y-3 text-center">
             <DialogTitle className="text-xl font-extrabold text-slate-800 dark:text-slate-100">
-              새 손님 주문을 시작할까요?
+              {t("cart_new_customer_title")}
             </DialogTitle>
             <DialogDescription className="text-sm leading-relaxed">
-              이전 손님의 주문 내역과 분리된 새 주문으로 시작합니다.
+              {t("cart_new_customer_desc")}
             </DialogDescription>
           </div>
           <div className="flex gap-3 pt-2">
@@ -287,7 +289,7 @@ export default function CartModal({
               disabled={duringPurchase}
               className="flex-1 h-12 rounded-xl font-bold"
             >
-              더 확인하기
+              {t("cart_check_more")}
             </Button>
             <Button
               onClick={() => {
@@ -297,7 +299,7 @@ export default function CartModal({
               disabled={duringPurchase}
               className="flex-[2] h-12 rounded-xl bg-primary hover:bg-brand-600 text-white font-extrabold"
             >
-              시작하기
+              {t("cart_start_btn")}
             </Button>
           </div>
         </DialogContent>

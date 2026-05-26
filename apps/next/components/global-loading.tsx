@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { useLoadingStore } from "~/stores/loading.store";
+import { useTranslation } from "~/hooks/use-translation";
 
 export default function GlobalLoading() {
   const activeQueries = useLoadingStore((state) => state.activeQueries);
@@ -17,11 +18,13 @@ export default function GlobalLoading() {
     return () => setMounted(false);
   }, []);
 
+  const { t } = useTranslation();
+
   if (!mounted) return null;
 
   const showQueryBar = activeQueries > 0;
   const showBlockingOverlay = activeMutations > 0 || activeBlockingLoads > 0;
-  const overlayLabel = activeMutations > 0 ? "처리 중" : "로딩 중";
+  const overlayLabel = activeMutations > 0 ? t("processing_status") : t("loading_status");
 
   return (
     <>

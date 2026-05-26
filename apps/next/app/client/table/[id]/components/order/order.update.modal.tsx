@@ -8,6 +8,7 @@ import { MinusIcon, PlusIcon } from "lucide-react";
 import useMenuStore from "~/stores/menu.store";
 import { useValidateOrder } from "~/hooks/validate-order";
 import { runWithBlockingLoading } from "~/lib/blocking-loading";
+import { useTranslation } from "~/hooks/use-translation";
 
 export default function OrderUpdateModal({
   menuOrder,
@@ -21,6 +22,7 @@ export default function OrderUpdateModal({
   const [invalid, setInvalid] = useState(false);
   const [duringConfirm, setDuringConfirm] = useState(false);
   const validateOrder = useValidateOrder();
+  const { t } = useTranslation();
 
   const { updateMenuOrder } = useCartStore();
   const { menus } = useMenuStore();
@@ -77,14 +79,14 @@ export default function OrderUpdateModal({
             {menu.name}
           </DialogTitle>
           <DialogDescription className="text-xs text-slate-400 font-medium">
-            수정할 메뉴 수량을 선택해 주세요.
+            {t("order_update_select_qty")}
           </DialogDescription>
         </div>
 
         {/* Quantity pills counter */}
         <div className="fc items-center justify-center space-y-3 mb-6 bg-slate-50 dark:bg-slate-950/40 p-4 rounded-2xl border border-slate-100/50 dark:border-slate-900/50">
           <div className="text-xs text-slate-400 dark:text-slate-300 font-bold uppercase tracking-wider">
-            수량 수정
+            {t("order_update_qty_title")}
           </div>
           <div className="flex items-center justify-between bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-full p-1.5 shadow-sm min-w-[150px]">
             <Button
@@ -109,13 +111,13 @@ export default function OrderUpdateModal({
           </div>
 
           <span className="text-[10px] text-slate-400 dark:text-slate-300 font-bold">
-            주문 가능 수량: <span className="text-slate-750 dark:text-slate-350">{menu.quantity}개</span>
+            {t("cart_available_qty")}<span className="text-slate-750 dark:text-slate-350">{menu.quantity}{t("order_history_item_unit")}</span>
           </span>
         </div>
 
         {invalid && (
           <p className="text-center text-xs text-destructive dark:text-rose-500 font-bold mb-4">
-            ⚠︎ 올바른 수량을 입력하세요.
+            {t("cart_invalid_qty")}
           </p>
         )}
 
@@ -127,14 +129,14 @@ export default function OrderUpdateModal({
             disabled={duringConfirm}
             className="flex-1 py-4 h-auto rounded-xl border-slate-200 dark:border-slate-800 font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900 cursor-pointer"
           >
-            취소
+            {t("cancel")}
           </Button>
           <Button
             onClick={handleConfirm}
             disabled={duringConfirm}
             className="flex-1 py-4 h-auto rounded-xl bg-primary hover:bg-brand-600 text-white font-extrabold text-sm shadow-[0_8px_20px_rgba(0,61,155,0.2)] hover:shadow-[0_12px_28px_rgba(0,61,155,0.3)] transition-all duration-300 active:scale-[0.98] cursor-pointer"
           >
-            수정하기
+            {t("order_update_btn")}
           </Button>
         </div>
       </BottomSheetContent>

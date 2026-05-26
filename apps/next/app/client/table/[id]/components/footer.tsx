@@ -7,6 +7,7 @@ import OrderModal from "./order/order.modal";
 import OrderHistoryModal from "./order/order.history.modal";
 import { isPaymentInstructionOrder, isUnresolvedPaymentOrder } from "~/lib/order-status";
 import { runWithBlockingLoading } from "~/lib/blocking-loading";
+import { useTranslation } from "~/hooks/use-translation";
 import { Utensils, ShoppingCart, Receipt, Clock, AlertCircle } from "lucide-react";
 
 export default function Footer({
@@ -24,6 +25,7 @@ export default function Footer({
   const [isRefreshingTable, setIsRefreshingTable] = useState(false);
   const { menuOrders } = useCartStore();
   const { clientTable, clientGetTable } = useTableStore();
+  const { t } = useTranslation();
 
   const quantity = menuOrders.reduce((acc, menuOrder) => acc + menuOrder.quantity, 0);
   const findUnresolvedPaymentOrder = (table: typeof clientTable) => (
@@ -92,7 +94,7 @@ export default function Footer({
           }`}
         >
           <Utensils className="h-4 w-4 stroke-[2.5]" />
-          <span className={`text-xs ${activeTab === "menu" ? "font-extrabold" : "font-semibold"}`}>메뉴</span>
+          <span className={`text-xs ${activeTab === "menu" ? "font-extrabold" : "font-semibold"}`}>{t("nav_menu")}</span>
         </button>
 
         {/* Dynamic Center Action Button (Pulsing Deposit Status) */}
@@ -104,7 +106,7 @@ export default function Footer({
           >
             {needsManualReview ? <AlertCircle className="h-3.5 w-3.5" /> : <Clock className="h-3.5 w-3.5" />}
             <span className="text-xs font-extrabold">
-              {needsManualReview ? "입금 확인 중" : "입금 대기"}
+              {needsManualReview ? t("nav_deposit_confirming") : t("nav_deposit_waiting")}
             </span>
           </button>
         )}
@@ -119,7 +121,7 @@ export default function Footer({
           }`}
         >
           <Receipt className="h-4 w-4 stroke-[2.5]" />
-          <span className={`text-xs ${activeTab === "orders" ? "font-extrabold" : "font-semibold"}`}>주문내역</span>
+          <span className={`text-xs ${activeTab === "orders" ? "font-extrabold" : "font-semibold"}`}>{t("nav_orders")}</span>
         </button>
         )}
       </nav>
