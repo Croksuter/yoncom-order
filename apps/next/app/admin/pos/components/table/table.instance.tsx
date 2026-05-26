@@ -28,7 +28,7 @@ export default function TableInstance({
     0,
   );
 
-  const isOnOrder = activeTableContext?.orders.some((order) => 
+  const isOnOrder = activeTableContext?.orders.some((order) =>
     isKitchenOrder(order)
     && order.menuOrders.some((menuOrder) => (
       menuOrder.status === "PENDING"
@@ -50,31 +50,31 @@ export default function TableInstance({
     <>
       {inUse ? (
         /* Occupied Table (Stitch Design) */
-        <div 
+        <div
           className="aspect-square bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl relative overflow-hidden shadow-sm hover:shadow-md transition-all active:scale-[0.98] cursor-pointer flex flex-col group"
           onClick={() => setModalOpen(true)}
         >
           <div className="h-1.5 bg-brand-500 w-full flex-shrink-0 group-hover:bg-brand-600 transition-colors"></div>
           <div className="p-3.5 flex-1 flex flex-col">
             <div className="flex justify-between items-start flex-shrink-0 gap-2">
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1 flex flex-row">
                 <h4 className="font-black text-lg text-slate-800 dark:text-slate-100 leading-none group-hover:text-brand-500 dark:group-hover:text-brand-400 transition-colors truncate max-w-full">
                   {table.name}
                 </h4>
-                <p className="text-xs text-slate-400/80 dark:text-slate-500 font-extrabold mt-1.5 truncate">
-                  {table.seats}인석
+                <p className="text-xs text-slate-400/80 dark:text-slate-500 font-extrabold mt-0.5 ml-0.5 truncate">
+                  ({table.seats})
                 </p>
               </div>
-              <span className="bg-brand-50 dark:bg-brand-950/20 text-brand-600 dark:text-brand-400 text-xs font-black px-2 py-0.5 rounded-full uppercase tracking-wider flex-shrink-0">
+              {/* <span className="bg-brand-50 dark:bg-brand-950/20 text-brand-600 dark:text-brand-400 text-xs font-black px-2 py-0.5 rounded-full uppercase tracking-wider flex-shrink-0">
                 Occupied
-              </span>
+              </span> */}
             </div>
 
             {/* Menu orders scrollable list */}
             <div className="flex-1 my-2 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] space-y-1 py-1 border-y border-slate-50 dark:border-slate-800/40">
               {menuOrders.map(({ menuOrder, order }) => (
-                <div 
-                  key={menuOrder.id} 
+                <div
+                  key={menuOrder.id}
                   className="flex justify-between items-center text-xs font-semibold text-slate-650 dark:text-slate-350"
                 >
                   <span className="flex items-center gap-1 truncate max-w-[100px]">
@@ -104,7 +104,7 @@ export default function TableInstance({
         </div>
       ) : (
         /* Available Table (Stitch Design) */
-        <div 
+        <div
           className="aspect-square bg-slate-50/40 dark:bg-slate-900/10 border border-dashed border-slate-200 dark:border-slate-800/80 rounded-2xl flex flex-col items-center justify-center text-center group hover:border-brand-500/50 hover:bg-brand-50/5 dark:hover:bg-brand-950/10 transition-all cursor-pointer p-4 active:scale-[0.98] min-w-0 w-full"
           onClick={() => setModalOpen(true)}
         >
