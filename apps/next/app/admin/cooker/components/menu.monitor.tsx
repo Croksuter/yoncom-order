@@ -79,7 +79,7 @@ export default function MenuMonitor({
     );
 
   return (
-    <section className="flex flex-col min-w-[320px] max-w-[360px] bg-slate-100/80 dark:bg-slate-900/60 border border-slate-200/50 dark:border-slate-800/60 rounded-2xl p-4 gap-4 h-[calc(100vh-240px)] overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 flex-shrink-0">
+    <section className="flex flex-col min-w-[200px] max-w-[360px] bg-slate-100/80 dark:bg-slate-900/60 border border-slate-200/50 dark:border-slate-800/60 rounded-2xl p-4 gap-4 h-[calc(100vh-240px)] overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 flex-shrink-0">
       {/* Menu Column Blurred Image Header */}
       <div className="relative h-32 w-full rounded-xl overflow-hidden shadow-inner shrink-0 group flex-shrink-0 select-none">
         <img
