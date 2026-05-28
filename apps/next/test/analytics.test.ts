@@ -110,6 +110,74 @@ describe("admin analytics calculations", () => {
     expect(result.summary.estimatedCost.value).toBe(9000);
     expect(result.summary.estimatedProfit.value).toBe(9000);
   });
+
+  it("adds category revenue share and order/payment record rows", () => {
+    const from = Date.parse("2026-05-28T00:00:00.000Z");
+    const paidAt = from + 1000;
+    const main = menu({ id: "menu_main0001", menuCategoryId: "cat_main", price: 9000, unitCost: 3000 });
+    const drink = menu({ id: "menu_drink001", menuCategoryId: "cat_drink", price: 3000, unitCost: 1000 });
+    const result = buildAdminAnalytics({
+      from,
+      to: from + 60_000,
+      bucket: "hour",
+      categories: [
+        { id: "cat_main", name: "메인" },
+        { id: "cat_drink", name: "음료" },
+      ],
+      menus: [main, drink],
+      bundleItems: [],
+      bankTransactions: [],
+      tables: [
+        {
+          id: "table_1",
+          name: "A1",
+          tableContexts: [
+            {
+              id: "ctx_1",
+              orders: [
+                {
+                  id: "order_share",
+                  displayNumber: 12,
+                  status: "ACTIVE",
+                  createdAt: paidAt,
+                  deletedAt: null,
+                  payment: {
+                    id: "payment_share",
+                    status: "PAID",
+                    amount: 12000,
+                    originalAmount: 12000,
+                    paymentCode: 7,
+                    paidAt,
+                    deletedAt: null,
+                  },
+                  menuOrders: [
+                    { menuId: main.id, quantity: 1, deletedAt: null },
+                    { menuId: drink.id, quantity: 1, deletedAt: null },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(result.categoryRows).toEqual([
+      expect.objectContaining({ categoryName: "메인", revenueShare: 0.75 }),
+      expect.objectContaining({ categoryName: "음료", revenueShare: 0.25 }),
+    ]);
+    expect(result.recordRows[0]).toEqual(expect.objectContaining({
+      orderId: "order_share",
+      paymentId: "payment_share",
+      tableName: "A1",
+      displayNumber: 12,
+      grossSales: 12000,
+      estimatedCost: 4000,
+      estimatedProfit: 8000,
+      itemCount: 2,
+      paymentCode: 7,
+    }));
+  });
 });
 
 describe("admin analytics route", () => {
@@ -170,5 +238,46 @@ describe("admin analytics route", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ result: payload });
+  });
+
+  it("deletes selected analytics records through a guarded mutation", async () => {
+    vi.doMock("~/lib/server/auth-session", () => ({
+      csrfCookieName: "yoncom_csrf",
+      requireAdmin: vi.fn(async () => null),
+    }));
+    vi.doMock("~/lib/server/api", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("~/lib/server/api")>();
+      return {
+        ...actual,
+        idempotentMutationResponse: vi.fn(async (_request: Request, _scope: string, _body: unknown, mutate: () => Promise<{ result?: unknown; status: number }>) => {
+          const result = await mutate();
+          return Response.json({ result: result.result }, { status: result.status });
+        }),
+      };
+    });
+    const deleteAdminAnalyticsRecords = vi.fn(async () => ({
+      result: "Deleted 1 order records and 1 payment records",
+      status: 200,
+    }));
+    vi.doMock("~/lib/server/admin-analytics", () => ({
+      getAdminAnalytics: vi.fn(),
+      deleteAdminAnalyticsRecords,
+    }));
+
+    const { DELETE } = await import("~/app/api/admin/analytics/route");
+    const response = await DELETE(new Request("http://order.test/api/admin/analytics", {
+      method: "DELETE",
+      headers: {
+        "content-type": "application/json",
+        origin: "http://order.test",
+        cookie: "yoncom_csrf=csrf-token",
+        "x-csrf-token": "csrf-token",
+        "idempotency-key": "delete-analytics-records",
+      },
+      body: JSON.stringify({ orderIds: ["order_1"], paymentIds: ["payment_1"] }),
+    }));
+
+    expect(response.status).toBe(200);
+    expect(deleteAdminAnalyticsRecords).toHaveBeenCalledWith({ orderIds: ["order_1"], paymentIds: ["payment_1"] });
   });
 });

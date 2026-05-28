@@ -4,7 +4,13 @@ import { createValidation, getValidation, removeValidation, updateValidation } f
 import { fail, guardUnsafeRequest, mutationOk, ok, parseJsonBody, parseSearchParams, routeError } from "~/lib/server/api";
 import { requireAdmin } from "~/lib/server/auth-session";
 import { getDb } from "~/lib/server/db";
-import { createAdminMenu, enrichMenuCategoriesWithBundles, removeAdminMenu, updateAdminMenu } from "~/lib/server/d1-mutations";
+import {
+  createAdminMenu,
+  enrichMenuCategoriesWithBundles,
+  ensureMenuProfitabilityColumns,
+  removeAdminMenu,
+  updateAdminMenu,
+} from "~/lib/server/d1-mutations";
 
 export async function GET(request: Request) {
   const adminError = await requireAdmin();
@@ -12,6 +18,7 @@ export async function GET(request: Request) {
 
   try {
     parseSearchParams(request, getValidation);
+    await ensureMenuProfitabilityColumns();
 
     const result = await getDb().query.menuCategories.findMany({
       where: isNull(menuCategories.deletedAt),

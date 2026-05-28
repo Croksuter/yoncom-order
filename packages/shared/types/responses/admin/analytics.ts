@@ -62,6 +62,30 @@ export type CategoryRow = {
   quantity: number;
   revenue: number;
   estimatedProfit: number;
+  revenueShare: number;
+};
+
+export type RecordRow = {
+  recordId: string;
+  orderId: string;
+  paymentId: string | null;
+  tableName: string;
+  displayNumber: number | null;
+  orderStatus: string | null;
+  paymentStatus: string | null;
+  timestamp: number;
+  createdAt: number;
+  paidAt: number | null;
+  updatedAt: number | null;
+  grossSales: number;
+  netSales: number;
+  refundAmount: number;
+  estimatedCost: number;
+  estimatedProfit: number;
+  itemCount: number;
+  paymentAmount: number;
+  expectedTransferAmount: number | null;
+  paymentCode: number | null;
 };
 
 export type Alert = {
@@ -81,6 +105,11 @@ export type Get = {
     paymentFlow: PaymentFlow;
     menuRows: MenuRow[];
     categoryRows: CategoryRow[];
+    recordRows: RecordRow[];
     alerts: Alert[];
   };
+};
+
+export type DeleteRecords = {
+  result: string;
 };

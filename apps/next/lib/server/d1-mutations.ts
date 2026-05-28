@@ -194,6 +194,7 @@ let firstOrderRuleTablesEnsured = false;
 let menuBundleTableEnsured = false;
 let clientNoticeSettingsTableEnsured = false;
 let orderWorkflowSettingsTableEnsured = false;
+let menuProfitabilityColumnsEnsured = false;
 let menuOrderProgressColumnsEnsured = false;
 
 export function quoteIdentifier(identifier: string) {
@@ -440,6 +441,25 @@ async function ensureOrderWorkflowSettingsTable() {
     )
   `);
   orderWorkflowSettingsTableEnsured = true;
+}
+
+export async function ensureMenuProfitabilityColumns() {
+  if (menuProfitabilityColumnsEnsured) {
+    return;
+  }
+
+  const columns = await getD1Columns("menus");
+  if (!columns.has("unitCost")) {
+    await executeD1(`ALTER TABLE ${quoteIdentifier("menus")} ADD ${quoteIdentifier("unitCost")} INTEGER`);
+    columns.add("unitCost");
+  }
+
+  if (!columns.has("targetMarginBps")) {
+    await executeD1(`ALTER TABLE ${quoteIdentifier("menus")} ADD ${quoteIdentifier("targetMarginBps")} INTEGER DEFAULT 3500 NOT NULL`);
+    columns.add("targetMarginBps");
+  }
+
+  menuProfitabilityColumnsEnsured = true;
 }
 
 async function ensureMenuOrderProgressColumns() {
@@ -2561,6 +2581,8 @@ export async function createAdminMenu(menuOptions: {
     return { error: "Menu Category Not Found", status: 404 };
   }
 
+  await ensureMenuProfitabilityColumns();
+
   const menuId = newId();
   await insertD1Row("menus", {
     id: menuId,
@@ -2599,6 +2621,8 @@ export async function updateAdminMenu(
     available: boolean;
   },
 ): Promise<MutationResult> {
+  await ensureMenuProfitabilityColumns();
+
   await updateD1Rows(
     "menus",
     {

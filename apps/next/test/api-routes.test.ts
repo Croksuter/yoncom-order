@@ -29,6 +29,10 @@ describe("implemented Next API route handlers", () => {
         },
       }),
     }));
+    vi.doMock("~/lib/server/d1-mutations", () => ({
+      enrichMenuCategoriesWithBundles: vi.fn(async (categories) => categories),
+      ensureMenuProfitabilityColumns: vi.fn(async () => undefined),
+    }));
 
     const { GET } = await import("~/app/api/menu/route");
     const response = await GET(new Request("http://order.test/api/menu"));
@@ -85,6 +89,7 @@ describe("implemented Next API route handlers", () => {
     }));
     vi.doMock("~/lib/server/d1-mutations", () => ({
       enrichMenuCategoriesWithBundles: vi.fn(async (categories) => categories),
+      ensureMenuProfitabilityColumns: vi.fn(async () => undefined),
     }));
 
     const { GET } = await import("~/app/api/menu/route");

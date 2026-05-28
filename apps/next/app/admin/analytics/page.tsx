@@ -10,11 +10,14 @@ import {
   Download,
   LineChart,
   PackageSearch,
+  Plus,
   ReceiptText,
   RefreshCw,
   Scale,
+  Trash2,
   TrendingUp,
   WalletCards,
+  X,
 } from "lucide-react";
 
 const kstOffsetMs = 9 * 60 * 60 * 1000;
@@ -29,20 +32,48 @@ const presetOptions = [
 ] as const;
 
 type Preset = (typeof presetOptions)[number]["id"];
+type ExpenseRow = {
+  id: string;
+  label: string;
+  amount: string;
+};
+
+const defaultExpenseRows: ExpenseRow[] = [
+  { id: "expense-booth", label: "부스 대여료", amount: "" },
+  { id: "expense-supplies", label: "소모품/장비", amount: "" },
+];
+
+function newExpenseId() {
+  return `expense-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
 
 function startOfKstDay(timestamp = Date.now()) {
   const kstDate = new Date(timestamp + kstOffsetMs);
   return Date.UTC(kstDate.getUTCFullYear(), kstDate.getUTCMonth(), kstDate.getUTCDate()) - kstOffsetMs;
 }
 
-function toDateInputValue(timestamp: number) {
+function toDateTimeInputValue(timestamp: number) {
   const date = new Date(timestamp + kstOffsetMs);
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
+  return [
+    `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`,
+    `${String(date.getUTCHours()).padStart(2, "0")}:${String(date.getUTCMinutes()).padStart(2, "0")}`,
+  ].join("T");
 }
 
-function fromDateInputValue(value: string) {
-  const [year, month, day] = value.split("-").map(Number);
-  return Date.UTC(year, month - 1, day) - kstOffsetMs;
+function fromDateTimeInputValue(value: string) {
+  const [datePart, timePart = "00:00"] = value.split("T");
+  const [year, month, day] = datePart.split("-").map(Number);
+  const [hour = 0, minute = 0] = timePart.split(":").map(Number);
+  return Date.UTC(year, month - 1, day, hour, minute) - kstOffsetMs;
+}
+
+function formatKstDateTime(timestamp: number | null) {
+  if (timestamp === null || !Number.isFinite(timestamp)) return "-";
+  return toDateTimeInputValue(timestamp).replace("T", " ");
+}
+
+function toFileDateTime(timestamp: number) {
+  return toDateTimeInputValue(timestamp).replaceAll("-", "").replaceAll(":", "").replaceAll("T", "");
 }
 
 function getPresetRange(preset: Preset) {
@@ -86,6 +117,29 @@ function recommendedPrice(unitCost: number, targetMarginBps: number) {
   return Math.ceil((safeUnitCost / Math.max(0.05, 1 - marginRate)) / 100) * 100;
 }
 
+function parseExpenseAmount(value: string) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
+function csvValue(value: string | number | null) {
+  return `"${String(value ?? "").replaceAll("\"", "\"\"")}"`;
+}
+
+function csvContent(header: string[], rows: Array<Array<string | number | null>>) {
+  return [header, ...rows].map((row) => row.map(csvValue).join(",")).join("\n");
+}
+
+function downloadCsvFile(filename: string, header: string[], rows: Array<Array<string | number | null>>) {
+  const blob = new Blob([csvContent(header, rows)], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
 function formatDelta(deltaRate: number | null) {
   if (deltaRate === null) return "신규";
   if (deltaRate === 0) return "변동 없음";
@@ -111,16 +165,12 @@ function KpiCard({
   icon: ComponentType<{ className?: string }>;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-xs font-black uppercase tracking-wider text-slate-400 dark:text-slate-300">{label}</p>
-          <p className="mt-2 truncate text-xl font-black text-slate-850 dark:text-white">{value}</p>
-          <p className={`mt-1 text-xs font-bold ${helperClass}`}>{helper}</p>
-        </div>
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-950/20 dark:text-brand-300">
-          <Icon className="h-4.5 w-4.5" />
-        </div>
+    <div className="relative rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 p-3 shadow-sm">
+      <Icon className="absolute right-3 top-3 h-3.5 w-3.5 text-brand-500/60 dark:text-brand-300/70" />
+      <div className="min-w-0 pr-5">
+        <p className="text-xs font-black uppercase tracking-wider text-slate-400 dark:text-slate-300">{label}</p>
+        <p className="mt-2 truncate text-xl font-black text-slate-850 dark:text-white">{value}</p>
+        <p className={`mt-1 truncate text-xs font-bold ${helperClass}`}>{helper}</p>
       </div>
     </div>
   );
@@ -183,8 +233,11 @@ function AnalyticsPage() {
   const [preset, setPreset] = useState<Preset>("today");
   const [range, setRange] = useState(getPresetRange("today"));
   const [targetMarginPercent, setTargetMarginPercent] = useState(defaultTargetMarginPercent);
+  const [expenseRows, setExpenseRows] = useState<ExpenseRow[]>(defaultExpenseRows);
+  const [selectedRecordIds, setSelectedRecordIds] = useState<Set<string>>(new Set());
   const [data, setData] = useState<AdminAnalyticsResponse.Get["result"] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isDeletingRecords, setIsDeletingRecords] = useState(false);
   const [error, setError] = useState(false);
   const bucket = range.to - range.from <= 2 * dayMs ? "hour" : "day";
   const targetMarginBps = useMemo(() => targetMarginBpsFromPercent(targetMarginPercent), [targetMarginPercent]);
@@ -213,6 +266,28 @@ function AnalyticsPage() {
     void loadAnalytics();
   }, [loadAnalytics]);
 
+  useEffect(() => {
+    setSelectedRecordIds(new Set());
+  }, [data?.from, data?.to, data?.generatedAt]);
+
+  const extraExpenseTotal = useMemo(
+    () => expenseRows.reduce((sum, row) => sum + parseExpenseAmount(row.amount), 0),
+    [expenseRows],
+  );
+  const adjustedFinancials = useMemo(() => {
+    const grossSales = data?.summary.grossSales.value ?? 0;
+    const estimatedCost = data?.summary.estimatedCost.value ?? 0;
+    const estimatedProfit = data?.summary.estimatedProfit.value ?? 0;
+    const adjustedCost = estimatedCost + extraExpenseTotal;
+    return {
+      grossSales,
+      estimatedCost,
+      adjustedCost,
+      adjustedProfit: estimatedProfit - extraExpenseTotal,
+      adjustedCostRate: grossSales > 0 ? adjustedCost / grossSales : null,
+    };
+  }, [data, extraExpenseTotal]);
+
   const kpis = useMemo(() => {
     if (!data) return [];
     return [
@@ -239,27 +314,27 @@ function AnalyticsPage() {
       },
       {
         label: "추정 원가",
-        value: formatWon(data.summary.estimatedCost.value),
-        helper: formatDelta(data.summary.estimatedCost.deltaRate),
-        helperClass: kpiTone(data.summary.estimatedCost.deltaRate),
+        value: formatWon(adjustedFinancials.adjustedCost),
+        helper: extraExpenseTotal > 0 ? `운영비 ${formatWon(extraExpenseTotal)} 포함` : formatDelta(data.summary.estimatedCost.deltaRate),
+        helperClass: extraExpenseTotal > 0 ? "text-amber-500" : kpiTone(data.summary.estimatedCost.deltaRate),
         icon: PackageSearch,
       },
       {
         label: "추정 이윤",
-        value: formatWon(data.summary.estimatedProfit.value),
-        helper: formatDelta(data.summary.estimatedProfit.deltaRate),
-        helperClass: kpiTone(data.summary.estimatedProfit.deltaRate),
+        value: formatWon(adjustedFinancials.adjustedProfit),
+        helper: extraExpenseTotal > 0 ? `운영비 차감 ${formatWon(extraExpenseTotal)}` : formatDelta(data.summary.estimatedProfit.deltaRate),
+        helperClass: adjustedFinancials.adjustedProfit >= 0 ? "text-emerald-500" : "text-rose-500",
         icon: WalletCards,
       },
       {
         label: "원가율",
-        value: formatPercent(data.summary.costRate),
+        value: formatPercent(adjustedFinancials.adjustedCostRate),
         helper: `${data.summary.soldItemCount.toLocaleString()}개 판매`,
         helperClass: "text-slate-400",
         icon: Scale,
       },
     ];
-  }, [data]);
+  }, [adjustedFinancials, data, extraExpenseTotal]);
 
   const simulatedMenuRows = useMemo(() => {
     if (!data) return [];
@@ -280,20 +355,92 @@ function AnalyticsPage() {
     const currentProfit = simulatedMenuRows.reduce((sum, row) => sum + row.estimatedProfit, 0);
     const recommendedRevenue = simulatedMenuRows.reduce((sum, row) => sum + row.recommendedRevenue, 0);
     const recommendedProfit = simulatedMenuRows.reduce((sum, row) => sum + row.recommendedProfit, 0);
+    const adjustedCurrentProfit = currentProfit - extraExpenseTotal;
+    const adjustedRecommendedProfit = recommendedProfit - extraExpenseTotal;
     return {
       currentRevenue,
-      currentProfit,
+      currentProfit: adjustedCurrentProfit,
       recommendedRevenue,
-      recommendedProfit,
+      recommendedProfit: adjustedRecommendedProfit,
       revenueDelta: recommendedRevenue - currentRevenue,
-      profitDelta: recommendedProfit - currentProfit,
+      profitDelta: adjustedRecommendedProfit - adjustedCurrentProfit,
     };
-  }, [simulatedMenuRows]);
+  }, [extraExpenseTotal, simulatedMenuRows]);
 
-  const exportCsv = () => {
+  const selectedRecords = useMemo(() => {
+    if (!data) return [];
+    return data.recordRows.filter((row) => selectedRecordIds.has(row.recordId));
+  }, [data, selectedRecordIds]);
+
+  const toggleRecordSelection = (recordId: string) => {
+    setSelectedRecordIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(recordId)) {
+        next.delete(recordId);
+      } else {
+        next.add(recordId);
+      }
+      return next;
+    });
+  };
+
+  const toggleAllRecords = () => {
     if (!data) return;
-    const header = ["메뉴", "판매수량", "매출", "적용원가", "이윤", "원가율", "현재가", "목표마진", "권장가", "현재가대비"];
-    const rows = simulatedMenuRows.map((row) => [
+    setSelectedRecordIds((prev) => {
+      if (prev.size === data.recordRows.length) return new Set();
+      return new Set(data.recordRows.map((row) => row.recordId));
+    });
+  };
+
+  const deleteSelectedRecords = async () => {
+    if (!data || selectedRecords.length === 0 || isDeletingRecords) return;
+    const confirmed = window.confirm(`${selectedRecords.length}개 오더/페이먼트 기록을 삭제 처리할까요?`);
+    if (!confirmed) return;
+
+    setIsDeletingRecords(true);
+    try {
+      await api.delete("admin/analytics", {
+        json: {
+          orderIds: selectedRecords.map((row) => row.orderId),
+          paymentIds: selectedRecords.map((row) => row.paymentId).filter((id): id is string => Boolean(id)),
+        },
+      }).json<AdminAnalyticsResponse.DeleteRecords>();
+      setSelectedRecordIds(new Set());
+      await loadAnalytics();
+    } finally {
+      setIsDeletingRecords(false);
+    }
+  };
+
+  const exportCsvBundle = () => {
+    if (!data) return;
+    const suffix = `${toFileDateTime(data.from)}-${toFileDateTime(data.to)}`;
+
+    downloadCsvFile(`sales-summary-${suffix}.csv`, ["항목", "값"], [
+      ["조회 시작", formatKstDateTime(data.from)],
+      ["조회 종료", formatKstDateTime(data.to)],
+      ["매출", data.summary.grossSales.value],
+      ["순입금", data.summary.matchedDeposits.value],
+      ["환불/취소", data.summary.refundAmount.value],
+      ["메뉴 추정 원가", adjustedFinancials.estimatedCost],
+      ["운영비", extraExpenseTotal],
+      ["운영비 포함 추정 원가", adjustedFinancials.adjustedCost],
+      ["운영비 포함 추정 이윤", adjustedFinancials.adjustedProfit],
+      ["운영비 포함 원가율", adjustedFinancials.adjustedCostRate === null ? "" : Math.round(adjustedFinancials.adjustedCostRate * 1000) / 10],
+      ["목표 마진", targetMarginLabel],
+    ]);
+
+    downloadCsvFile(`sales-trend-${suffix}.csv`, ["시작시각", "라벨", "매출", "순매출", "추정원가", "추정이윤", "주문수"], data.series.map((point) => [
+      formatKstDateTime(point.bucketStart),
+      point.label,
+      point.grossSales,
+      point.netSales,
+      point.estimatedCost,
+      point.estimatedProfit,
+      point.orderCount,
+    ]));
+
+    downloadCsvFile(`sales-menu-profitability-${suffix}.csv`, ["메뉴", "판매수량", "매출", "적용원가", "이윤", "원가율", "현재가", "목표마진", "권장가", "현재가대비"], simulatedMenuRows.map((row) => [
       row.menuName,
       row.quantity,
       row.revenue,
@@ -304,15 +451,37 @@ function AnalyticsPage() {
       targetMarginLabel,
       row.recommendedPrice,
       row.priceGap,
+    ]));
+
+    downloadCsvFile(`sales-category-mix-${suffix}.csv`, ["카테고리", "판매수량", "매출", "매출비중", "추정이윤"], data.categoryRows.map((row) => [
+      row.categoryName,
+      row.quantity,
+      row.revenue,
+      Math.round(row.revenueShare * 1000) / 10,
+      row.estimatedProfit,
+    ]));
+
+    downloadCsvFile(`sales-records-${suffix}.csv`, ["시각", "테이블", "주문번호", "오더ID", "페이먼트ID", "오더상태", "결제상태", "매출", "순매출", "환불", "추정원가", "추정이윤", "상품수", "결제코드"], data.recordRows.map((row) => [
+      formatKstDateTime(row.timestamp),
+      row.tableName,
+      row.displayNumber ?? "",
+      row.orderId,
+      row.paymentId ?? "",
+      row.orderStatus ?? "",
+      row.paymentStatus ?? "",
+      row.grossSales,
+      row.netSales,
+      row.refundAmount,
+      row.estimatedCost,
+      row.estimatedProfit,
+      row.itemCount,
+      row.paymentCode ?? "",
+    ]));
+
+    downloadCsvFile(`sales-expenses-${suffix}.csv`, ["비용 항목", "금액"], [
+      ...expenseRows.map((row) => [row.label, parseExpenseAmount(row.amount)] as [string, number]),
+      ["합계", extraExpenseTotal],
     ]);
-    const csv = [header, ...rows].map((row) => row.map((cell) => `"${String(cell).replaceAll("\"", "\"\"")}"`).join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `sales-analytics-${toDateInputValue(data.from)}-${toDateInputValue(data.to - 1)}.csv`;
-    anchor.click();
-    URL.revokeObjectURL(url);
   };
 
   return (
@@ -341,20 +510,20 @@ function AnalyticsPage() {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <input
-                type="date"
-                value={toDateInputValue(range.from)}
+                type="datetime-local"
+                value={toDateTimeInputValue(range.from)}
                 onChange={(event) => {
                   setPreset("custom");
-                  setRange((prev) => ({ ...prev, from: fromDateInputValue(event.target.value) }));
+                  setRange((prev) => ({ ...prev, from: fromDateTimeInputValue(event.target.value) }));
                 }}
                 className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200"
               />
               <input
-                type="date"
-                value={toDateInputValue(range.to - 1)}
+                type="datetime-local"
+                value={toDateTimeInputValue(range.to)}
                 onChange={(event) => {
                   setPreset("custom");
-                  setRange((prev) => ({ ...prev, to: fromDateInputValue(event.target.value) + dayMs }));
+                  setRange((prev) => ({ ...prev, to: fromDateTimeInputValue(event.target.value) }));
                 }}
                 className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200"
               />
@@ -381,12 +550,12 @@ function AnalyticsPage() {
               </button>
               <button
                 type="button"
-                onClick={exportCsv}
+                onClick={exportCsvBundle}
                 disabled={!data}
                 className="flex h-9 items-center gap-2 rounded-xl bg-emerald-500 px-3 text-xs font-black text-white hover:bg-emerald-600 disabled:opacity-50"
               >
                 <Download className="h-3.5 w-3.5" />
-                CSV
+                CSV 묶음
               </button>
             </div>
           </div>
@@ -412,6 +581,57 @@ function AnalyticsPage() {
                   <KpiCard label={kpi.label} value={kpi.value} helper={kpi.helper} helperClass={kpi.helperClass} icon={kpi.icon} />
                 </div>
               ))}
+            </div>
+
+            <div className="rounded-2xl border border-slate-200/80 bg-white p-3 shadow-sm dark:border-slate-800/80 dark:bg-slate-900">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <h3 className="text-base font-black text-slate-850 dark:text-white">운영 비용</h3>
+                  <p className="text-xs font-bold text-slate-400 dark:text-slate-300">부스 대여료, 소모품, 장비 구매처럼 메뉴 원가 밖 비용을 이윤 계산에 반영합니다.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="rounded-xl bg-amber-50 px-3 py-2 text-xs font-black text-amber-700 dark:bg-amber-950/20 dark:text-amber-300">
+                    합계 {formatWon(extraExpenseTotal)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setExpenseRows((rows) => [...rows, { id: newExpenseId(), label: "", amount: "" }])}
+                    className="flex h-9 items-center gap-1.5 rounded-xl bg-slate-800 px-3 text-xs font-black text-white hover:bg-slate-900 dark:bg-slate-100 dark:text-slate-900"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    비용 추가
+                  </button>
+                </div>
+              </div>
+              <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+                {expenseRows.map((row) => (
+                  <div key={row.id} className="grid grid-cols-[1fr_120px_32px] items-center gap-2 rounded-xl bg-slate-50 p-2 dark:bg-slate-950/50">
+                    <input
+                      value={row.label}
+                      onChange={(event) => setExpenseRows((rows) => rows.map((item) => item.id === row.id ? { ...item, label: event.target.value } : item))}
+                      placeholder="비용 항목"
+                      className="h-9 min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none focus:border-brand-300 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+                    />
+                    <input
+                      type="number"
+                      min={0}
+                      step={100}
+                      value={row.amount}
+                      onChange={(event) => setExpenseRows((rows) => rows.map((item) => item.id === row.id ? { ...item, amount: event.target.value } : item))}
+                      placeholder="금액"
+                      className="h-9 min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-right text-xs font-black text-slate-700 outline-none focus:border-brand-300 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setExpenseRows((rows) => rows.length <= 1 ? [{ ...rows[0], label: "", amount: "" }] : rows.filter((item) => item.id !== row.id))}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-500 dark:hover:bg-rose-950/20"
+                      title="비용 항목 삭제"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
@@ -535,7 +755,7 @@ function AnalyticsPage() {
                         <div key={row.categoryId}>
                           <div className="mb-1 flex items-center justify-between text-xs font-bold">
                             <span className="text-slate-600 dark:text-slate-200">{row.categoryName}</span>
-                            <span className="text-slate-400">{formatWon(row.revenue)}</span>
+                            <span className="text-slate-400">{formatWon(row.revenue)} · {formatPercent(row.revenueShare)}</span>
                           </div>
                           <div className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                             <div className="h-full rounded-full bg-brand-500" style={{ width: `${Math.max(4, (row.revenue / maxRevenue) * 100)}%` }} />
@@ -573,6 +793,89 @@ function AnalyticsPage() {
                     )}
                   </div>
                 </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800/80 dark:bg-slate-900">
+              <div className="flex flex-col gap-3 border-b border-slate-100 p-4 dark:border-slate-800 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <h3 className="text-base font-black text-slate-850 dark:text-white">오더/페이먼트 기록</h3>
+                  <p className="text-xs font-bold text-slate-400 dark:text-slate-300">조회 기간 내 주문과 결제 기록을 확인하고 선택 삭제할 수 있습니다.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={deleteSelectedRecords}
+                  disabled={selectedRecords.length === 0 || isDeletingRecords}
+                  className="flex h-9 items-center justify-center gap-2 rounded-xl bg-rose-500 px-3 text-xs font-black text-white hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  {isDeletingRecords ? "삭제 중" : `선택 삭제 ${selectedRecords.length}`}
+                </button>
+              </div>
+              <div className="max-h-[420px] overflow-auto">
+                <table className="w-full min-w-[1080px] text-left">
+                  <thead className="sticky top-0 z-10">
+                    <tr className="bg-slate-50 text-xs font-black text-slate-400 dark:bg-slate-800 dark:text-slate-300">
+                      <th className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={data.recordRows.length > 0 && selectedRecordIds.size === data.recordRows.length}
+                          onChange={toggleAllRecords}
+                          aria-label="전체 기록 선택"
+                        />
+                      </th>
+                      <th className="px-4 py-3">시각</th>
+                      <th className="px-4 py-3">오더</th>
+                      <th className="px-4 py-3">페이먼트</th>
+                      <th className="px-4 py-3 text-right">매출</th>
+                      <th className="px-4 py-3 text-right">순매출</th>
+                      <th className="px-4 py-3 text-right">환불</th>
+                      <th className="px-4 py-3 text-right">추정 원가</th>
+                      <th className="px-4 py-3 text-right">추정 이윤</th>
+                      <th className="px-4 py-3 text-right">상품수</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
+                    {data.recordRows.map((row) => (
+                      <tr key={row.recordId} className="hover:bg-slate-50/80 dark:hover:bg-slate-850/60">
+                        <td className="px-4 py-3">
+                          <input
+                            type="checkbox"
+                            checked={selectedRecordIds.has(row.recordId)}
+                            onChange={() => toggleRecordSelection(row.recordId)}
+                            aria-label={`${row.orderId} 선택`}
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-xs font-bold text-slate-500 dark:text-slate-300">{formatKstDateTime(row.timestamp)}</td>
+                        <td className="px-4 py-3">
+                          <div className="fc">
+                            <span className="text-sm font-black text-slate-800 dark:text-slate-100">
+                              {row.tableName}{row.displayNumber ? ` #${row.displayNumber}` : ""}
+                            </span>
+                            <span className="font-mono text-[11px] font-bold text-slate-400">{row.orderId}</span>
+                            <span className="text-[11px] font-black text-slate-400">{row.orderStatus ?? "-"}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="fc">
+                            <span className="text-xs font-black text-slate-700 dark:text-slate-200">{row.paymentStatus ?? "-"}</span>
+                            <span className="font-mono text-[11px] font-bold text-slate-400">{row.paymentId ?? "-"}</span>
+                            <span className="text-[11px] font-bold text-slate-400">{row.paymentCode ? `code ${row.paymentCode}` : ""}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-right text-sm font-black text-slate-850 dark:text-white">{formatWon(row.grossSales)}</td>
+                        <td className="px-4 py-3 text-right text-sm font-bold text-slate-600 dark:text-slate-200">{formatWon(row.netSales)}</td>
+                        <td className="px-4 py-3 text-right text-sm font-bold text-rose-500">{formatWon(row.refundAmount)}</td>
+                        <td className="px-4 py-3 text-right text-sm font-bold text-slate-600 dark:text-slate-200">{formatWon(row.estimatedCost)}</td>
+                        <td className="px-4 py-3 text-right text-sm font-black text-emerald-600 dark:text-emerald-400">{formatWon(row.estimatedProfit)}</td>
+                        <td className="px-4 py-3 text-right text-sm font-bold text-slate-600 dark:text-slate-200">{row.itemCount}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {data.recordRows.length === 0 && (
+                  <div className="p-8 text-center text-sm font-bold text-slate-400">선택한 기간의 오더/페이먼트 기록이 없습니다.</div>
+                )}
               </div>
             </div>
           </>

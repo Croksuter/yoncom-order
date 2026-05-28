@@ -4,7 +4,7 @@ import type * as Schema from "db/schema";
 import { getValidation } from "shared/types/requests/client/menu";
 import { ok, parseSearchParams, routeError } from "~/lib/server/api";
 import { getDb } from "~/lib/server/db";
-import { enrichMenuCategoriesWithBundles } from "~/lib/server/d1-mutations";
+import { enrichMenuCategoriesWithBundles, ensureMenuProfitabilityColumns } from "~/lib/server/d1-mutations";
 import type * as ClientMenuResponse from "shared/types/responses/client/menu";
 
 type MenuWithBundles = Schema.Menu & {
@@ -42,6 +42,7 @@ function toClientMenuCategories(categories: MenuCategoryWithMenus[]): ClientMenu
 export async function GET(request: Request) {
   try {
     parseSearchParams(request, getValidation);
+    await ensureMenuProfitabilityColumns();
 
     const result = await getDb().query.menuCategories.findMany({
       where: isNull(menuCategories.deletedAt),

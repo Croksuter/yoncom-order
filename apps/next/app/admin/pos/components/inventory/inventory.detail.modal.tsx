@@ -127,7 +127,7 @@ export default function InventoryDetailModal({
 
   return (
     <Dialog open={openState} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl shadow-2xl p-6 overflow-hidden">
+      <DialogContent className="flex max-h-[calc(100vh-100px)] max-w-2xl flex-col overflow-hidden bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl shadow-2xl p-6">
         <DialogHeader className="w-full">
           <DialogTitle className="text-xl font-black text-slate-800 dark:text-slate-100 flex items-center justify-between">
             <span>메뉴 상세 및 재고 설정</span>
@@ -140,6 +140,7 @@ export default function InventoryDetailModal({
           </DialogDescription>
         </DialogHeader>
 
+        <div className="min-h-0 flex-1 overflow-y-auto pr-1">
         {/* Layout Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 my-4">
 
@@ -336,6 +337,7 @@ export default function InventoryDetailModal({
             ⚠️ 메뉴 명칭, 카테고리, 원가 값을 확인해 주세요.
           </p>
         )}
+        </div>
 
         {/* Footer Actions */}
         <DialogFooter className="border-t border-slate-100 dark:border-slate-850 pt-4 flex gap-2">
