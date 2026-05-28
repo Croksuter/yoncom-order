@@ -16,7 +16,6 @@ import {
   Plus,
   ReceiptText,
   RefreshCw,
-  Scale,
   Search,
   Trash2,
   TrendingUp,
@@ -59,15 +58,8 @@ type MenuSortKey =
   | "currentPrice"
   | "recommendedPrice";
 type MenuProfitabilityRow = AdminAnalyticsResponse.MenuRow & {
-  recommendedRevenue: number;
-  recommendedProfit: number;
   priceGap: number;
 };
-
-const defaultExpenseRows: ExpenseRow[] = [
-  { id: "expense-booth", label: "부스 대여료", amount: "" },
-  { id: "expense-supplies", label: "소모품/장비", amount: "" },
-];
 
 function newExpenseId() {
   return `expense-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -184,7 +176,33 @@ function recommendedPrice(unitCost: number, targetMarginBps: number) {
 
 function parseExpenseAmount(value: string) {
   const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+  return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : 0;
+}
+
+function expenseRowsFromPersisted(rows: AdminAnalyticsResponse.OperatingExpenseRow[]): ExpenseRow[] {
+  return rows.map((row) => ({
+    id: row.id,
+    label: row.label,
+    amount: String(row.amount),
+  }));
+}
+
+function getExpenseSavePayload(rows: ExpenseRow[]) {
+  const operatingExpenses: Array<{ id: string; label: string; amount: number }> = [];
+  let hasInvalidAmountWithoutLabel = false;
+
+  for (const row of rows) {
+    const label = row.label.trim();
+    const amount = parseExpenseAmount(row.amount);
+    if (!label && amount <= 0) continue;
+    if (!label) {
+      hasInvalidAmountWithoutLabel = true;
+      continue;
+    }
+    operatingExpenses.push({ id: row.id, label, amount });
+  }
+
+  return { operatingExpenses, hasInvalidAmountWithoutLabel };
 }
 
 function normalizeSearchText(value: string | number | null | undefined) {
@@ -354,13 +372,15 @@ function AnalyticsPage() {
   const [range, setRange] = useState(getPresetRange("today"));
   const [isRangeHydrated, setIsRangeHydrated] = useState(false);
   const [targetMarginPercent, setTargetMarginPercent] = useState(defaultTargetMarginPercent);
-  const [expenseRows, setExpenseRows] = useState<ExpenseRow[]>(defaultExpenseRows);
+  const [expenseRows, setExpenseRows] = useState<ExpenseRow[]>([]);
   const [menuSort, setMenuSort] = useState<{ key: MenuSortKey; direction: SortDirection }>({ key: "revenue", direction: "desc" });
   const [recordSearchQuery, setRecordSearchQuery] = useState("");
   const [selectedRecordIds, setSelectedRecordIds] = useState<Set<string>>(new Set());
   const [data, setData] = useState<AdminAnalyticsResponse.Get["result"] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isDeletingRecords, setIsDeletingRecords] = useState(false);
+  const [isSavingExpenses, setIsSavingExpenses] = useState(false);
+  const [isSavingTargetMargin, setIsSavingTargetMargin] = useState(false);
   const [error, setError] = useState(false);
   const bucket = range.to - range.from <= 2 * dayMs ? "hour" : "day";
   const targetMarginBps = useMemo(() => targetMarginBpsFromPercent(targetMarginPercent), [targetMarginPercent]);
@@ -407,6 +427,12 @@ function AnalyticsPage() {
   useEffect(() => {
     setSelectedRecordIds(new Set());
   }, [data?.from, data?.to, data?.generatedAt]);
+
+  useEffect(() => {
+    if (!data) return;
+    setExpenseRows(expenseRowsFromPersisted(data.operatingExpenses));
+    setTargetMarginPercent(String(data.targetMarginBps / 100));
+  }, [data]);
 
   const extraExpenseTotal = useMemo(
     () => expenseRows.reduce((sum, row) => sum + parseExpenseAmount(row.amount), 0),
@@ -466,13 +492,6 @@ function AnalyticsPage() {
         helperClass: adjustedFinancials.adjustedProfit >= 0 ? "text-emerald-500" : "text-rose-500",
         icon: WalletCards,
       },
-      {
-        label: "원가율",
-        value: formatPercent(adjustedFinancials.adjustedCostRate),
-        helper: `${data.summary.soldItemCount.toLocaleString()}개 판매`,
-        helperClass: "text-slate-400",
-        icon: Scale,
-      },
     ];
   }, [adjustedFinancials, data, extraExpenseTotal]);
 
@@ -483,8 +502,6 @@ function AnalyticsPage() {
       return {
         ...row,
         recommendedPrice: simulatedRecommendedPrice,
-        recommendedRevenue: simulatedRecommendedPrice * row.quantity,
-        recommendedProfit: (simulatedRecommendedPrice - row.appliedUnitCost) * row.quantity,
         priceGap: simulatedRecommendedPrice - row.currentPrice,
       };
     });
@@ -493,23 +510,6 @@ function AnalyticsPage() {
     () => [...simulatedMenuRows].sort((a, b) => compareMenuRows(a, b, menuSort.key, menuSort.direction)),
     [menuSort.direction, menuSort.key, simulatedMenuRows],
   );
-
-  const pricingSummary = useMemo(() => {
-    const currentRevenue = simulatedMenuRows.reduce((sum, row) => sum + row.revenue, 0);
-    const currentProfit = simulatedMenuRows.reduce((sum, row) => sum + row.estimatedProfit, 0);
-    const recommendedRevenue = simulatedMenuRows.reduce((sum, row) => sum + row.recommendedRevenue, 0);
-    const recommendedProfit = simulatedMenuRows.reduce((sum, row) => sum + row.recommendedProfit, 0);
-    const adjustedCurrentProfit = currentProfit - extraExpenseTotal;
-    const adjustedRecommendedProfit = recommendedProfit - extraExpenseTotal;
-    return {
-      currentRevenue,
-      currentProfit: adjustedCurrentProfit,
-      recommendedRevenue,
-      recommendedProfit: adjustedRecommendedProfit,
-      revenueDelta: recommendedRevenue - currentRevenue,
-      profitDelta: adjustedRecommendedProfit - adjustedCurrentProfit,
-    };
-  }, [extraExpenseTotal, simulatedMenuRows]);
 
   const selectedRecords = useMemo(() => {
     if (!data) return [];
@@ -557,6 +557,52 @@ function AnalyticsPage() {
       visibleRecordIds.forEach((recordId) => next.add(recordId));
       return next;
     });
+  };
+
+  const saveOperatingExpenses = async () => {
+    if (!data || isSavingExpenses) return;
+    const { operatingExpenses, hasInvalidAmountWithoutLabel } = getExpenseSavePayload(expenseRows);
+    if (hasInvalidAmountWithoutLabel) {
+      window.alert("금액이 있는 운영 비용은 항목명을 입력해야 합니다.");
+      return;
+    }
+
+    setIsSavingExpenses(true);
+    try {
+      const response = await api.put("admin/analytics", {
+        json: { operatingExpenses, targetMarginBps },
+      }).json<AdminAnalyticsResponse.SaveAnalyticsSettings>();
+      setData((prev) => prev ? {
+        ...prev,
+        operatingExpenses: response.result.operatingExpenses,
+        targetMarginBps: response.result.targetMarginBps,
+      } : prev);
+      setExpenseRows(expenseRowsFromPersisted(response.result.operatingExpenses));
+    } catch {
+      window.alert("운영 비용을 저장하지 못했습니다.");
+    } finally {
+      setIsSavingExpenses(false);
+    }
+  };
+
+  const saveTargetMargin = async () => {
+    if (!data || isSavingTargetMargin) return;
+    setIsSavingTargetMargin(true);
+    try {
+      const response = await api.put("admin/analytics", {
+        json: { targetMarginBps },
+      }).json<AdminAnalyticsResponse.SaveAnalyticsSettings>();
+      setData((prev) => prev ? {
+        ...prev,
+        operatingExpenses: response.result.operatingExpenses,
+        targetMarginBps: response.result.targetMarginBps,
+      } : prev);
+      setTargetMarginPercent(String(response.result.targetMarginBps / 100));
+    } catch {
+      window.alert("목표 마진을 저장하지 못했습니다.");
+    } finally {
+      setIsSavingTargetMargin(false);
+    }
   };
 
   const deleteSelectedRecords = async () => {
@@ -729,6 +775,14 @@ function AnalyticsPage() {
               </label>
               <button
                 type="button"
+                onClick={saveTargetMargin}
+                disabled={!data || isSavingTargetMargin}
+                className="h-9 rounded-xl bg-brand-500 px-3 text-xs font-black text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isSavingTargetMargin ? "저장 중" : "마진 저장"}
+              </button>
+              <button
+                type="button"
                 onClick={() => void loadAnalytics()}
                 className="flex h-9 items-center gap-2 rounded-xl bg-slate-800 px-3 text-xs font-black text-white hover:bg-slate-900 dark:bg-slate-100 dark:text-slate-900"
               >
@@ -755,14 +809,14 @@ function AnalyticsPage() {
         )}
 
         {!data ? (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">
-            {Array.from({ length: 6 }).map((_, index) => (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            {Array.from({ length: 5 }).map((_, index) => (
               <div key={index} className="h-32 animate-pulse rounded-2xl bg-white dark:bg-slate-900" />
             ))}
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
               {kpis.map((kpi) => (
                 <div key={kpi.label}>
                   <KpiCard label={kpi.label} value={kpi.value} helper={kpi.helper} helperClass={kpi.helperClass} icon={kpi.icon} />
@@ -776,10 +830,18 @@ function AnalyticsPage() {
                   <h3 className="text-base font-black text-slate-850 dark:text-white">운영 비용</h3>
                   <p className="text-xs font-bold text-slate-400 dark:text-slate-300">부스 대여료, 소모품, 장비 구매처럼 메뉴 원가 밖 비용을 이윤 계산에 반영합니다.</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="rounded-xl bg-amber-50 px-3 py-2 text-xs font-black text-amber-700 dark:bg-amber-950/20 dark:text-amber-300">
                     합계 {formatWon(extraExpenseTotal)}
                   </span>
+                  <button
+                    type="button"
+                    onClick={saveOperatingExpenses}
+                    disabled={isSavingExpenses}
+                    className="flex h-9 items-center gap-1.5 rounded-xl bg-brand-500 px-3 text-xs font-black text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isSavingExpenses ? "저장 중" : "저장"}
+                  </button>
                   <button
                     type="button"
                     onClick={() => setExpenseRows((rows) => [...rows, { id: newExpenseId(), label: "", amount: "" }])}
@@ -810,7 +872,7 @@ function AnalyticsPage() {
                     />
                     <button
                       type="button"
-                      onClick={() => setExpenseRows((rows) => rows.length <= 1 ? [{ ...rows[0], label: "", amount: "" }] : rows.filter((item) => item.id !== row.id))}
+                      onClick={() => setExpenseRows((rows) => rows.filter((item) => item.id !== row.id))}
                       className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-500 dark:hover:bg-rose-950/20"
                       title="비용 항목 삭제"
                     >
@@ -818,28 +880,11 @@ function AnalyticsPage() {
                     </button>
                   </div>
                 ))}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-              <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm dark:border-slate-800/80 dark:bg-slate-900">
-                <p className="text-xs font-black uppercase tracking-wider text-slate-400 dark:text-slate-300">목표 마진</p>
-                <p className="mt-2 text-xl font-black text-slate-850 dark:text-white">{targetMarginLabel}</p>
-                <p className="mt-1 text-xs font-bold text-slate-400 dark:text-slate-300">전역 권장가 기준</p>
-              </div>
-              <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm dark:border-slate-800/80 dark:bg-slate-900">
-                <p className="text-xs font-black uppercase tracking-wider text-slate-400 dark:text-slate-300">권장가 기준 매출</p>
-                <p className="mt-2 text-xl font-black text-slate-850 dark:text-white">{formatWon(pricingSummary.recommendedRevenue)}</p>
-                <p className={`mt-1 text-xs font-bold ${pricingSummary.revenueDelta >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
-                  현재가 대비 {formatSignedWon(pricingSummary.revenueDelta)}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm dark:border-slate-800/80 dark:bg-slate-900">
-                <p className="text-xs font-black uppercase tracking-wider text-slate-400 dark:text-slate-300">권장가 기준 이윤</p>
-                <p className="mt-2 text-xl font-black text-slate-850 dark:text-white">{formatWon(pricingSummary.recommendedProfit)}</p>
-                <p className={`mt-1 text-xs font-bold ${pricingSummary.profitDelta >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
-                  현재가 대비 {formatSignedWon(pricingSummary.profitDelta)}
-                </p>
+                {expenseRows.length === 0 && (
+                  <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-3 text-xs font-bold text-slate-400 dark:border-slate-800 dark:bg-slate-950/50 dark:text-slate-300">
+                    저장된 운영 비용이 없습니다.
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1011,7 +1056,7 @@ function AnalyticsPage() {
                 </div>
               </div>
               <div className="max-h-[420px] overflow-auto">
-                <table className="w-full min-w-[1240px] text-left">
+                <table className="w-full text-left">
                   <thead className="sticky top-0 z-10">
                     <tr className="bg-slate-50 text-xs font-black text-slate-400 dark:bg-slate-800 dark:text-slate-300">
                       <th className="px-4 py-3">

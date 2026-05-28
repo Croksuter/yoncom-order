@@ -51,6 +51,29 @@ describe("admin analytics calculations", () => {
     expect(getRecommendedPrice(3300, 3500)).toBe(5100);
   });
 
+  it("includes persisted operating expenses in the analytics payload", () => {
+    const from = Date.parse("2026-05-28T00:00:00.000Z");
+    const result = buildAdminAnalytics({
+      from,
+      to: from + 60_000,
+      bucket: "hour",
+      categories: [],
+      menus: [],
+      bundleItems: [],
+      bankTransactions: [],
+      targetMarginBps: 4200,
+      operatingExpenses: [
+        { id: "expense_booth", label: "부스 대여료", amount: 50000, createdAt: from, updatedAt: from },
+      ],
+      tables: [],
+    });
+
+    expect(result.targetMarginBps).toBe(4200);
+    expect(result.operatingExpenses).toEqual([
+      { id: "expense_booth", label: "부스 대여료", amount: 50000, createdAt: from, updatedAt: from },
+    ]);
+  });
+
   it("keeps recommended prices finite for invalid intermediate inputs", () => {
     expect(getRecommendedPrice(Number.NaN, 3500)).toBe(0);
     expect(getRecommendedPrice(3300, Number.NaN)).toBe(5100);
@@ -361,6 +384,56 @@ describe("admin analytics route", () => {
     expect(deleteAdminAnalyticsRecords).toHaveBeenCalledWith({ orderIds: ["order_1"], paymentIds: ["payment_1"] });
   });
 
+  it("saves analytics settings through a guarded mutation", async () => {
+    vi.doMock("~/lib/server/auth-session", () => ({
+      csrfCookieName: "yoncom_csrf",
+      requireAdmin: vi.fn(async () => null),
+    }));
+    vi.doMock("~/lib/server/api", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("~/lib/server/api")>();
+      return {
+        ...actual,
+        idempotentMutationResponse: vi.fn(async (_request: Request, _scope: string, _body: unknown, mutate: () => Promise<{ result?: unknown; status: number }>) => {
+          const result = await mutate();
+          return Response.json({ result: result.result }, { status: result.status });
+        }),
+      };
+    });
+    const saveAdminAnalyticsSettings = vi.fn(async () => ({
+      result: {
+        operatingExpenses: [
+          { id: "expense_1", label: "부스 대여료", amount: 50000, createdAt: 1, updatedAt: 2 },
+        ],
+        targetMarginBps: 4200,
+      },
+      status: 200,
+    }));
+    vi.doMock("~/lib/server/admin-analytics", () => ({
+      getAdminAnalytics: vi.fn(),
+      deleteAdminAnalyticsRecords: vi.fn(),
+      saveAdminAnalyticsSettings,
+    }));
+
+    const { PUT } = await import("~/app/api/admin/analytics/route");
+    const response = await PUT(new Request("http://order.test/api/admin/analytics", {
+      method: "PUT",
+      headers: {
+        "content-type": "application/json",
+        origin: "http://order.test",
+        cookie: "yoncom_csrf=csrf-token",
+        "x-csrf-token": "csrf-token",
+        "idempotency-key": "save-operating-expenses",
+      },
+      body: JSON.stringify({ operatingExpenses: [{ id: "expense_1", label: "부스 대여료", amount: 50000 }], targetMarginBps: 4200 }),
+    }));
+
+    expect(response.status).toBe(200);
+    expect(saveAdminAnalyticsSettings).toHaveBeenCalledWith({
+      operatingExpenses: [{ id: "expense_1", label: "부스 대여료", amount: 50000 }],
+      targetMarginBps: 4200,
+    });
+  });
+
   it("deletes analytics records when legacy payments do not have orderId", async () => {
     vi.doUnmock("~/lib/server/admin-analytics");
     vi.doMock("~/lib/server/sync-events", () => ({ venueScope: "venue" }));
@@ -378,6 +451,7 @@ describe("admin analytics route", () => {
       enrichMenuCategoriesWithBundles: vi.fn(),
       ensureMenuProfitabilityColumns: vi.fn(),
       getD1Columns: vi.fn(async () => new Set(["id", "deletedAt"])),
+      newId: vi.fn(() => "new_id"),
       now: vi.fn(() => 123),
       quoteIdentifier: (identifier: string) => `"${identifier}"`,
       updateD1Rows,

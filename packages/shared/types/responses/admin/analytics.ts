@@ -95,6 +95,14 @@ export type Alert = {
   description: string;
 };
 
+export type OperatingExpenseRow = {
+  id: string;
+  label: string;
+  amount: number;
+  createdAt: number;
+  updatedAt: number;
+};
+
 export type Get = {
   result: {
     from: number;
@@ -107,6 +115,8 @@ export type Get = {
     menuRows: MenuRow[];
     categoryRows: CategoryRow[];
     recordRows: RecordRow[];
+    operatingExpenses: OperatingExpenseRow[];
+    targetMarginBps: number;
     alerts: Alert[];
   };
 };
@@ -114,3 +124,12 @@ export type Get = {
 export type DeleteRecords = {
   result: string;
 };
+
+export type SaveOperatingExpenses = {
+  result: {
+    operatingExpenses: OperatingExpenseRow[];
+    targetMarginBps: number;
+  };
+};
+
+export type SaveAnalyticsSettings = SaveOperatingExpenses;

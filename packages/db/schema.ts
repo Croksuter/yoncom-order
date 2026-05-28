@@ -501,6 +501,37 @@ export const bankTransactionsRelations = relations(bankTransactions, ({ one }) =
 
 export type BankTransaction = typeof bankTransactions.$inferSelect;
 
+export const operatingExpenses = sqliteTable("operatingExpenses", {
+  id: text("id")
+    .primaryKey()
+    .notNull()
+    .$defaultFn(() => generateId(15)),
+  label: text("label").notNull(),
+  amount: integer("amount").notNull(),
+  createdAt: integer("createdAt")
+    .notNull()
+    .$defaultFn(() => Date.now()),
+  updatedAt: integer("updatedAt")
+    .notNull()
+    .$defaultFn(() => Date.now()),
+  deletedAt: integer("deletedAt"),
+});
+
+export type OperatingExpense = typeof operatingExpenses.$inferSelect;
+
+export const analyticsSettings = sqliteTable("analyticsSettings", {
+  id: text("id").primaryKey().notNull(),
+  targetMarginBps: integer("targetMarginBps").notNull().default(3500),
+  createdAt: integer("createdAt")
+    .notNull()
+    .$defaultFn(() => Date.now()),
+  updatedAt: integer("updatedAt")
+    .notNull()
+    .$defaultFn(() => Date.now()),
+});
+
+export type AnalyticsSettings = typeof analyticsSettings.$inferSelect;
+
 export const paymentSettings = sqliteTable("paymentSettings", {
   id: text("id").primaryKey().notNull(),
   bankName: text("bankName").notNull(),

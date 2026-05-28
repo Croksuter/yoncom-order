@@ -85,6 +85,20 @@
       "when": 1780070400000,
       "tag": "0011_menu_profitability",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1779950904000,
+      "tag": "0012_operating_expenses",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1779951421000,
+      "tag": "0013_analytics_settings",
+      "breakpoints": true
     }
   ]
 }

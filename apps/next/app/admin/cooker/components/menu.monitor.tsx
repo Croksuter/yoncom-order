@@ -87,7 +87,7 @@ export default function MenuMonitor({
   const totalPendingQuantity = menuOrders.reduce((total, menuOrder) => total + menuOrder.pendingQuantity, 0);
 
   return (
-    <section className={`${compact ? "min-w-[200px] h-full min-h-0" : "min-w-[200px] max-w-[360px] h-[calc(100vh-240px)]"} flex flex-col bg-slate-100/80 dark:bg-slate-900/60 border border-slate-200/50 dark:border-slate-800/60 rounded-2xl p-4 gap-4 overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 flex-shrink-0`}>
+    <section className={`${compact ? "min-w-[320px] h-full min-h-0" : "min-w-[320px] max-w-[360px] h-[calc(100vh-240px)]"} flex flex-col bg-slate-100/80 dark:bg-slate-900/60 border border-slate-200/50 dark:border-slate-800/60 rounded-2xl p-4 gap-4 overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 flex-shrink-0`}>
       {/* Menu Column Blurred Image Header */}
       <div className={`${compact ? "h-20" : "h-32"} relative w-full rounded-xl overflow-hidden shadow-inner shrink-0 group flex-shrink-0 select-none`}>
         <img

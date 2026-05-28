@@ -78,6 +78,8 @@ export type AnalyticsBankTransaction = {
   matchedPaymentId?: string | null;
 };
 
+export type AnalyticsOperatingExpense = AdminAnalyticsResponse.OperatingExpenseRow;
+
 export type BuildAnalyticsInput = {
   from: number;
   to: number;
@@ -87,6 +89,8 @@ export type BuildAnalyticsInput = {
   menus: AnalyticsMenu[];
   bundleItems: AnalyticsMenuBundleItem[];
   bankTransactions: AnalyticsBankTransaction[];
+  operatingExpenses?: AnalyticsOperatingExpense[];
+  targetMarginBps?: number;
   generatedAt?: number;
 };
 
@@ -574,6 +578,8 @@ export function buildAdminAnalytics(input: BuildAnalyticsInput): AdminAnalyticsR
     menuRows,
     categoryRows,
     recordRows,
+    operatingExpenses: input.operatingExpenses ?? [],
+    targetMarginBps: input.targetMarginBps ?? defaultTargetMarginBps,
     alerts,
   };
 }
