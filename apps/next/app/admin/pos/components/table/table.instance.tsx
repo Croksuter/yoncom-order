@@ -56,7 +56,7 @@ export default function TableInstance({
           onClick={() => setModalOpen(true)}
         >
           <div className="h-1.5 bg-brand-500 w-full flex-shrink-0 group-hover:bg-brand-600 transition-colors"></div>
-          <div className="p-2.5 flex-1 flex flex-col">
+          <div className="p-2.5 flex-1 flex flex-col h-full">
             <div className="flex justify-between items-start flex-shrink-0 gap-2">
               <div className="min-w-0 flex-1 flex flex-row">
                 <h4 className="font-black text-md text-slate-800 dark:text-white leading-none group-hover:text-brand-500 dark:group-hover:text-brand-400 transition-colors truncate max-w-full">
