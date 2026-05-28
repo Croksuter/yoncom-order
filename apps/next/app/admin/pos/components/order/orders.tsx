@@ -72,13 +72,13 @@ export default function Orders() {
     <div className="full p-2 h-full">
       <div className="full bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 shadow-md rounded-3xl flex flex-col overflow-hidden">
         {/* Header Block */}
-        <div className="h-[76px] bg-slate-50/50 dark:bg-slate-800/30 border-b border-slate-200/60 dark:border-slate-800/60 flex justify-between items-center px-4 shrink-0">
-          <div className="flex flex-col gap-1">
+        <div className="bg-slate-50/50 dark:bg-slate-800/30 border-b border-slate-200/60 dark:border-slate-800/60 flex flex-col px-4 py-3 shrink-0 gap-3">
+          <div className="flex justify-between items-center w-full">
             <h3 className="font-extrabold text-base text-slate-800 dark:text-white leading-none">
               주문 대기열 <span className="text-slate-400 dark:text-slate-300 font-bold text-sm">({inProgressOrders.length + refundPendingOrdersCount})</span>
             </h3>
             {/* Status indicators */}
-            <div className="flex gap-3 text-xs font-black text-slate-500 dark:text-slate-200 mt-1">
+            <div className="flex gap-3 text-xs font-black text-slate-500 dark:text-slate-200">
               <span className="flex items-center gap-1.5" title="입금대기">
                 <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
                 <span>{pendingPaymentOrdersCount}</span>
@@ -97,11 +97,11 @@ export default function Orders() {
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="grid grid-cols-3 gap-2 w-full">
             <Button
               size="sm"
               variant="outline"
-              className="h-8 rounded-xl border-slate-200 px-2.5 text-xs font-extrabold text-slate-500 hover:text-slate-700 dark:border-slate-800 dark:text-slate-200"
+              className="h-8 min-w-0 gap-1.5 rounded-xl border-slate-200 px-1.5 text-xs font-extrabold text-slate-500 hover:text-slate-700 dark:border-slate-800 dark:text-slate-200"
               onClick={() => setOrderWorkflowSettingsOpenState(true)}
             >
               <SlidersHorizontal className="h-3.5 w-3.5" />
@@ -110,7 +110,7 @@ export default function Orders() {
             <Button
               size="sm"
               variant="outline"
-              className="h-8 rounded-xl border-rose-200 bg-rose-50 px-2.5 text-xs font-extrabold text-rose-600 hover:bg-rose-100 hover:text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/20 dark:text-rose-300"
+              className="h-8 min-w-0 gap-1.5 rounded-xl border-rose-200 bg-rose-50 px-1.5 text-xs font-extrabold text-rose-600 hover:bg-rose-100 hover:text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/20 dark:text-rose-300"
               onClick={() => setClientNoticeSettingsOpenState(true)}
             >
               <Megaphone className="h-3.5 w-3.5" />
@@ -119,7 +119,7 @@ export default function Orders() {
             <Button
               size="sm"
               variant="outline"
-              className="h-8 rounded-xl border-slate-200 px-2.5 text-xs font-extrabold text-slate-500 hover:text-slate-700 dark:border-slate-800 dark:text-slate-200"
+              className="h-8 min-w-0 gap-1.5 rounded-xl border-slate-200 px-1.5 text-xs font-extrabold text-slate-500 hover:text-slate-700 dark:border-slate-800 dark:text-slate-200"
               onClick={() => setPaymentSettingsOpenState(true)}
             >
               <Settings className="h-3.5 w-3.5" />
