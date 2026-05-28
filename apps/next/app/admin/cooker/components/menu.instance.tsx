@@ -7,6 +7,7 @@ import { CheckCircle2 } from "lucide-react";
 export default function MenuInstance({
   order,
   onClick,
+  showMenuName = false,
 }: {
   order: {
     id: string;
@@ -19,6 +20,7 @@ export default function MenuInstance({
     timestamp: number;
   }
   onClick: () => void;
+  showMenuName?: boolean;
 }) {
   const [now, setNow] = useState(0);
 
@@ -61,6 +63,11 @@ export default function MenuInstance({
           <h3 className="text-lg font-black text-slate-800 dark:text-slate-200 tracking-tight group-hover:text-brand-500 transition-colors truncate w-full max-w-full block">
             {order.tableName}
           </h3>
+          {showMenuName && (
+            <span className="mt-1 block w-full truncate text-sm font-extrabold text-slate-600 dark:text-slate-300">
+              {order.menuName}
+            </span>
+          )}
           <span className={`text-base mt-1 ${timerClass} truncate block w-full`}>
             {formattedTime}
           </span>

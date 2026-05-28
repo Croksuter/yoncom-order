@@ -27,8 +27,10 @@ const getMenuFallbackImage = (name: string) => {
 
 export default function MenuMonitor({
   menuId,
+  compact = false,
 }: {
   menuId: string;
+  compact?: boolean;
 }) {
   const [menuCompleteModalOpen, setMenuCompleteModalOpen] = useState(false);
   const [menuName, setMenuName] = useState("");
@@ -41,8 +43,8 @@ export default function MenuMonitor({
 
   if (!menu) {
     return (
-      <div className="flex flex-col min-w-[320px] max-w-[360px] bg-slate-100/50 dark:bg-slate-900/40 border border-slate-200/50 dark:border-slate-800/60 rounded-2xl p-4 gap-4 h-[calc(100vh-280px)] animate-pulse shrink-0">
-        <div className="h-32 w-full bg-slate-200 dark:bg-slate-800 rounded-xl"></div>
+      <div className={`${compact ? "min-w-0 h-full min-h-0" : "min-w-[320px] max-w-[360px] h-[calc(100vh-280px)]"} flex flex-col bg-slate-100/50 dark:bg-slate-900/40 border border-slate-200/50 dark:border-slate-800/60 rounded-2xl p-4 gap-4 animate-pulse shrink-0`}>
+        <div className={`${compact ? "h-20" : "h-32"} w-full bg-slate-200 dark:bg-slate-800 rounded-xl`}></div>
         <div className="flex-1 space-y-3 py-1">
           <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded"></div>
           <div className="space-y-2">
@@ -79,16 +81,16 @@ export default function MenuMonitor({
     );
 
   return (
-    <section className="flex flex-col min-w-[200px] max-w-[360px] bg-slate-100/80 dark:bg-slate-900/60 border border-slate-200/50 dark:border-slate-800/60 rounded-2xl p-4 gap-4 h-[calc(100vh-240px)] overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 flex-shrink-0">
+    <section className={`${compact ? "min-w-0 h-full min-h-0" : "min-w-[200px] max-w-[360px] h-[calc(100vh-240px)]"} flex flex-col bg-slate-100/80 dark:bg-slate-900/60 border border-slate-200/50 dark:border-slate-800/60 rounded-2xl p-4 gap-4 overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 flex-shrink-0`}>
       {/* Menu Column Blurred Image Header */}
-      <div className="relative h-32 w-full rounded-xl overflow-hidden shadow-inner shrink-0 group flex-shrink-0 select-none">
+      <div className={`${compact ? "h-20" : "h-32"} relative w-full rounded-xl overflow-hidden shadow-inner shrink-0 group flex-shrink-0 select-none`}>
         <img
           alt={menu.name}
           className="absolute inset-0 w-full h-full object-cover scale-105 group-hover:scale-110 transition-transform duration-500"
           src={menu.image || getMenuFallbackImage(menu.name)}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/40 to-transparent flex items-end p-4">
-          <h2 className="text-xl font-black text-white tracking-tight drop-shadow-sm truncate">
+          <h2 className={`${compact ? "text-lg" : "text-xl"} font-black text-white tracking-tight drop-shadow-sm truncate`}>
             {menu.name}
           </h2>
         </div>
