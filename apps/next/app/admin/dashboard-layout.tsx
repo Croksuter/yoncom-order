@@ -8,6 +8,7 @@ import useTableStore from "~/stores/table.store";
 import useMenuStore from "~/stores/menu.store";
 import { api } from "~/lib/query";
 import { useTheme } from "~/hooks/use-theme";
+import * as AdminTableResponse from "shared/types/responses/admin/table";
 import {
   Package,
   LayoutDashboard,
@@ -33,6 +34,41 @@ function getProfileInitials(name: string) {
   }
 
   return trimmed.slice(0, 2).toUpperCase();
+}
+
+type DashboardOrder = AdminTableResponse.Get["result"][number]["tableContexts"][number]["orders"][number];
+
+function getKstDayRange(timestamp = Date.now()) {
+  const kstOffsetMs = 9 * 60 * 60 * 1000;
+  const kstDate = new Date(timestamp + kstOffsetMs);
+  const start = Date.UTC(kstDate.getUTCFullYear(), kstDate.getUTCMonth(), kstDate.getUTCDate()) - kstOffsetMs;
+  return { start, end: start + 24 * 60 * 60 * 1000 };
+}
+
+function getSalesTimestamp(order: DashboardOrder) {
+  return order.payment?.paidAt ?? order.payment?.updatedAt ?? order.createdAt;
+}
+
+function isPaidSalesOrder(order: DashboardOrder, salesDayRange: { start: number; end: number }) {
+  const salesTimestamp = getSalesTimestamp(order);
+  return (
+    order.deletedAt === null
+    && order.status !== "CANCELLED"
+    && order.status !== "EXPIRED"
+    && order.payment?.status === "PAID"
+    && salesTimestamp >= salesDayRange.start
+    && salesTimestamp < salesDayRange.end
+  );
+}
+
+function getOrderMenuTotal(
+  order: DashboardOrder,
+  menus: ReturnType<typeof useMenuStore.getState>["menus"],
+) {
+  return order.menuOrders.reduce((sum, menuOrder) => {
+    const menu = menus.find((item) => item.id === menuOrder.menuId);
+    return sum + (menu?.price ?? 0) * menuOrder.quantity;
+  }, 0);
 }
 
 export default function DashboardLayout({
@@ -63,17 +99,16 @@ export default function DashboardLayout({
   const tablesList = tables ?? [];
   const bankTransactionsList = bankTransactions ?? [];
 
-  // 1. 누적 매출 (PAID 상태의 결제 금액 합산 - 정가 기준)
+  // 1. 당일 매출 (KST 기준 PAID 상태의 결제 금액 합산 - 정가 기준)
+  const salesDayRange = getKstDayRange();
   const confirmedOrders = tablesList
-    .filter((table) => table.tableContexts?.[0]?.deletedAt === null)
-    .flatMap((table) => table.tableContexts?.[0]?.orders ?? [])
-    .filter((order) => order.payment?.status === "PAID");
+    .flatMap((table) => table.tableContexts ?? [])
+    .flatMap((tableContext) => tableContext.orders ?? [])
+    .filter((order) => isPaidSalesOrder(order, salesDayRange));
 
   const totalRevenue = confirmedOrders.reduce((acc, order) => {
-    const originalOrderPrice = order.menuOrders.reduce((sum, menuOrder) => {
-      const menu = menus.find((m) => m.id === menuOrder.menuId);
-      return sum + (menu?.price ?? 0) * menuOrder.quantity;
-    }, 0);
+    const menuTotal = getOrderMenuTotal(order, menus);
+    const originalOrderPrice = order.payment?.originalAmount ?? (menuTotal > 0 ? menuTotal : order.payment?.amount ?? 0);
     return acc + originalOrderPrice;
   }, 0);
 
