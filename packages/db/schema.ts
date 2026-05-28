@@ -129,6 +129,8 @@ export const menus = sqliteTable("menus", {
   description: text("description").notNull(),
   descriptionEn: text("descriptionEn"),
   price: integer("price").notNull(),
+  unitCost: integer("unitCost"),
+  targetMarginBps: integer("targetMarginBps").notNull().default(3500),
   quantity: integer("quantity").notNull(),
   available: integer("available", { mode: "boolean" }).notNull().default(true),
   menuCategoryId: text("menuCategoryId")

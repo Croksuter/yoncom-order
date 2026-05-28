@@ -17,10 +17,15 @@ import queryStore, { api, mutationHeaders } from '~/lib/query';
 import { toast } from '~/hooks/use-toast';
 import { useLoadingStore } from '~/stores/loading.store';
 
+type AppMenu = ClientMenuResponse.Menu & {
+  unitCost: number | null;
+  targetMarginBps: number;
+};
+
 export type MenuState = {
   clientMenuCategories: ClientMenuResponse.Get["result"] | null;
   menuCategories: Schema.MenuCategory[];
-  menus: ClientMenuResponse.Menu[];
+  menus: AppMenu[];
   firstOrderRule: AdminFirstOrderRuleResponse.Rule | null;
   isLoaded: boolean;
   error: boolean;
@@ -41,7 +46,7 @@ export type MenuState = {
   updateMenuBundle: (query: AdminMenuBundleRequest.Update) => Promise<AdminMenuBundleResponse.Update | null>;
 
   // 다른 store에서 사용하기 위해 노출. component에서 사용하지 않음.
-  _setMenus: (menus: ClientMenuResponse.Menu[]) => void;
+  _setMenus: (menus: AppMenu[]) => void;
 }
 
 const useMenuStore = create<MenuState>((set, get) => ({
@@ -59,7 +64,11 @@ const useMenuStore = create<MenuState>((set, get) => ({
     setter: set,
     onSuccess: (res) => set({
       clientMenuCategories: res.result,
-      menus: res.result.flatMap((menuCategory) => menuCategory.menus),
+      menus: res.result.flatMap((menuCategory) => menuCategory.menus).map((menu) => ({
+        ...menu,
+        unitCost: null,
+        targetMarginBps: 3500,
+      })),
     }),
   }),
 
@@ -236,7 +245,7 @@ const useMenuStore = create<MenuState>((set, get) => ({
     },
   }),
 
-  _setMenus: (menus: ClientMenuResponse.Menu[]) => set({ menus }),
+  _setMenus: (menus: AppMenu[]) => set({ menus }),
 }));
 
 export default useMenuStore;

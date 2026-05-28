@@ -1,5 +1,10 @@
 import * as Schema from "db/schema";
-import type { Menu } from "../client/menu";
+import type { MenuBundleItem } from "../client/menu";
+
+export type Menu = Schema.Menu & {
+  bundleItems?: MenuBundleItem[];
+  bundleAvailableQuantity?: number | null;
+};
 
 export type Create = {
   result: string;

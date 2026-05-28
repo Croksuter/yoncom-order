@@ -7,6 +7,8 @@ describe("implemented Next API route handlers", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    vi.doUnmock("~/lib/server/d1-mutations");
+    vi.doUnmock("~/lib/server/db");
   });
 
   it("GET /api/menu returns menu categories from the DB query layer", async () => {
@@ -43,6 +45,60 @@ describe("implemented Next API route handlers", () => {
       ],
     });
     expect(findMany).toHaveBeenCalledTimes(1);
+  });
+
+  it("GET /api/menu does not expose admin-only cost fields", async () => {
+    const findMany = vi.fn(async () => [
+      {
+        id: "category_123456",
+        name: "Meals",
+        description: "Main dishes",
+        menus: [
+          {
+            id: "menu_1234567890",
+            name: "치킨",
+            nameEn: "Chicken",
+            image: "/image/chicken.png",
+            description: "바삭한 치킨",
+            descriptionEn: "Crispy chicken",
+            price: 9000,
+            unitCost: 3000,
+            targetMarginBps: 4000,
+            quantity: 10,
+            available: true,
+            menuCategoryId: "category_123456",
+            createdAt: 1,
+            updatedAt: 2,
+            deletedAt: null,
+          },
+        ],
+      },
+    ]);
+    vi.doMock("~/lib/server/db", () => ({
+      getDb: () => ({
+        query: {
+          menuCategories: {
+            findMany,
+          },
+        },
+      }),
+    }));
+    vi.doMock("~/lib/server/d1-mutations", () => ({
+      enrichMenuCategoriesWithBundles: vi.fn(async (categories) => categories),
+    }));
+
+    const { GET } = await import("~/app/api/menu/route");
+    const response = await GET(new Request("http://order.test/api/menu"));
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.result[0].menus[0]).toMatchObject({
+      id: "menu_1234567890",
+      name: "치킨",
+      price: 9000,
+    });
+    expect(body.result[0].menus[0]).not.toHaveProperty("unitCost");
+    expect(body.result[0].menus[0]).not.toHaveProperty("targetMarginBps");
   });
 
   it("GET /api/table validates the visible query string before DB access", async () => {

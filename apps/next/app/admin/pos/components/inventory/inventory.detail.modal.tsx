@@ -8,6 +8,18 @@ import useMenuStore from "~/stores/menu.store";
 import { Checkbox } from "~/components/ui/checkbox";
 import { Image, UploadCloud } from "lucide-react";
 
+function safeNumber(value: number, fallback = 0) {
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function formatWon(value: number) {
+  return `₩${Math.round(safeNumber(value)).toLocaleString()}`;
+}
+
+function fallbackUnitCost(price: number) {
+  return Math.floor(Math.max(0, safeNumber(price)) / 3);
+}
+
 export default function InventoryDetailModal({
   openState, setOpenState,
   menu,
@@ -25,6 +37,7 @@ export default function InventoryDetailModal({
   const [menuDescriptionEn, setMenuDescriptionEn] = useState(menu.descriptionEn || "");
   const [menuImage, setMenuImage] = useState(menu.image || "");
   const [menuPrice, setMenuPrice] = useState(menu.price || 0);
+  const [menuUnitCost, setMenuUnitCost] = useState(menu.unitCost === null || menu.unitCost === undefined ? "" : String(menu.unitCost));
   const [menuQuantity, setMenuQuantity] = useState(menu.quantity || 0);
   const [menuAvailable, setMenuAvailable] = useState(menu.available || false);
   const [isUploading, setIsUploading] = useState(false);
@@ -40,6 +53,7 @@ export default function InventoryDetailModal({
     setMenuDescriptionEn(menu.descriptionEn || "");
     setMenuImage(menu.image || "");
     setMenuPrice(menu.price || 0);
+    setMenuUnitCost(menu.unitCost === null || menu.unitCost === undefined ? "" : String(menu.unitCost));
     setMenuQuantity(menu.quantity || 0);
     setMenuAvailable(menu.available || false);
     setInvalid(false);
@@ -65,9 +79,11 @@ export default function InventoryDetailModal({
   const handleConfirm = async () => {
     if (isBusy) return;
 
+    const unitCost = menuUnitCost.trim().length > 0 ? Number(menuUnitCost) : null;
     if (
       menuName.length === 0
       || !menuCategories.some(category => category.id === menuCategory)
+      || (unitCost !== null && (!Number.isFinite(unitCost) || unitCost < 0))
     ) {
       setInvalid(true);
       return;
@@ -84,6 +100,7 @@ export default function InventoryDetailModal({
           descriptionEn: menuDescriptionEn.trim() || null,
           image: menuImage,
           price: menuPrice,
+          unitCost,
           quantity: menuQuantity,
           available: menuAvailable,
         },
@@ -189,7 +206,7 @@ export default function InventoryDetailModal({
             </div>
 
             {/* Price & Quantity Row */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div className="fc gap-1.5">
                 <label className="text-xs uppercase font-bold text-slate-455 dark:text-slate-300 px-0.5">단가 (원)</label>
                 <Input
@@ -199,6 +216,20 @@ export default function InventoryDetailModal({
                   step={100}
                   onChange={(e) => setMenuPrice(Number(e.target.value))}
                   placeholder="단가 입력"
+                  className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-xl h-10 font-medium text-sm"
+                  disabled={isBusy}
+                />
+              </div>
+
+              <div className="fc gap-1.5">
+                <label className="text-xs uppercase font-bold text-slate-455 dark:text-slate-300 px-0.5">원가 (선택)</label>
+                <Input
+                  type="number"
+                  value={menuUnitCost}
+                  min={0}
+                  step={100}
+                  onChange={(e) => setMenuUnitCost(e.target.value)}
+                  placeholder={`${formatWon(fallbackUnitCost(menuPrice))} 자동`}
                   className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-xl h-10 font-medium text-sm"
                   disabled={isBusy}
                 />
@@ -216,6 +247,11 @@ export default function InventoryDetailModal({
                   disabled={isBusy}
                 />
               </div>
+            </div>
+
+            <div className="p-3 bg-emerald-50/70 dark:bg-emerald-950/20 rounded-2xl border border-emerald-100 dark:border-emerald-900/40 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+              적용 원가 {formatWon(menuUnitCost.trim().length > 0 ? Number(menuUnitCost) || 0 : fallbackUnitCost(menuPrice))}
+              {menuUnitCost.trim().length === 0 && " · 정가/3 자동"}
             </div>
 
             {/* Available Toggle Checkbox */}
@@ -297,7 +333,7 @@ export default function InventoryDetailModal({
 
         {invalid && (
           <p className="text-rose-500 dark:text-rose-455 text-xs font-semibold px-0.5 flex items-center gap-1.5 animate-pulse mt-2">
-            ⚠️ 메뉴 명칭과 유효한 카테고리를 입력해야 저장할 수 있습니다.
+            ⚠️ 메뉴 명칭, 카테고리, 원가 값을 확인해 주세요.
           </p>
         )}
 

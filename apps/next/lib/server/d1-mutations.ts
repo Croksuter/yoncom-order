@@ -41,6 +41,8 @@ type MenuRow = BaseRow & {
   name: string;
   nameEn?: string | null;
   price: number;
+  unitCost?: number | null;
+  targetMarginBps?: number | null;
   quantity: number;
   available?: boolean | number;
   menuCategoryId: string;
@@ -2539,9 +2541,13 @@ export async function vacateAdminTable(tableId: string): Promise<MutationResult>
 
 export async function createAdminMenu(menuOptions: {
   name: string;
+  nameEn?: string | null;
   image: string;
   description: string;
+  descriptionEn?: string | null;
   price: number;
+  unitCost?: number | null;
+  targetMarginBps?: number;
   quantity: number;
   menuCategoryId: string;
   available: boolean;
@@ -2559,6 +2565,7 @@ export async function createAdminMenu(menuOptions: {
   await insertD1Row("menus", {
     id: menuId,
     ...menuOptions,
+    targetMarginBps: menuOptions.targetMarginBps ?? 3500,
     available: menuOptions.available ? 1 : 0,
     createdAt: now(),
     updatedAt: now(),
@@ -2580,9 +2587,13 @@ export async function updateAdminMenu(
   menuId: string,
   menuOptions: {
     name: string;
+    nameEn?: string | null;
     image: string;
     description: string;
+    descriptionEn?: string | null;
     price: number;
+    unitCost?: number | null;
+    targetMarginBps?: number;
     quantity: number;
     menuCategoryId: string;
     available: boolean;

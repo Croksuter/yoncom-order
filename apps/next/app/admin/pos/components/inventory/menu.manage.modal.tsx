@@ -5,7 +5,25 @@ import { Input } from "~/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import useMenuStore from "~/stores/menu.store";
 import { Checkbox } from "~/components/ui/checkbox";
-import { Image, UploadCloud, Plus, Trash2 } from "lucide-react";
+import { Image, UploadCloud, Plus, Trash2, BadgeDollarSign, Save } from "lucide-react";
+
+type MenuManageTab = "create" | "remove" | "cost";
+type CostDraft = {
+  unitCost: string;
+  saving: boolean;
+};
+
+function safeNumber(value: number, fallback = 0) {
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function formatWon(value: number) {
+  return `₩${Math.round(safeNumber(value)).toLocaleString()}`;
+}
+
+function fallbackUnitCost(price: number) {
+  return Math.floor(Math.max(0, safeNumber(price)) / 3);
+}
 
 export default function MenuManageModal({
   openState, setOpenState,
@@ -13,8 +31,8 @@ export default function MenuManageModal({
   openState: boolean;
   setOpenState: any;
 }) {
-  const [activeTab, setActiveTab] = useState<"create" | "remove">("create");
-  const { menuCategories, menus, createMenu, removeMenu } = useMenuStore();
+  const [activeTab, setActiveTab] = useState<MenuManageTab>("create");
+  const { menuCategories, menus, createMenu, removeMenu, updateMenu } = useMenuStore();
 
   // Create Form State
   const [menuName, setMenuName] = useState("");
@@ -24,12 +42,14 @@ export default function MenuManageModal({
   const [menuDescriptionEn, setMenuDescriptionEn] = useState("");
   const [menuImage, setMenuImage] = useState("");
   const [menuPrice, setMenuPrice] = useState(0);
+  const [menuUnitCost, setMenuUnitCost] = useState("");
   const [menuQuantity, setMenuQuantity] = useState(0);
   const [menuAvailable, setMenuAvailable] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
 
   // Remove Form State
   const [removeMenuId, setRemoveMenuId] = useState<string>("");
+  const [costDrafts, setCostDrafts] = useState<Record<string, CostDraft>>({});
 
   // Common State
   const [invalid, setInvalid] = useState(false);
@@ -44,6 +64,7 @@ export default function MenuManageModal({
     setMenuDescriptionEn("");
     setMenuImage("");
     setMenuPrice(0);
+    setMenuUnitCost("");
     setMenuQuantity(0);
     setMenuAvailable(true);
     setInvalid(false);
@@ -77,9 +98,11 @@ export default function MenuManageModal({
     if (isBusy) return;
 
     if (activeTab === "create") {
+      const createUnitCost = menuUnitCost.trim().length > 0 ? Number(menuUnitCost) : null;
       if (
         menuName.length === 0
         || !menuCategories.some(category => category.id === menuCategory)
+        || (createUnitCost !== null && (!Number.isFinite(createUnitCost) || createUnitCost < 0))
       ) {
         setInvalid(true);
         return;
@@ -95,6 +118,7 @@ export default function MenuManageModal({
             descriptionEn: menuDescriptionEn.trim() || null,
             image: menuImage,
             price: menuPrice,
+            unitCost: createUnitCost,
             quantity: menuQuantity,
             available: menuAvailable,
             menuCategoryId: menuCategory,
@@ -105,7 +129,7 @@ export default function MenuManageModal({
       } finally {
         setDuringConfirm(false);
       }
-    } else {
+    } else if (activeTab === "remove") {
       if (removeMenuId.length === 0) {
         setInvalid(true);
         return;
@@ -119,6 +143,56 @@ export default function MenuManageModal({
       } finally {
         setDuringConfirm(false);
       }
+    } else {
+      setOpenState(false);
+    }
+  };
+
+  const handleCostDraftChange = (menuId: string, patch: Partial<CostDraft>) => {
+    setCostDrafts((drafts) => ({
+      ...drafts,
+      [menuId]: {
+        ...(drafts[menuId] ?? {
+          unitCost: "",
+          saving: false,
+        }),
+        ...patch,
+      },
+    }));
+  };
+
+  const handleSaveCost = async (menu: typeof menus[number]) => {
+    const draft = costDrafts[menu.id];
+    if (!draft || draft.saving) return;
+
+    const unitCost = draft.unitCost.trim().length > 0 ? Number(draft.unitCost) : null;
+    if (
+      (unitCost !== null && (!Number.isFinite(unitCost) || unitCost < 0))
+    ) {
+      setInvalid(true);
+      return;
+    }
+
+    handleCostDraftChange(menu.id, { saving: true });
+    try {
+      await updateMenu({
+        menuId: menu.id,
+        menuOptions: {
+          name: menu.name,
+          nameEn: menu.nameEn ?? null,
+          menuCategoryId: menu.menuCategoryId,
+          description: menu.description,
+          descriptionEn: menu.descriptionEn ?? null,
+          image: menu.image,
+          price: menu.price,
+          unitCost,
+          quantity: menu.quantity,
+          available: menu.available,
+        },
+      });
+      setInvalid(false);
+    } finally {
+      handleCostDraftChange(menu.id, { saving: false });
     }
   };
 
@@ -134,51 +208,68 @@ export default function MenuManageModal({
     setInvalid(false);
   }, [activeTab]);
 
+  useEffect(() => {
+    if (!openState) return;
+    setCostDrafts(Object.fromEntries(
+      menus
+        .filter((menu) => menu?.deletedAt === null)
+        .map((menu) => [
+          menu.id,
+          {
+            unitCost: menu.unitCost === null || menu.unitCost === undefined ? "" : String(menu.unitCost),
+            saving: false,
+          },
+        ]),
+    ));
+  }, [menus, openState]);
+
   const deletableMenus = menus
     .filter((menu) => menu?.deletedAt === null)
     .filter((menu) => !menu.available); // Safety rule: only non-active menus can be deleted
+  const editableMenus = menus
+    .filter((menu) => menu?.deletedAt === null)
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   return (
     <Dialog open={openState} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl shadow-2xl p-6 overflow-hidden">
+      <DialogContent className={`${activeTab === "cost" ? "max-w-5xl" : "max-w-2xl"} bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl shadow-2xl p-6 overflow-hidden`}>
         <DialogHeader className="w-full">
           <div className="flex justify-between items-center mr-6">
             <DialogTitle className="text-xl font-black text-slate-800 dark:text-slate-100">메뉴 관리</DialogTitle>
 
             {/* Custom Premium Segmented Tab Selector */}
             <div className="bg-slate-100/80 dark:bg-slate-800/60 p-0.5 rounded-lg flex border border-slate-200/20 dark:border-slate-800/40">
-              <button
-                type="button"
-                className={`flex items-center gap-1 px-3 py-1 text-xs font-bold rounded-md transition-all ${
-                  activeTab === "create"
-                    ? "bg-white dark:bg-slate-900 text-brand-500 shadow-sm"
-                    : "text-slate-400 dark:text-slate-300 hover:text-slate-650"
-                }`}
-                onClick={() => setActiveTab("create")}
-                disabled={isBusy}
-              >
-                <Plus className="h-3 w-3" />
-                메뉴 추가
-              </button>
-              <button
-                type="button"
-                className={`flex items-center gap-1 px-3 py-1 text-xs font-bold rounded-md transition-all ${
-                  activeTab === "remove"
-                    ? "bg-white dark:bg-slate-900 text-rose-500 shadow-sm"
-                    : "text-slate-400 dark:text-slate-300 hover:text-rose-450"
-                }`}
-                onClick={() => setActiveTab("remove")}
-                disabled={isBusy}
-              >
-                <Trash2 className="h-3 w-3" />
-                메뉴 제거
-              </button>
+              {[
+                { id: "create" as const, label: "메뉴 추가", icon: Plus, activeClass: "text-brand-500", hoverClass: "hover:text-slate-650" },
+                { id: "remove" as const, label: "메뉴 제거", icon: Trash2, activeClass: "text-rose-500", hoverClass: "hover:text-rose-450" },
+                { id: "cost" as const, label: "원가", icon: BadgeDollarSign, activeClass: "text-emerald-600", hoverClass: "hover:text-emerald-600" },
+              ].map((tab) => {
+                const Icon = tab.icon;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    className={`flex items-center gap-1 px-3 py-1 text-xs font-bold rounded-md transition-all ${
+                      activeTab === tab.id
+                        ? `bg-white dark:bg-slate-900 ${tab.activeClass} shadow-sm`
+                        : `text-slate-400 dark:text-slate-300 ${tab.hoverClass}`
+                    }`}
+                    onClick={() => setActiveTab(tab.id)}
+                    disabled={isBusy}
+                  >
+                    <Icon className="h-3 w-3" />
+                    {tab.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
           <DialogDescription className="text-xs text-slate-400 dark:text-slate-300 font-semibold mt-1">
             {activeTab === "create"
               ? "매장에서 신규 판매할 신규 메뉴와 기본 가격, 재고 정보를 입력합니다."
-              : "안전하게 비활성화된 메뉴를 목록에서 영구적으로 제거합니다."}
+              : activeTab === "remove"
+                ? "안전하게 비활성화된 메뉴를 목록에서 영구적으로 제거합니다."
+                : "메뉴별 원가를 관리합니다. 권장가와 목표 마진 분석은 Sales Analytics에서 조정합니다."}
           </DialogDescription>
         </DialogHeader>
 
@@ -248,7 +339,7 @@ export default function MenuManageModal({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div className="fc gap-1.5">
                   <label className="text-xs uppercase font-bold text-slate-455 dark:text-slate-300 px-0.5">단가 (원)</label>
                   <Input
@@ -258,6 +349,20 @@ export default function MenuManageModal({
                     step={100}
                     onChange={(e) => setMenuPrice(Number(e.target.value))}
                     placeholder="단가 입력"
+                    className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-xl h-10 font-medium text-sm"
+                    disabled={isBusy}
+                  />
+                </div>
+
+                <div className="fc gap-1.5">
+                  <label className="text-xs uppercase font-bold text-slate-455 dark:text-slate-300 px-0.5">원가 (선택)</label>
+                  <Input
+                    type="number"
+                    value={menuUnitCost}
+                    min={0}
+                    step={100}
+                    onChange={(e) => setMenuUnitCost(e.target.value)}
+                    placeholder={`${formatWon(fallbackUnitCost(menuPrice))} 자동`}
                     className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-xl h-10 font-medium text-sm"
                     disabled={isBusy}
                   />
@@ -275,6 +380,11 @@ export default function MenuManageModal({
                     disabled={isBusy}
                   />
                 </div>
+              </div>
+
+              <div className="p-3 bg-emerald-50/70 dark:bg-emerald-950/20 rounded-2xl border border-emerald-100 dark:border-emerald-900/40 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                적용 원가 {formatWon(menuUnitCost.trim().length > 0 ? Number(menuUnitCost) || 0 : fallbackUnitCost(menuPrice))}
+                {menuUnitCost.trim().length === 0 && " · 원가 미입력 시 정가/3 자동 적용"}
               </div>
 
               <label className="p-3.5 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-850 flex items-center justify-between gap-3 cursor-pointer select-none">
@@ -350,7 +460,7 @@ export default function MenuManageModal({
               </p>
             </div>
           </div>
-        ) : (
+        ) : activeTab === "remove" ? (
           /* ================== MENU REMOVE TAB ================== */
           <div className="space-y-4 my-6 fc">
             <div className="fc gap-1.5 w-full">
@@ -380,13 +490,92 @@ export default function MenuManageModal({
               </span>
             </div>
           </div>
+        ) : (
+          /* ================== MENU COST TAB ================== */
+          <div className="my-4 overflow-hidden rounded-2xl border border-slate-200/80 dark:border-slate-800/80">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[640px] text-left">
+                <thead>
+                  <tr className="bg-slate-50 dark:bg-slate-800/40 border-b border-slate-200/70 dark:border-slate-800/70">
+                    <th className="px-3 py-2.5 text-xs font-black text-slate-400 dark:text-slate-300">메뉴</th>
+                    <th className="px-3 py-2.5 text-xs font-black text-slate-400 dark:text-slate-300 text-right">정가</th>
+                    <th className="px-3 py-2.5 text-xs font-black text-slate-400 dark:text-slate-300">원가</th>
+                    <th className="px-3 py-2.5 text-xs font-black text-slate-400 dark:text-slate-300 text-right">적용 원가</th>
+                    <th className="px-3 py-2.5 text-xs font-black text-slate-400 dark:text-slate-300 text-right">저장</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
+                  {editableMenus.map((menu) => {
+                    const draft = costDrafts[menu.id] ?? {
+                      unitCost: menu.unitCost === null || menu.unitCost === undefined ? "" : String(menu.unitCost),
+                      saving: false,
+                    };
+                    const unitCost = draft.unitCost.trim().length > 0 ? Number(draft.unitCost) || 0 : fallbackUnitCost(menu.price);
+                    const usesFallback = draft.unitCost.trim().length === 0;
+
+                    return (
+                      <tr key={menu.id} className="bg-white dark:bg-slate-900 hover:bg-slate-50/70 dark:hover:bg-slate-850/60">
+                        <td className="px-3 py-3">
+                          <div className="fc">
+                            <span className="text-sm font-extrabold text-slate-800 dark:text-slate-100">{menu.name}</span>
+                            <span className="text-xs font-semibold text-slate-400 dark:text-slate-300">
+                              {menuCategories.find((category) => category.id === menu.menuCategoryId)?.name ?? "기타"}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-3 py-3 text-right text-sm font-black text-slate-700 dark:text-slate-200">
+                          {formatWon(menu.price)}
+                        </td>
+                        <td className="px-3 py-3">
+                          <Input
+                            type="number"
+                            value={draft.unitCost}
+                            min={0}
+                            step={100}
+                            onChange={(e) => handleCostDraftChange(menu.id, { unitCost: e.target.value })}
+                            placeholder="정가/3 자동"
+                            className="h-8 w-28 rounded-lg text-xs font-bold"
+                            disabled={draft.saving}
+                          />
+                        </td>
+                        <td className="px-3 py-3 text-right">
+                          <span className="text-sm font-black text-slate-800 dark:text-slate-100">{formatWon(unitCost)}</span>
+                          {usesFallback && (
+                            <span className="ml-2 rounded-full bg-amber-50 dark:bg-amber-950/20 px-2 py-0.5 text-[10px] font-black text-amber-600 dark:text-amber-400">
+                              자동
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-3 text-right">
+                          <Button
+                            size="sm"
+                            onClick={() => handleSaveCost(menu)}
+                            disabled={draft.saving}
+                            className="h-8 rounded-lg bg-slate-800 hover:bg-slate-900 text-xs font-black text-white dark:bg-slate-100 dark:text-slate-900"
+                          >
+                            <Save className="h-3.5 w-3.5" />
+                            {draft.saving ? "저장 중" : "저장"}
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            {editableMenus.length === 0 && (
+              <div className="p-6 text-center text-xs font-bold text-slate-400">관리할 메뉴가 없습니다.</div>
+            )}
+          </div>
         )}
 
         {invalid && (
           <p className="text-rose-500 dark:text-rose-455 text-xs font-semibold px-0.5 flex items-center gap-1.5 animate-pulse">
             {activeTab === "create"
               ? "⚠️ 메뉴 명칭과 유효한 카테고리를 반드시 지정해야 추가할 수 있습니다."
-              : "⚠️ 제거 대상을 반드시 지정해 주세요."}
+              : activeTab === "remove"
+                ? "⚠️ 제거 대상을 반드시 지정해 주세요."
+                : "⚠️ 원가는 0 이상의 유효한 숫자로 입력해 주세요."}
           </p>
         )}
 
@@ -406,14 +595,18 @@ export default function MenuManageModal({
             className={`font-bold text-sm px-6 h-10 transition-all shadow-sm border-none text-white ${
               activeTab === "create"
                 ? "bg-brand-500 hover:bg-brand-600 shadow-brand-500/10"
-                : "bg-rose-500 hover:bg-rose-600 shadow-rose-500/10"
+                : activeTab === "remove"
+                  ? "bg-rose-500 hover:bg-rose-600 shadow-rose-500/10"
+                  : "bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/10"
             }`}
           >
             {duringConfirm
               ? "처리 중..."
               : activeTab === "create"
                 ? "확인 및 추가"
-                : "확인 및 제거"}
+                : activeTab === "remove"
+                  ? "확인 및 제거"
+                  : "닫기"}
           </Button>
         </DialogFooter>
       </DialogContent>

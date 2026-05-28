@@ -4,7 +4,22 @@ export type MenuBundleItem = Pick<Schema.MenuBundleItem, "bundleMenuId" | "compo
   componentMenu?: Pick<Schema.Menu, "id" | "name" | "nameEn" | "quantity" | "available"> | null;
 };
 
-export type Menu = Schema.Menu & {
+export type Menu = Pick<
+  Schema.Menu,
+  | "id"
+  | "name"
+  | "nameEn"
+  | "image"
+  | "description"
+  | "descriptionEn"
+  | "price"
+  | "quantity"
+  | "available"
+  | "menuCategoryId"
+  | "createdAt"
+  | "updatedAt"
+  | "deletedAt"
+> & {
   bundleItems?: MenuBundleItem[];
   bundleAvailableQuantity?: number | null;
 };

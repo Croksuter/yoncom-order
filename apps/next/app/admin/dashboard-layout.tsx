@@ -10,10 +10,7 @@ import { api } from "~/lib/query";
 import { useTheme } from "~/hooks/use-theme";
 import * as AdminTableResponse from "shared/types/responses/admin/table";
 import {
-  Package,
   LayoutDashboard,
-  Receipt,
-  Grid3X3,
   BarChart3,
   AlertCircle,
   ChefHat,
@@ -126,10 +123,19 @@ export default function DashboardLayout({
   // Dynamic header titles based on pathname
   const isCooker = pathname === "/admin/cooker";
   const isPos = pathname === "/admin/pos";
-  const canCollapseHeader = isPos || isCooker;
-  const headerCollapseStorageKey = isCooker ? "admin_cooker_header_collapsed" : "admin_pos_header_collapsed";
-  const title = isCooker ? "Kitchen Monitor" : "Dashboard Overview";
-  const subtitle = isCooker ? "메뉴별 실시간 대기열 모니터링" : "POS Dashboard & Live Status";
+  const isAnalytics = pathname === "/admin/analytics";
+  const canCollapseHeader = isPos || isCooker || isAnalytics;
+  const headerCollapseStorageKey = isCooker
+    ? "admin_cooker_header_collapsed"
+    : isAnalytics
+      ? "admin_analytics_header_collapsed"
+      : "admin_pos_header_collapsed";
+  const title = isCooker ? "Kitchen Monitor" : isAnalytics ? "Sales Analytics" : "Dashboard Overview";
+  const subtitle = isCooker
+    ? "메뉴별 실시간 대기열 모니터링"
+    : isAnalytics
+      ? "부스 운영·정산·수익성 분석"
+      : "POS Dashboard & Live Status";
   const profileInitials = getProfileInitials(user.name);
 
   useEffect(() => {
@@ -192,7 +198,7 @@ export default function DashboardLayout({
                 className={`relative flex items-center h-11 ml-3 rounded-2xl transition-all duration-200 border ${
                   isSidebarHovered ? "w-[192px]" : "w-10"
                 } ${
-                  !isCooker
+                  isPos
                     ? "bg-brand-50 dark:bg-brand-950/20 text-brand-600 dark:text-white font-bold border-brand-100 dark:border-brand-900/30"
                     : "text-slate-500 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-800 dark:hover:text-slate-200 border-transparent"
                 }`}
@@ -228,32 +234,25 @@ export default function DashboardLayout({
                 </span>
               </Link>
 
-              {[
-                // { label: "Orders", icon: Receipt },
-                // { label: "Table Management", icon: Grid3X3 },
-                // { label: "Inventory", icon: Package },
-                { label: "Sales Analytics", icon: BarChart3 }
-              ].map((tab, idx) => {
-                const Icon = tab.icon;
-                return (
-                  <a
-                    key={idx}
-                    href="#"
-                    className={`relative flex items-center h-11 ml-3 rounded-2xl border border-transparent transition-all duration-200 ${
-                      isSidebarHovered ? "w-[192px]" : "w-10"
-                    } text-slate-500 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-800 dark:hover:text-slate-200`}
-                  >
-                    <Icon className="h-5 w-5 absolute left-[10px] top-1/2 -translate-y-1/2 flex-shrink-0" />
-                    <span className={`text-sm truncate select-none transition-all duration-300 absolute left-12 top-1/2 -translate-y-1/2 ${
-                      isSidebarHovered
-                        ? "opacity-100 translate-x-0 pointer-events-auto"
-                        : "opacity-0 -translate-x-3 overflow-hidden pointer-events-none"
-                    }`}>
-                      {tab.label}
-                    </span>
-                  </a>
-                );
-              })}
+              <Link
+                href="/admin/analytics"
+                className={`relative flex items-center h-11 ml-3 rounded-2xl transition-all duration-200 border ${
+                  isSidebarHovered ? "w-[192px]" : "w-10"
+                } ${
+                  isAnalytics
+                    ? "bg-brand-50 dark:bg-brand-950/20 text-brand-600 dark:text-white font-bold border-brand-100 dark:border-brand-900/30"
+                    : "text-slate-500 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-800 dark:hover:text-slate-200 border-transparent"
+                }`}
+              >
+                <BarChart3 className="h-5 w-5 absolute left-[10px] top-1/2 -translate-y-1/2 flex-shrink-0" />
+                <span className={`text-sm truncate select-none transition-all duration-300 absolute left-12 top-1/2 -translate-y-1/2 ${
+                  isSidebarHovered
+                    ? "opacity-100 translate-x-0 pointer-events-auto"
+                    : "opacity-0 -translate-x-3 overflow-hidden pointer-events-none"
+                }`}>
+                  Sales Analytics
+                </span>
+              </Link>
             </nav>
           </div>
 
