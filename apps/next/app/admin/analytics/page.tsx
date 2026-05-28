@@ -22,6 +22,7 @@ import {
 
 const kstOffsetMs = 9 * 60 * 60 * 1000;
 const dayMs = 24 * 60 * 60 * 1000;
+const rangeStorageKey = "yoncom-order.admin.analytics.range";
 const defaultTargetMarginPercent = "35";
 const defaultTargetMarginBps = 3500;
 const presetOptions = [
@@ -36,6 +37,11 @@ type ExpenseRow = {
   id: string;
   label: string;
   amount: string;
+};
+
+type RangeValue = {
+  from: number;
+  to: number;
 };
 
 const defaultExpenseRows: ExpenseRow[] = [
@@ -82,6 +88,45 @@ function getPresetRange(preset: Preset) {
   if (preset === "7d") return { from: todayStart - 6 * dayMs, to: todayStart + dayMs };
   if (preset === "30d") return { from: todayStart - 29 * dayMs, to: todayStart + dayMs };
   return { from: todayStart, to: todayStart + dayMs };
+}
+
+function isPreset(value: unknown): value is Preset {
+  return presetOptions.some((option) => option.id === value);
+}
+
+function readStoredRangePreference(): { preset: Preset; range: RangeValue } | null {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const rawValue = window.localStorage.getItem(rangeStorageKey);
+    if (!rawValue) return null;
+
+    const parsed = JSON.parse(rawValue) as { preset?: unknown; from?: unknown; to?: unknown };
+    const storedPreset = isPreset(parsed.preset) ? parsed.preset : "custom";
+    if (storedPreset !== "custom") {
+      return { preset: storedPreset, range: getPresetRange(storedPreset) };
+    }
+
+    const from = Number(parsed.from);
+    const to = Number(parsed.to);
+    if (!Number.isFinite(from) || !Number.isFinite(to) || to <= from) return null;
+    return { preset: "custom", range: { from, to } };
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredRangePreference(preset: Preset, range: RangeValue) {
+  if (typeof window === "undefined") return;
+
+  try {
+    const payload = preset === "custom"
+      ? { preset, from: range.from, to: range.to }
+      : { preset };
+    window.localStorage.setItem(rangeStorageKey, JSON.stringify(payload));
+  } catch {
+    // Ignore storage failures; analytics should still work without persistence.
+  }
 }
 
 function formatWon(value: number) {
@@ -232,6 +277,7 @@ function RevenueChart({ series }: { series: AdminAnalyticsResponse.SeriesPoint[]
 function AnalyticsPage() {
   const [preset, setPreset] = useState<Preset>("today");
   const [range, setRange] = useState(getPresetRange("today"));
+  const [isRangeHydrated, setIsRangeHydrated] = useState(false);
   const [targetMarginPercent, setTargetMarginPercent] = useState(defaultTargetMarginPercent);
   const [expenseRows, setExpenseRows] = useState<ExpenseRow[]>(defaultExpenseRows);
   const [selectedRecordIds, setSelectedRecordIds] = useState<Set<string>>(new Set());
@@ -263,8 +309,23 @@ function AnalyticsPage() {
   }, [bucket, range.from, range.to]);
 
   useEffect(() => {
+    const storedPreference = readStoredRangePreference();
+    if (storedPreference) {
+      setPreset(storedPreference.preset);
+      setRange(storedPreference.range);
+    }
+    setIsRangeHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isRangeHydrated) return;
+    writeStoredRangePreference(preset, range);
+  }, [isRangeHydrated, preset, range]);
+
+  useEffect(() => {
+    if (!isRangeHydrated) return;
     void loadAnalytics();
-  }, [loadAnalytics]);
+  }, [isRangeHydrated, loadAnalytics]);
 
   useEffect(() => {
     setSelectedRecordIds(new Set());
@@ -697,7 +758,7 @@ function AnalyticsPage() {
                     </div>
                   </div>
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[920px] text-left">
+                    <table className="w-full text-left">
                       <thead>
                         <tr className="bg-slate-50 text-xs font-black text-slate-400 dark:bg-slate-800/40 dark:text-slate-300">
                           <th className="px-4 py-3">메뉴</th>
@@ -715,7 +776,7 @@ function AnalyticsPage() {
                           <tr key={row.menuId} className="hover:bg-slate-50/80 dark:hover:bg-slate-850/60">
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-2">
-                                <span className="font-black text-slate-800 dark:text-slate-100">{row.menuName}</span>
+                                <span className="font-medium text-sm text-slate-800 dark:text-slate-100">{row.menuName}</span>
                                 {row.fallbackCostUsed && (
                                   <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-black text-amber-600 dark:bg-amber-950/20 dark:text-amber-400">
                                     자동원가
