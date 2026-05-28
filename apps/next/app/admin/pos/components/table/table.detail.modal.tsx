@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import useTableStore from "~/stores/table.store";
 import * as AdminTableResponse from "shared/types/responses/admin/table";
 import { Input } from "~/components/ui/input";
+import { Checkbox } from "~/components/ui/checkbox";
 import { useCallback, useEffect, useState } from "react";
 
 export default function TableDetailModal({
@@ -16,6 +17,8 @@ export default function TableDetailModal({
   const [invalid, setInvalid] = useState(false);
   const [tableName, setTableName] = useState(table.name);
   const [tableSeats, setTableSeats] = useState(table.seats);
+  const [isTakeout, setIsTakeout] = useState(table.isTakeout);
+  const [takeoutFirstOrderRuleEnabled, setTakeoutFirstOrderRuleEnabled] = useState(table.takeoutFirstOrderRuleEnabled);
   const activeTableContext = table.tableContexts.find((tableContext) => tableContext.deletedAt === null);
   const inUse = activeTableContext !== undefined;
   const { updateTable, occupyTable, vacateTable } = useTableStore();
@@ -26,6 +29,8 @@ export default function TableDetailModal({
   const resetForm = useCallback(() => {
     setTableName(table.name);
     setTableSeats(table.seats);
+    setIsTakeout(table.isTakeout);
+    setTakeoutFirstOrderRuleEnabled(table.takeoutFirstOrderRuleEnabled);
     setInvalid(false);
   }, [table]);
 
@@ -58,7 +63,15 @@ export default function TableDetailModal({
 
     setPendingAction("update");
     try {
-      await updateTable({ tableId: table.id, tableOptions: { name: tableName, seats: tableSeats } });
+      await updateTable({
+        tableId: table.id,
+        tableOptions: {
+          name: tableName,
+          seats: tableSeats,
+          isTakeout,
+          takeoutFirstOrderRuleEnabled,
+        },
+      });
       setOpenState(false);
     } finally {
       setPendingAction(null);
@@ -96,9 +109,13 @@ export default function TableDetailModal({
               <span className="font-semibold text-slate-400">테이블 ID</span>
               <code className="text-xs text-slate-600 dark:text-slate-200 font-mono font-bold bg-white dark:bg-slate-950 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-850">{table.id.slice(-8).toUpperCase()}</code>
             </div>
+          <div className="flex justify-between items-center">
+            <span className="font-semibold text-slate-400">테이블 명칭</span>
+            <span className="text-slate-700 dark:text-slate-200 font-bold">{table.name}</span>
+          </div>
             <div className="flex justify-between items-center">
-              <span className="font-semibold text-slate-400">테이블 명칭</span>
-              <span className="text-slate-700 dark:text-slate-200 font-bold">{table.name}</span>
+              <span className="font-semibold text-slate-400">운영 방식</span>
+              <span className="text-slate-700 dark:text-slate-200 font-bold">{table.isTakeout ? "테이크아웃" : "일반"}</span>
             </div>
           </div>
         </DialogHeader>
@@ -127,6 +144,25 @@ export default function TableDetailModal({
               className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-xl h-10 font-medium text-sm"
               disabled={isPending}
             />
+          </div>
+
+          <div className="space-y-3 rounded-2xl border border-slate-100 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-slate-900/40">
+            <label className="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
+              <Checkbox
+                checked={isTakeout}
+                onCheckedChange={(checked) => setIsTakeout(checked === true)}
+                disabled={isPending}
+              />
+              테이크아웃 테이블
+            </label>
+            <label className="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
+              <Checkbox
+                checked={takeoutFirstOrderRuleEnabled}
+                onCheckedChange={(checked) => setTakeoutFirstOrderRuleEnabled(checked === true)}
+                disabled={isPending || !isTakeout}
+              />
+              첫주문 제한 적용
+            </label>
           </div>
 
           {invalid && (

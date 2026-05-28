@@ -74,6 +74,13 @@ export default function OrderDetailModal({
     handleClose();
   }
 
+  const handleComplete = async (menuOrderId: string) => {
+    await useTableStore.getState().adminCompleteOrder({
+      menuOrderId,
+    });
+    handleClose();
+  }
+
   const handleClose = () => {
     setOpenState(false);
   }
@@ -151,7 +158,15 @@ export default function OrderDetailModal({
                         </span>
                       </TableCell>
                       <TableCell className="text-center px-4 py-3">
-                        {menuOrder?.status === "READY" ? (
+                        {menuOrder?.status === "PENDING" ? (
+                          <Button
+                            size="sm"
+                            className="bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl h-8 px-3.5 font-bold text-xs transition-all shadow-sm border-none shadow-emerald-500/10"
+                            onClick={() => handleComplete(menuOrder.id)}
+                          >
+                            조리 완료
+                          </Button>
+                        ) : menuOrder?.status === "READY" ? (
                           <Button
                             size="sm"
                             className="bg-brand-500 hover:bg-brand-600 text-white rounded-xl h-8 px-3.5 font-bold text-xs transition-all shadow-sm border-none shadow-brand-500/10"

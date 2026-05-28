@@ -4,6 +4,8 @@ export const createValidation = z.object({
   tableOptions: z.object({
     name: z.string().trim().min(1).max(40),
     seats: z.number().int().min(1).max(99),
+    isTakeout: z.boolean().optional(),
+    takeoutFirstOrderRuleEnabled: z.boolean().optional(),
   }).strict(),
 }).strict();
 export type Create = z.infer<typeof createValidation>;
@@ -23,6 +25,8 @@ export const updateValidation = z.object({
   tableOptions: z.object({
     name: z.string().trim().min(1).max(40).optional(),
     seats: z.number().int().min(1).max(99).optional(),
+    isTakeout: z.boolean().optional(),
+    takeoutFirstOrderRuleEnabled: z.boolean().optional(),
   }).strict(),
 }).strict();
 export type Update = z.infer<typeof updateValidation>;

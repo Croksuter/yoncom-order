@@ -290,6 +290,8 @@ export const tables = sqliteTable("tables", {
   key: integer("key").notNull(),
   name: text("name").notNull().unique(),
   seats: integer("seats").notNull(),
+  isTakeout: integer("isTakeout", { mode: "boolean" }).notNull().default(false),
+  takeoutFirstOrderRuleEnabled: integer("takeoutFirstOrderRuleEnabled", { mode: "boolean" }).notNull().default(true),
   createdAt: integer("createdAt")
     .notNull()
     .$defaultFn(() => Date.now()),
@@ -527,6 +529,19 @@ export const clientNoticeSettings = sqliteTable("clientNoticeSettings", {
 });
 
 export type ClientNoticeSettings = typeof clientNoticeSettings.$inferSelect;
+
+export const orderWorkflowSettings = sqliteTable("orderWorkflowSettings", {
+  id: text("id").primaryKey().notNull(),
+  autoPickUpOnCookComplete: integer("autoPickUpOnCookComplete", { mode: "boolean" }).notNull().default(false),
+  createdAt: integer("createdAt")
+    .notNull()
+    .$defaultFn(() => Date.now()),
+  updatedAt: integer("updatedAt")
+    .notNull()
+    .$defaultFn(() => Date.now()),
+});
+
+export type OrderWorkflowSettings = typeof orderWorkflowSettings.$inferSelect;
 
 export const menuOrders = sqliteTable("menuOrders", {
   id: text("id")

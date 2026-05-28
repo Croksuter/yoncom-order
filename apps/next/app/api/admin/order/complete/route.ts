@@ -1,8 +1,7 @@
-import { menuOrderStatus } from "db/schema";
 import { completeValidation } from "shared/types/requests/admin/order";
 import { guardUnsafeRequest, idempotentMutationResponse, parseJsonBody, routeError } from "~/lib/server/api";
 import { requireAdmin } from "~/lib/server/auth-session";
-import { setMenuOrderStatus } from "~/lib/server/d1-mutations";
+import { completeMenuOrder } from "~/lib/server/d1-mutations";
 
 export async function PUT(request: Request) {
   const adminError = await requireAdmin();
@@ -13,7 +12,7 @@ export async function PUT(request: Request) {
   try {
     const query = await parseJsonBody(request, completeValidation);
     return await idempotentMutationResponse(request, "admin:order:complete", query, () =>
-      setMenuOrderStatus(query.menuOrderId, menuOrderStatus.READY),
+      completeMenuOrder(query.menuOrderId),
     );
   } catch (error) {
     return routeError(error);

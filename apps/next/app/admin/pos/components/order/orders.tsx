@@ -5,16 +5,18 @@ import OrderInstance from "./order.instance";
 import OrderDetailModal from "./order.detail.modal";
 import PaymentSettingsModal from "./payment-settings.modal";
 import ClientNoticeSettingsModal from "./client-notice-settings.modal";
+import OrderWorkflowSettingsModal from "./order-workflow-settings.modal";
 import * as AdminTableResponse from "shared/types/responses/admin/table";
 import { Button } from "~/components/ui/button";
 import { isActiveOrder, isKitchenOrder, isUnresolvedPaymentOrder } from "~/lib/order-status";
-import { Megaphone, Settings } from "lucide-react";
+import { Megaphone, Settings, SlidersHorizontal } from "lucide-react";
 
 export default function Orders() {
   const [orderDetail, setOrderDetail] = useState<AdminTableResponse.Get["result"][number]["tableContexts"][number]["orders"][number] | null>(null);
   const [orderDetailModalOpenState, setOrderDetailModalOpenState] = useState(false);
   const [paymentSettingsOpenState, setPaymentSettingsOpenState] = useState(false);
   const [clientNoticeSettingsOpenState, setClientNoticeSettingsOpenState] = useState(false);
+  const [orderWorkflowSettingsOpenState, setOrderWorkflowSettingsOpenState] = useState(false);
 
   const { tables, bankTransactions } = useTableStore();
   const orderRows = tables
@@ -96,6 +98,15 @@ export default function Orders() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 rounded-xl border-slate-200 px-2.5 text-xs font-extrabold text-slate-500 hover:text-slate-700 dark:border-slate-800 dark:text-slate-200"
+              onClick={() => setOrderWorkflowSettingsOpenState(true)}
+            >
+              <SlidersHorizontal className="h-3.5 w-3.5" />
+              처리 설정
+            </Button>
             <Button
               size="sm"
               variant="outline"
@@ -315,6 +326,10 @@ export default function Orders() {
       <ClientNoticeSettingsModal
         openState={clientNoticeSettingsOpenState}
         setOpenState={setClientNoticeSettingsOpenState}
+      />
+      <OrderWorkflowSettingsModal
+        openState={orderWorkflowSettingsOpenState}
+        setOpenState={setOrderWorkflowSettingsOpenState}
       />
     </div>
   );

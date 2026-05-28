@@ -1,6 +1,6 @@
 import { ok, parseSearchParams, routeError } from "~/lib/server/api";
 import { requireAdmin } from "~/lib/server/auth-session";
-import { enrichMenuCategoriesWithBundles, getClientNoticeSettings, getPaymentSettings, getPendingBankTransactions } from "~/lib/server/d1-mutations";
+import { enrichMenuCategoriesWithBundles, getClientNoticeSettings, getOrderWorkflowSettings, getPaymentSettings, getPendingBankTransactions } from "~/lib/server/d1-mutations";
 import { getDb } from "~/lib/server/db";
 import { getDomainEventsAfter, getScopeRevision, venueScope } from "~/lib/server/sync-events";
 import { getTablesWithRelations } from "~/lib/server/table-queries";
@@ -23,7 +23,8 @@ export async function GET(request: Request) {
     const hasGap = events.length > 0 && events[0].revision > afterRevision + 1;
     const settingsChanged = events.some((event) => (
       event.type === "paymentSettings.updated" ||
-      event.type === "clientNoticeSettings.updated"
+      event.type === "clientNoticeSettings.updated" ||
+      event.type === "orderWorkflowSettings.updated"
     ));
     const needsSnapshot = afterRevision === 0 || hasGap || settingsChanged;
 
@@ -46,6 +47,7 @@ export async function GET(request: Request) {
         bankTransactions: (await getPendingBankTransactions()).result,
         paymentSettings: await getPaymentSettings(),
         clientNoticeSettings: await getClientNoticeSettings(),
+        orderWorkflowSettings: await getOrderWorkflowSettings(),
       } : null,
       gap: hasGap,
     });

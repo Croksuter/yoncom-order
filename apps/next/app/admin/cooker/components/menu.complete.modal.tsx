@@ -16,6 +16,7 @@ export default function MenuCompleteModal({
   menuOrderId: string;
 }) {
   const [duringConfirm, setDuringConfirm] = useState(false);
+  const autoPickUpOnCookComplete = useTableStore((state) => state.orderWorkflowSettings?.autoPickUpOnCookComplete ?? false);
 
   const handleConfirm = async () => {
     if (duringConfirm) return;
@@ -40,13 +41,15 @@ export default function MenuCompleteModal({
     <Dialog open={openState} onOpenChange={setOpenState}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{tableName} - {menuName} 준비 완료 처리</DialogTitle>
-          <DialogDescription>준비 완료 처리 하시겠습니까?</DialogDescription>
+          <DialogTitle>{tableName} - {menuName} 조리 완료 처리</DialogTitle>
+          <DialogDescription>
+            {autoPickUpOnCookComplete ? "조리완료와 수령완료를 함께 처리합니다." : "조리 완료 처리 하시겠습니까?"}
+          </DialogDescription>
         </DialogHeader>
         <DialogFooter>
           <Button variant="outline" onClick={handleClose} disabled={duringConfirm}>취소</Button>
           <Button className="dangerBG dangerB" onClick={handleConfirm} disabled={duringConfirm}>
-            {duringConfirm ? "처리 중..." : "준비 완료"}
+            {duringConfirm ? "처리 중..." : "조리 완료"}
           </Button>
         </DialogFooter>
       </DialogContent>

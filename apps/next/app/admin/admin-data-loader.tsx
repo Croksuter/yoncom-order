@@ -9,6 +9,7 @@ import { useRealtimeSync } from "~/hooks/use-realtime-sync";
 import type * as AdminDepositResponse from "shared/types/responses/admin/deposit";
 import type * as AdminMenuResponse from "shared/types/responses/admin/menu";
 import type * as AdminClientNoticeSettingsResponse from "shared/types/responses/admin/client-notice-settings";
+import type * as AdminOrderWorkflowSettingsResponse from "shared/types/responses/admin/order-workflow-settings";
 import type * as AdminPaymentSettingsResponse from "shared/types/responses/admin/payment-settings";
 import type * as AdminTableResponse from "shared/types/responses/admin/table";
 
@@ -24,6 +25,7 @@ type AdminSyncResponse = {
       bankTransactions: AdminDepositResponse.Get["result"];
       paymentSettings: AdminPaymentSettingsResponse.Get["result"];
       clientNoticeSettings: AdminClientNoticeSettingsResponse.Get["result"];
+      orderWorkflowSettings: AdminOrderWorkflowSettingsResponse.Get["result"];
     } | null;
     gap: boolean;
   };
@@ -52,6 +54,7 @@ export function AdminDataLoader({ children }: { children: React.ReactNode }) {
       useTableStore.getState().loadBankTransactions(),
       useTableStore.getState().loadPaymentSettings(),
       useTableStore.getState().loadClientNoticeSettings(),
+      useTableStore.getState().loadOrderWorkflowSettings(),
     ]);
   }, []);
 
@@ -61,6 +64,7 @@ export function AdminDataLoader({ children }: { children: React.ReactNode }) {
       bankTransactions: snapshot.bankTransactions.transactions,
       paymentSettings: snapshot.paymentSettings,
       clientNoticeSettings: snapshot.clientNoticeSettings,
+      orderWorkflowSettings: snapshot.orderWorkflowSettings,
       isLoaded: true,
       error: false,
     });

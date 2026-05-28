@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
+import { Checkbox } from "~/components/ui/checkbox";
 import useTableStore from "~/stores/table.store";
 
 export default function CreateTableModal({
@@ -12,6 +13,8 @@ export default function CreateTableModal({
 }) {
   const [tableName, setTableName] = useState<string>("");
   const [tableSeats, setTableSeats] = useState<number>(0);
+  const [isTakeout, setIsTakeout] = useState(false);
+  const [takeoutFirstOrderRuleEnabled, setTakeoutFirstOrderRuleEnabled] = useState(true);
   const [invalid, setInvalid] = useState(false);
   const [duringConfirm, setDuringConfirm] = useState(false);
 
@@ -27,9 +30,18 @@ export default function CreateTableModal({
 
     setDuringConfirm(true);
     try {
-      await createTable({ tableOptions: { name: tableName, seats: tableSeats } });
+      await createTable({
+        tableOptions: {
+          name: tableName,
+          seats: tableSeats,
+          isTakeout,
+          takeoutFirstOrderRuleEnabled,
+        },
+      });
       setTableName("");
       setTableSeats(0);
+      setIsTakeout(false);
+      setTakeoutFirstOrderRuleEnabled(true);
       setInvalid(false);
       setOpenState(false);
     } finally {
@@ -41,6 +53,8 @@ export default function CreateTableModal({
     if (duringConfirm) return;
     setTableName("");
     setTableSeats(0);
+    setIsTakeout(false);
+    setTakeoutFirstOrderRuleEnabled(true);
     setInvalid(false);
     setOpenState(false);
   }
@@ -77,6 +91,25 @@ export default function CreateTableModal({
               className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-xl h-10 font-medium text-sm"
               disabled={duringConfirm}
             />
+          </div>
+
+          <div className="space-y-3 rounded-2xl border border-slate-100 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-slate-900/40">
+            <label className="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
+              <Checkbox
+                checked={isTakeout}
+                onCheckedChange={(checked) => setIsTakeout(checked === true)}
+                disabled={duringConfirm}
+              />
+              테이크아웃 테이블
+            </label>
+            <label className="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
+              <Checkbox
+                checked={takeoutFirstOrderRuleEnabled}
+                onCheckedChange={(checked) => setTakeoutFirstOrderRuleEnabled(checked === true)}
+                disabled={duringConfirm || !isTakeout}
+              />
+              첫주문 제한 적용
+            </label>
           </div>
 
           {invalid && (

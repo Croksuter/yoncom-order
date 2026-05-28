@@ -26,7 +26,7 @@ export async function POST(request: Request) {
   try {
     const query = await parseJsonBody(request, createValidation);
     return await idempotentMutationResponse(request, "admin:table:create", query, () =>
-      createAdminTable(query.tableOptions.name, query.tableOptions.seats),
+      createAdminTable(query.tableOptions),
     );
   } catch (error) {
     return routeError(error);

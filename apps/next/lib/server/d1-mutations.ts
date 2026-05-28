@@ -1,6 +1,6 @@
 import { generateId } from "lucia";
 import { bankTransactionStatus, menuOrderStatus, orderStatus, paymentStatus } from "db/schema";
-import type { ClientNoticeSettings, PaymentSettings } from "db/schema";
+import type { ClientNoticeSettings, OrderWorkflowSettings, PaymentSettings } from "db/schema";
 import { executeD1, hasD1Table, queryD1 } from "~/lib/server/db";
 import { defaultPaymentSettings, normalizePaymentSettings } from "~/lib/payment-settings";
 import { revokeTableSessions } from "~/lib/server/table-session";
@@ -17,6 +17,8 @@ type TableRow = BaseRow & {
   key: number;
   name: string;
   seats: number;
+  isTakeout?: boolean | number | null;
+  takeoutFirstOrderRuleEnabled?: boolean | number | null;
 };
 
 type TableContextRow = BaseRow & {
@@ -169,12 +171,15 @@ type PaymentSettingsInput = Pick<
 
 type ClientNoticeSettingsInput = Pick<ClientNoticeSettings, "description" | "descriptionEn">;
 
+type OrderWorkflowSettingsInput = Pick<OrderWorkflowSettings, "autoPickUpOnCookComplete">;
+
 const paymentCodeMin = 1;
 const paymentCodeMax = 99;
 const pendingOrderTtlMs = 5 * 60 * 1000;
 const activePaymentStatuses = [paymentStatus.PENDING, paymentStatus.MANUAL_REVIEW];
 const firstOrderRuleId = "default";
 const clientNoticeSettingsId = "default";
+const orderWorkflowSettingsId = "default";
 
 let tableContextTableName: string | null = null;
 const columnCache = new Map<string, Set<string>>();
@@ -183,6 +188,7 @@ let paymentSettingsTableEnsured = false;
 let firstOrderRuleTablesEnsured = false;
 let menuBundleTableEnsured = false;
 let clientNoticeSettingsTableEnsured = false;
+let orderWorkflowSettingsTableEnsured = false;
 
 export function quoteIdentifier(identifier: string) {
   return `"${identifier.replaceAll("\"", "\"\"")}"`;
@@ -414,6 +420,22 @@ async function ensureClientNoticeSettingsTable() {
   clientNoticeSettingsTableEnsured = true;
 }
 
+async function ensureOrderWorkflowSettingsTable() {
+  if (orderWorkflowSettingsTableEnsured) {
+    return;
+  }
+
+  await executeD1(`
+    CREATE TABLE IF NOT EXISTS orderWorkflowSettings (
+      id TEXT PRIMARY KEY NOT NULL,
+      autoPickUpOnCookComplete INTEGER DEFAULT 0 NOT NULL,
+      createdAt INTEGER NOT NULL,
+      updatedAt INTEGER NOT NULL
+    )
+  `);
+  orderWorkflowSettingsTableEnsured = true;
+}
+
 async function getVenueAndTableScopes() {
   const tables = await queryD1<{ id: string }>(
     "SELECT id FROM tables WHERE deletedAt IS NULL",
@@ -427,6 +449,16 @@ function normalizeClientNoticeSettings(settings?: Partial<ClientNoticeSettings> 
     id: settings?.id ?? clientNoticeSettingsId,
     description: settings?.description ?? "",
     descriptionEn: settings?.descriptionEn ?? "",
+    createdAt: Number(settings?.createdAt ?? timestamp),
+    updatedAt: Number(settings?.updatedAt ?? timestamp),
+  };
+}
+
+function normalizeOrderWorkflowSettings(settings?: Partial<OrderWorkflowSettings> | null): OrderWorkflowSettings {
+  const timestamp = now();
+  return {
+    id: settings?.id ?? orderWorkflowSettingsId,
+    autoPickUpOnCookComplete: isEnabled(settings?.autoPickUpOnCookComplete),
     createdAt: Number(settings?.createdAt ?? timestamp),
     updatedAt: Number(settings?.updatedAt ?? timestamp),
   };
@@ -541,6 +573,55 @@ export async function updateClientNoticeSettings(input: ClientNoticeSettingsInpu
   );
 }
 
+export async function getOrderWorkflowSettings() {
+  await ensureOrderWorkflowSettingsTable();
+  const [settings] = await queryD1<OrderWorkflowSettings>(
+    "SELECT * FROM orderWorkflowSettings WHERE id = ? LIMIT 1",
+    [orderWorkflowSettingsId],
+  );
+
+  return normalizeOrderWorkflowSettings(settings);
+}
+
+export async function updateOrderWorkflowSettings(input: OrderWorkflowSettingsInput): Promise<MutationResult> {
+  await ensureOrderWorkflowSettingsTable();
+
+  const current = await getOrderWorkflowSettings();
+  const timestamp = now();
+  const settings = normalizeOrderWorkflowSettings({
+    ...current,
+    autoPickUpOnCookComplete: input.autoPickUpOnCookComplete,
+    createdAt: current.createdAt || timestamp,
+    updatedAt: timestamp,
+  });
+
+  await executeD1(
+    `INSERT INTO orderWorkflowSettings
+      (id, autoPickUpOnCookComplete, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET
+      autoPickUpOnCookComplete = excluded.autoPickUpOnCookComplete,
+      updatedAt = excluded.updatedAt`,
+    [
+      settings.id,
+      settings.autoPickUpOnCookComplete ? 1 : 0,
+      settings.createdAt,
+      settings.updatedAt,
+    ],
+  );
+
+  return await withDomainEvent(
+    { result: settings, status: 200 },
+    {
+      type: "orderWorkflowSettings.updated",
+      scopes: await getVenueAndTableScopes(),
+      entityType: "orderWorkflowSettings",
+      entityId: settings.id,
+      payload: { settings },
+    },
+  );
+}
+
 async function getTableIdForOrder(orderId: string) {
   const [row] = await queryD1<{ tableId: string }>(
     `SELECT tc.tableId
@@ -568,8 +649,8 @@ async function getTableIdForPayment(paymentId: string) {
 }
 
 async function getTableIdForMenuOrder(menuOrderId: string) {
-  const [row] = await queryD1<{ tableId: string; orderId: string }>(
-    `SELECT tc.tableId, mo.orderId
+  const [row] = await queryD1<{ tableId: string; tableContextId: string; orderId: string }>(
+    `SELECT tc.tableId, tc.id AS tableContextId, mo.orderId
      FROM menuOrders mo
      INNER JOIN orders o ON o.id = mo.orderId
      INNER JOIN tableContexts tc ON tc.id = o.tableContextId
@@ -705,9 +786,12 @@ export async function updateFirstOrderRule(input: FirstOrderRuleInput): Promise<
 async function validateFirstOrderRule(
   requestedMenuOrders: MenuOrderInput[],
   menusById: Map<string, MenuRow>,
+  table: TableRow,
 ) {
   const rule = await getFirstOrderRule();
   if (!rule.enabled) return null;
+  if (isEnabled(table.isTakeout) && table.takeoutFirstOrderRuleEnabled === false) return null;
+  if (isEnabled(table.isTakeout) && table.takeoutFirstOrderRuleEnabled === 0) return null;
 
   const countByMenuId = new Map(rule.menuCounts.map((menuCount) => [menuCount.menuId, menuCount.countAs]));
   const matchedCount = requestedMenuOrders.reduce((total, menuOrder) => {
@@ -1307,7 +1391,7 @@ async function createClientOrderInternal(
   }
 
   if (mode.kind === "new-session") {
-    const firstOrderRuleError = await validateFirstOrderRule(requestedMenuOrders, menusById);
+    const firstOrderRuleError = await validateFirstOrderRule(requestedMenuOrders, menusById, table);
     if (firstOrderRuleError) {
       return { error: firstOrderRuleError, status: 409 };
     }
@@ -1884,7 +1968,16 @@ export async function ignoreBankTransaction(bankTransactionId: string): Promise<
   );
 }
 
-export async function setMenuOrderStatus(menuOrderId: string, status: string): Promise<MutationResult> {
+type SetMenuOrderStatusOptions = {
+  allowPendingPickup?: boolean;
+  autoVacateTakeout?: boolean;
+};
+
+export async function setMenuOrderStatus(
+  menuOrderId: string,
+  status: string,
+  options: SetMenuOrderStatusOptions = {},
+): Promise<MutationResult> {
   const menuOrder = (await queryD1<MenuOrderRow>(
     "SELECT * FROM menuOrders WHERE id = ? AND deletedAt IS NULL LIMIT 1",
     [menuOrderId],
@@ -1898,11 +1991,14 @@ export async function setMenuOrderStatus(menuOrderId: string, status: string): P
     return { error: "Menu order must be pending before ready", status: 409 };
   }
 
-  if (status === menuOrderStatus.PICKED_UP && menuOrder.status !== menuOrderStatus.READY) {
+  const canPickUp = options.allowPendingPickup
+    ? menuOrder.status === menuOrderStatus.PENDING || menuOrder.status === menuOrderStatus.READY
+    : menuOrder.status === menuOrderStatus.READY;
+  if (status === menuOrderStatus.PICKED_UP && !canPickUp) {
     return { error: "Menu order must be ready before pickup", status: 409 };
   }
 
-  if (status === menuOrderStatus.READY) {
+  if (status === menuOrderStatus.READY || (status === menuOrderStatus.PICKED_UP && menuOrder.status === menuOrderStatus.PENDING)) {
     const paymentJoin = await paymentJoinSql("o", "p");
     const paidOrders = await queryD1<{ paid: boolean | number; status?: string | null; orderStatus?: string | null }>(
       `SELECT p.paid, p.status, o.status AS orderStatus FROM orders o INNER JOIN payments p ON ${paymentJoin} WHERE o.id = ? AND p.deletedAt IS NULL LIMIT 1`,
@@ -1926,7 +2022,7 @@ export async function setMenuOrderStatus(menuOrderId: string, status: string): P
     return { error: "Menu order status changed", status: 409 };
   }
   const scopeInfo = await getTableIdForMenuOrder(menuOrderId);
-  return await withDomainEvent(
+  const result = await withDomainEvent(
     { result: "Success", status: 200 },
     {
       type: status === menuOrderStatus.READY ? "menuOrder.ready" : "menuOrder.pickedUp",
@@ -1936,6 +2032,134 @@ export async function setMenuOrderStatus(menuOrderId: string, status: string): P
       payload: { tableId: scopeInfo?.tableId ?? null, orderId: scopeInfo?.orderId ?? menuOrder.orderId, status },
     },
   );
+  if (options.autoVacateTakeout && scopeInfo?.tableId && scopeInfo.tableContextId) {
+    const vacateResult = await maybeAutoVacateTakeoutTable(scopeInfo.tableId, scopeInfo.tableContextId, status);
+    if (vacateResult) {
+      result.events = [...(result.events ?? []), ...(vacateResult.events ?? [])];
+      result.affectedScopes = [...new Set([...(result.affectedScopes ?? []), ...(vacateResult.affectedScopes ?? [])])];
+      result.revision = Math.max(result.revision ?? 0, vacateResult.revision ?? 0);
+    }
+  }
+  return result;
+}
+
+export async function completeMenuOrder(menuOrderId: string): Promise<MutationResult> {
+  const settings = await getOrderWorkflowSettings();
+  return await setMenuOrderStatus(
+    menuOrderId,
+    settings.autoPickUpOnCookComplete ? menuOrderStatus.PICKED_UP : menuOrderStatus.READY,
+    {
+      allowPendingPickup: settings.autoPickUpOnCookComplete,
+      autoVacateTakeout: true,
+    },
+  );
+}
+
+async function hasAutoVacatePaymentBlocker(tableContextId: string) {
+  const paymentJoin = await paymentJoinSql("o", "p");
+  const rows = await queryD1<{ id: string }>(
+    `SELECT o.id
+     FROM orders o
+     LEFT JOIN payments p ON ${paymentJoin} AND p.deletedAt IS NULL
+     WHERE o.tableContextId = ?
+      AND o.deletedAt IS NULL
+      AND COALESCE(o.status, ?) NOT IN (?, ?)
+      AND (
+        p.id IS NULL
+        OR COALESCE(p.status, CASE WHEN p.paid = 1 THEN ? ELSE ? END) IN (?, ?, ?)
+      )
+     LIMIT 1`,
+    [
+      tableContextId,
+      orderStatus.ACTIVE,
+      orderStatus.CANCELLED,
+      orderStatus.EXPIRED,
+      paymentStatus.PAID,
+      paymentStatus.PENDING,
+      paymentStatus.PENDING,
+      paymentStatus.MANUAL_REVIEW,
+      paymentStatus.REFUND_PENDING,
+    ],
+  );
+
+  return rows.length > 0;
+}
+
+async function hasAutoVacateMenuBlocker(tableContextId: string, completedStatus: string) {
+  const statusSql = completedStatus === menuOrderStatus.READY
+    ? "mo.status = ?"
+    : "mo.status NOT IN (?, ?)";
+  const statusParams = completedStatus === menuOrderStatus.READY
+    ? [menuOrderStatus.PENDING]
+    : [menuOrderStatus.PICKED_UP, menuOrderStatus.CANCELLED];
+  const rows = await queryD1<{ id: string }>(
+    `SELECT mo.id
+     FROM menuOrders mo
+     INNER JOIN orders o ON o.id = mo.orderId
+     WHERE o.tableContextId = ?
+      AND o.deletedAt IS NULL
+      AND COALESCE(o.status, ?) NOT IN (?, ?)
+      AND mo.deletedAt IS NULL
+      AND ${statusSql}
+     LIMIT 1`,
+    [
+      tableContextId,
+      orderStatus.ACTIVE,
+      orderStatus.CANCELLED,
+      orderStatus.EXPIRED,
+      ...statusParams,
+    ],
+  );
+
+  return rows.length > 0;
+}
+
+async function closeTableContextWithEvent(tableId: string, activeContext: TableContextRow): Promise<MutationResult> {
+  const contextTable = await getTableContextTableName();
+  const timestamp = now();
+  const values = { deletedAt: timestamp, updatedAt: timestamp };
+  await updateD1Rows(contextTable, values, "id = ?", [activeContext.id]);
+  await updateLegacyTableContextMirror(contextTable, values, "id = ?", [activeContext.id]);
+  await revokeTableSessions(tableId, activeContext.id);
+  return await withDomainEvent(
+    { result: "Table vacated", status: 200 },
+    {
+      type: "table.vacated",
+      scopes: [venueScope, tableScope(tableId)],
+      entityType: "table",
+      entityId: tableId,
+      payload: { tableContextId: activeContext.id },
+    },
+  );
+}
+
+async function maybeAutoVacateTakeoutTable(
+  tableId: string,
+  tableContextId: string,
+  completedStatus: string,
+): Promise<MutationResult | null> {
+  const table = (await queryD1<TableRow>(
+    "SELECT * FROM tables WHERE id = ? AND deletedAt IS NULL LIMIT 1",
+    [tableId],
+  ))[0];
+  if (!table || !isEnabled(table.isTakeout)) {
+    return null;
+  }
+
+  const activeContext = await findActiveTableContextById(tableId, tableContextId);
+  if (!activeContext) {
+    return null;
+  }
+
+  if (await hasAutoVacatePaymentBlocker(tableContextId)) {
+    return null;
+  }
+
+  if (await hasAutoVacateMenuBlocker(tableContextId, completedStatus)) {
+    return null;
+  }
+
+  return await closeTableContextWithEvent(tableId, activeContext);
 }
 
 export async function markOrderPaid(orderId: string): Promise<MutationResult> {
@@ -2022,10 +2246,17 @@ export async function completeOrderRefund(
   );
 }
 
-export async function createAdminTable(name: string, seats: number): Promise<MutationResult> {
+type AdminTableOptions = {
+  name?: string;
+  seats?: number;
+  isTakeout?: boolean;
+  takeoutFirstOrderRuleEnabled?: boolean;
+};
+
+export async function createAdminTable(tableOptions: Required<Pick<AdminTableOptions, "name" | "seats">> & AdminTableOptions): Promise<MutationResult> {
   const duplicate = (await queryD1<TableRow>(
     "SELECT * FROM tables WHERE name = ? AND deletedAt IS NULL LIMIT 1",
-    [name],
+    [tableOptions.name],
   ))[0];
 
   if (duplicate) {
@@ -2041,8 +2272,10 @@ export async function createAdminTable(name: string, seats: number): Promise<Mut
   await insertD1Row("tables", {
     id: tableId,
     key,
-    name,
-    seats,
+    name: tableOptions.name,
+    seats: tableOptions.seats,
+    isTakeout: tableOptions.isTakeout ? 1 : 0,
+    takeoutFirstOrderRuleEnabled: tableOptions.takeoutFirstOrderRuleEnabled === false ? 0 : 1,
     createdAt: timestamp,
     updatedAt: timestamp,
     deletedAt: null,
@@ -2061,7 +2294,7 @@ export async function createAdminTable(name: string, seats: number): Promise<Mut
 
 export async function updateAdminTable(
   tableId: string,
-  tableOptions: { name?: string; seats?: number },
+  tableOptions: AdminTableOptions,
 ): Promise<MutationResult> {
   const table = (await queryD1<TableRow>(
     "SELECT * FROM tables WHERE id = ? AND deletedAt IS NULL LIMIT 1",
@@ -2072,7 +2305,15 @@ export async function updateAdminTable(
     return { error: "Table Not Found", status: 404 };
   }
 
-  await updateD1Rows("tables", { ...tableOptions, updatedAt: now() }, "id = ?", [tableId]);
+  const normalizedTableOptions: Record<string, unknown> = { ...tableOptions };
+  if (tableOptions.isTakeout !== undefined) {
+    normalizedTableOptions.isTakeout = tableOptions.isTakeout ? 1 : 0;
+  }
+  if (tableOptions.takeoutFirstOrderRuleEnabled !== undefined) {
+    normalizedTableOptions.takeoutFirstOrderRuleEnabled = tableOptions.takeoutFirstOrderRuleEnabled ? 1 : 0;
+  }
+
+  await updateD1Rows("tables", { ...normalizedTableOptions, updatedAt: now() }, "id = ?", [tableId]);
   return await withDomainEvent(
     { result: "Table updated", status: 200 },
     {

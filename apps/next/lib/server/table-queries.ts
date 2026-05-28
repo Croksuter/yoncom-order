@@ -11,6 +11,8 @@ type TableRow = BaseRow & {
   key: number;
   name: string;
   seats: number;
+  isTakeout?: boolean | number | null;
+  takeoutFirstOrderRuleEnabled?: boolean | number | null;
 };
 
 type TableContextRow = BaseRow & {
@@ -124,7 +126,11 @@ function normalizeBase<T extends BaseRow>(row: T) {
 }
 
 function normalizeTable(row: TableRow) {
-  return normalizeBase(row);
+  return {
+    ...normalizeBase(row),
+    isTakeout: row.isTakeout === true || row.isTakeout === 1,
+    takeoutFirstOrderRuleEnabled: row.takeoutFirstOrderRuleEnabled !== false && row.takeoutFirstOrderRuleEnabled !== 0,
+  };
 }
 
 function normalizeTableContext(row: TableContextRow) {

@@ -70,8 +70,11 @@ function handleRealtimeSql(sql: string) {
   if (sql.startsWith("INSERT INTO domainEvents")) {
     return d1Success([], { duration: 1, changes: 1 });
   }
+  if (sql.startsWith("SELECT tc.tableId, tc.id AS tableContextId, mo.orderId")) {
+    return d1Success([{ tableId: "table_e2e_00001", tableContextId: "ctx_12345678901", orderId: "ord_paid_000001" }]);
+  }
   if (sql.startsWith("SELECT tc.tableId, mo.orderId")) {
-    return d1Success([{ tableId: "table_e2e_00001", orderId: "ord_paid_000001" }]);
+    return d1Success([{ tableId: "table_e2e_00001", tableContextId: "ctx_12345678901", orderId: "ord_paid_000001" }]);
   }
   if (sql.startsWith("SELECT tc.tableId")) {
     return d1Success([{ tableId: "table_e2e_00001" }]);
@@ -127,6 +130,7 @@ function installCreateOrderMutationMock(options: {
   firstOrderRuleMenuCounts?: Array<Record<string, unknown>>;
   bundleItems?: Array<Record<string, unknown>>;
   stockUpdateChanges?: Record<string, number>;
+  table?: Record<string, unknown>;
 }) {
   return installD1FetchMock(({ sql, params }: D1Request) => {
     const realtime = handleRealtimeSql(sql);
@@ -172,9 +176,12 @@ function installCreateOrderMutationMock(options: {
         key: 7,
         name: "E2E Table",
         seats: 2,
+        isTakeout: 0,
+        takeoutFirstOrderRuleEnabled: 1,
         createdAt: 1,
         updatedAt: 1,
         deletedAt: null,
+        ...(options.table ?? {}),
       }]);
     }
     if (sql === "SELECT * FROM \"tableContexts\" WHERE id = ? AND tableId = ? AND deletedAt IS NULL LIMIT 1") {
@@ -239,6 +246,86 @@ function installCreateOrderMutationMock(options: {
       return d1Success([], { duration: 1, changes: 1 });
     }
     if (sql === "DELETE FROM paymentCodeLeases WHERE paymentId = ?") {
+      return d1Success([], { duration: 1, changes: 1 });
+    }
+    throw new Error(`Unexpected SQL: ${sql}`);
+  });
+}
+
+function installCompleteMenuOrderMock(options: {
+  sourceStatus?: string;
+  autoPickUpOnCookComplete?: boolean | number;
+  isTakeout?: boolean | number;
+  menuBlocker?: boolean;
+}) {
+  return installD1FetchMock(({ sql, params }: D1Request) => {
+    const realtime = handleRealtimeSql(sql);
+    if (realtime) return realtime;
+    if (sql.includes("CREATE TABLE IF NOT EXISTS orderWorkflowSettings")) {
+      return d1Success([], { duration: 1, changes: 0 });
+    }
+    if (sql === "SELECT * FROM orderWorkflowSettings WHERE id = ? LIMIT 1") {
+      return d1Success([{
+        id: "default",
+        autoPickUpOnCookComplete: options.autoPickUpOnCookComplete ?? 0,
+        createdAt: 1,
+        updatedAt: 1,
+      }]);
+    }
+    if (sql === "SELECT * FROM menuOrders WHERE id = ? AND deletedAt IS NULL LIMIT 1") {
+      return d1Success([{
+        id: "menuorder_ready1",
+        quantity: 1,
+        status: options.sourceStatus ?? "PENDING",
+        orderId: "ord_paid_000001",
+        menuId: "menu_e2e_000001",
+        createdAt: 1,
+        updatedAt: 1,
+        deletedAt: null,
+      }]);
+    }
+    if (sql === "PRAGMA table_info(\"payments\")") {
+      return tableInfo(paymentColumns);
+    }
+    if (sql === "PRAGMA table_info(\"menuOrders\")") {
+      return tableInfo(["id", "quantity", "status", "orderId", "menuId", "createdAt", "updatedAt", "deletedAt"]);
+    }
+    if (sql === "PRAGMA table_info(\"tableContexts\")") {
+      return tableInfo(["id", "tableId", "createdAt", "updatedAt", "deletedAt"]);
+    }
+    if (sql === "SELECT p.paid, p.status, o.status AS orderStatus FROM orders o INNER JOIN payments p ON p.orderId = o.id WHERE o.id = ? AND p.deletedAt IS NULL LIMIT 1") {
+      return d1Success([{ paid: 1, status: "PAID", orderStatus: "ACTIVE" }]);
+    }
+    if (sql === "UPDATE \"menuOrders\" SET \"status\" = ?, \"updatedAt\" = ? WHERE id = ? AND status = ?") {
+      return d1Success([], { duration: 1, changes: 1 });
+    }
+    if (sql === "SELECT * FROM tables WHERE id = ? AND deletedAt IS NULL LIMIT 1") {
+      return d1Success([{
+        id: "table_e2e_00001",
+        key: 7,
+        name: "E2E Table",
+        seats: 2,
+        isTakeout: options.isTakeout ?? 1,
+        takeoutFirstOrderRuleEnabled: 1,
+        createdAt: 1,
+        updatedAt: 1,
+        deletedAt: null,
+      }]);
+    }
+    if (sql === "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?") {
+      const tableName = String(params[0]);
+      return d1Success(tableName === "tableContexts" ? [{ name: tableName }] : []);
+    }
+    if (sql === "SELECT * FROM \"tableContexts\" WHERE id = ? AND tableId = ? AND deletedAt IS NULL LIMIT 1") {
+      return d1Success([testTableContext()]);
+    }
+    if (sql.startsWith("SELECT o.id\n     FROM orders o\n     LEFT JOIN payments p ON")) {
+      return d1Success([]);
+    }
+    if (sql.startsWith("SELECT mo.id\n     FROM menuOrders mo")) {
+      return d1Success(options.menuBlocker ? [{ id: "menuorder_block" }] : []);
+    }
+    if (sql === "UPDATE \"tableContexts\" SET \"deletedAt\" = ?, \"updatedAt\" = ? WHERE id = ?") {
       return d1Success([], { duration: 1, changes: 1 });
     }
     throw new Error(`Unexpected SQL: ${sql}`);
@@ -661,6 +748,68 @@ describe("implemented mutation route handlers", () => {
     expect(stockUpdate?.params[2]).toBe("menu_rule_000002");
   });
 
+  it("first-order rule skips takeout first orders when the table disables the rule", async () => {
+    const { requests } = installCreateOrderMutationMock({
+      table: { isTakeout: 1, takeoutFirstOrderRuleEnabled: 0 },
+      menus: [testMenu({ id: "menu_takeout_001", menuCategoryId: "cat_other_00000", quantity: 5 })],
+      firstOrderRule: {
+        id: "default",
+        enabled: 1,
+        requiredCount: 99,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+      firstOrderRuleMenuCounts: [{
+        ruleId: "default",
+        menuId: "menu_takeout_001",
+        countAs: 0,
+        createdAt: 1,
+        updatedAt: 1,
+      }],
+    });
+
+    const { createClientOrderForNewTableSession } = await import("~/lib/server/d1-mutations");
+    const result = await createClientOrderForNewTableSession(
+      "table_e2e_00001",
+      "client-order-takeout-rule-disabled",
+      [{ menuId: "menu_takeout_001", quantity: 1 }],
+    );
+
+    expect(result.error).toBeUndefined();
+    expect(result.status).toBe(200);
+    expect(requests.some((request) => request.sql.startsWith("INSERT INTO \"orders\""))).toBe(true);
+  });
+
+  it("first-order rule applies to takeout first orders when both global and table flags are enabled", async () => {
+    installCreateOrderMutationMock({
+      table: { isTakeout: 1, takeoutFirstOrderRuleEnabled: 1 },
+      menus: [testMenu({ id: "menu_takeout_002", menuCategoryId: "cat_other_00000", quantity: 5 })],
+      firstOrderRule: {
+        id: "default",
+        enabled: 1,
+        requiredCount: 2,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+      firstOrderRuleMenuCounts: [{
+        ruleId: "default",
+        menuId: "menu_takeout_002",
+        countAs: 0,
+        createdAt: 1,
+        updatedAt: 1,
+      }],
+    });
+
+    const { createClientOrderForNewTableSession } = await import("~/lib/server/d1-mutations");
+    const result = await createClientOrderForNewTableSession(
+      "table_e2e_00001",
+      "client-order-takeout-rule-enabled",
+      [{ menuId: "menu_takeout_002", quantity: 1 }],
+    );
+
+    expect(result).toEqual({ error: "First Order Rule Not Satisfied", status: 409 });
+  });
+
   it("first-order rule is bypassed for existing-session second orders", async () => {
     const { requests } = installCreateOrderMutationMock({
       existingMode: true,
@@ -687,6 +836,55 @@ describe("implemented mutation route handlers", () => {
     expect(result.error).toBeUndefined();
     expect(result.status).toBe(200);
     expect(requests.some((request) => request.sql === "SELECT * FROM firstOrderRules WHERE id = ? LIMIT 1")).toBe(false);
+  });
+
+  it("completeMenuOrder auto-vacates takeout tables after the last pending item becomes ready", async () => {
+    const { requests } = installCompleteMenuOrderMock({
+      autoPickUpOnCookComplete: 0,
+      isTakeout: 1,
+      menuBlocker: false,
+    });
+
+    const { completeMenuOrder } = await import("~/lib/server/d1-mutations");
+    const result = await completeMenuOrder("menuorder_ready1");
+
+    expect(result.error).toBeUndefined();
+    expect(result.status).toBe(200);
+    const statusUpdate = requests.find((request) => request.sql === "UPDATE \"menuOrders\" SET \"status\" = ?, \"updatedAt\" = ? WHERE id = ? AND status = ?");
+    expect(statusUpdate?.params[0]).toBe("READY");
+    expect(requests.some((request) => request.sql === "UPDATE \"tableContexts\" SET \"deletedAt\" = ?, \"updatedAt\" = ? WHERE id = ?")).toBe(true);
+  });
+
+  it("completeMenuOrder bypasses ready and auto-vacates takeout tables when auto pickup is enabled", async () => {
+    const { requests } = installCompleteMenuOrderMock({
+      autoPickUpOnCookComplete: 1,
+      isTakeout: 1,
+      menuBlocker: false,
+    });
+
+    const { completeMenuOrder } = await import("~/lib/server/d1-mutations");
+    const result = await completeMenuOrder("menuorder_ready1");
+
+    expect(result.error).toBeUndefined();
+    expect(result.status).toBe(200);
+    const statusUpdate = requests.find((request) => request.sql === "UPDATE \"menuOrders\" SET \"status\" = ?, \"updatedAt\" = ? WHERE id = ? AND status = ?");
+    expect(statusUpdate?.params[0]).toBe("PICKED_UP");
+    expect(requests.some((request) => request.sql === "UPDATE \"tableContexts\" SET \"deletedAt\" = ?, \"updatedAt\" = ? WHERE id = ?")).toBe(true);
+  });
+
+  it("completeMenuOrder does not auto-vacate regular tables", async () => {
+    const { requests } = installCompleteMenuOrderMock({
+      autoPickUpOnCookComplete: 0,
+      isTakeout: 0,
+      menuBlocker: false,
+    });
+
+    const { completeMenuOrder } = await import("~/lib/server/d1-mutations");
+    const result = await completeMenuOrder("menuorder_ready1");
+
+    expect(result.error).toBeUndefined();
+    expect(result.status).toBe(200);
+    expect(requests.some((request) => request.sql === "UPDATE \"tableContexts\" SET \"deletedAt\" = ?, \"updatedAt\" = ? WHERE id = ?")).toBe(false);
   });
 
   it("bundle orders decrement component stock, charge the bundle price, and store one bundle menuOrder row", async () => {

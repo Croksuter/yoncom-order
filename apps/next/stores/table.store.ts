@@ -15,6 +15,8 @@ import * as AdminPaymentSettingsRequest from "shared/types/requests/admin/paymen
 import * as AdminPaymentSettingsResponse from "shared/types/responses/admin/payment-settings";
 import * as AdminClientNoticeSettingsRequest from "shared/types/requests/admin/client-notice-settings";
 import * as AdminClientNoticeSettingsResponse from "shared/types/responses/admin/client-notice-settings";
+import * as AdminOrderWorkflowSettingsRequest from "shared/types/requests/admin/order-workflow-settings";
+import * as AdminOrderWorkflowSettingsResponse from "shared/types/responses/admin/order-workflow-settings";
 
 type TableState = {
   clientTable: ClientTableResponse.Get["result"] | null;
@@ -22,6 +24,7 @@ type TableState = {
   bankTransactions: AdminDepositResponse.Get["result"]["transactions"];
   paymentSettings: AdminPaymentSettingsResponse.Get["result"] | null;
   clientNoticeSettings: AdminClientNoticeSettingsResponse.Get["result"] | null;
+  orderWorkflowSettings: AdminOrderWorkflowSettingsResponse.Get["result"] | null;
   isLoaded: boolean;
   error: boolean;
 
@@ -60,6 +63,8 @@ type TableState = {
   updatePaymentSettings: (query: AdminPaymentSettingsRequest.Update) => Promise<AdminPaymentSettingsResponse.Update | null>;
   loadClientNoticeSettings: () => Promise<AdminClientNoticeSettingsResponse.Get | null>;
   updateClientNoticeSettings: (query: AdminClientNoticeSettingsRequest.Update) => Promise<AdminClientNoticeSettingsResponse.Update | null>;
+  loadOrderWorkflowSettings: () => Promise<AdminOrderWorkflowSettingsResponse.Get | null>;
+  updateOrderWorkflowSettings: (query: AdminOrderWorkflowSettingsRequest.Update) => Promise<AdminOrderWorkflowSettingsResponse.Update | null>;
   adminConfirmBankTransaction: (query: AdminDepositRequest.Confirm) => Promise<AdminDepositResponse.Confirm | null>;
   adminIgnoreBankTransaction: (query: AdminDepositRequest.Ignore) => Promise<AdminDepositResponse.Ignore | null>;
 
@@ -76,6 +81,7 @@ const useTableStore = create<TableState>((set, get) => ({
   bankTransactions: [],
   paymentSettings: null,
   clientNoticeSettings: null,
+  orderWorkflowSettings: null,
   isLoaded: false,
   error: false,
 
@@ -242,9 +248,12 @@ const useTableStore = create<TableState>((set, get) => ({
     query,
     setter: set,
     onSuccess: (res) => {
+      const bypass = get().orderWorkflowSettings?.autoPickUpOnCookComplete;
       toast({
-        title: "준비 완료",
-        description: "해당 메뉴를 수령 대기 상태로 변경했습니다.",
+        title: bypass ? "수령 완료" : "조리 완료",
+        description: bypass
+          ? "해당 메뉴를 조리완료와 동시에 수령 완료로 변경했습니다."
+          : "해당 메뉴를 수령 대기 상태로 변경했습니다.",
         duration: 3000,
       });
       get().load({});
@@ -370,6 +379,31 @@ const useTableStore = create<TableState>((set, get) => ({
       toast({
         title: "고객 공지 저장 완료",
         description: "고객 주문 화면 헤더 공지가 실시간으로 반영됩니다.",
+        duration: 3000,
+      });
+    },
+  }),
+
+  loadOrderWorkflowSettings: async () => await queryStore<{}, AdminOrderWorkflowSettingsResponse.Get>({
+    route: "admin/order-workflow-settings",
+    method: "get",
+    query: {},
+    onSuccess: (res) => set({ orderWorkflowSettings: res.result }),
+  }),
+
+  updateOrderWorkflowSettings: async (query: AdminOrderWorkflowSettingsRequest.Update) => await queryStore<
+    AdminOrderWorkflowSettingsRequest.Update,
+    AdminOrderWorkflowSettingsResponse.Update
+  >({
+    route: "admin/order-workflow-settings",
+    method: "put",
+    query,
+    setter: set,
+    onSuccess: (res) => {
+      set({ orderWorkflowSettings: res.result });
+      toast({
+        title: "처리 설정 수정 완료",
+        description: "조리완료 후 수령완료 처리 방식이 변경되었습니다.",
         duration: 3000,
       });
     },
