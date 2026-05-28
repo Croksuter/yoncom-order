@@ -7,6 +7,7 @@ import MenuInstance from "./menu.instance";
 import MenuCompleteModal from "./menu.complete.modal";
 import { menuOrderStatus } from "db/schema";
 import { isKitchenOrder } from "~/lib/order-status";
+import { getMenuOrderProgress } from "~/lib/menu-order-progress";
 
 const getMenuFallbackImage = (name: string) => {
   const lower = name.toLowerCase();
@@ -36,6 +37,7 @@ export default function MenuMonitor({
   const [menuName, setMenuName] = useState("");
   const [menuOrderId, setMenuOrderId] = useState("");
   const [tableName, setTableName] = useState("");
+  const [pendingQuantity, setPendingQuantity] = useState(0);
   const { menus } = useMenuStore();
   const { tables } = useTableStore();
 
@@ -67,18 +69,22 @@ export default function MenuMonitor({
         (order) => order.menuOrders
           .filter(menuOrder => menuOrder.menuId === menuId)
           .filter(menuOrder => menuOrder.status === menuOrderStatus.PENDING)
+          .filter(menuOrder => getMenuOrderProgress(menuOrder).pendingQuantity > 0)
           .map(menuOrder => ({ ...menuOrder, timestamp: order.createdAt })),
       ).map((menuOrder) => ({
+        ...getMenuOrderProgress(menuOrder),
         id: menuOrder.id,
         menuId: menu.id,
         menuName: menu.name,
         menuPrice: menu.price,
-        quantity: menuOrder.quantity,
+        quantity: getMenuOrderProgress(menuOrder).pendingQuantity,
+        totalQuantity: menuOrder.quantity,
         status: menuOrder.status,
         tableName,
         timestamp: menuOrder.timestamp,
       })),
     );
+  const totalPendingQuantity = menuOrders.reduce((total, menuOrder) => total + menuOrder.pendingQuantity, 0);
 
   return (
     <section className={`${compact ? "min-w-0 h-full min-h-0" : "min-w-[200px] max-w-[360px] h-[calc(100vh-240px)]"} flex flex-col bg-slate-100/80 dark:bg-slate-900/60 border border-slate-200/50 dark:border-slate-800/60 rounded-2xl p-4 gap-4 overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 flex-shrink-0`}>
@@ -94,6 +100,9 @@ export default function MenuMonitor({
             {menu.name}
           </h2>
         </div>
+        <div className="absolute right-3 top-3 z-10 rounded-full bg-white/95 px-3 py-1.5 text-lg font-black leading-none text-slate-800 shadow-sm ring-1 ring-black/5 dark:bg-slate-950/90 dark:text-slate-100 dark:ring-white/10">
+          x{totalPendingQuantity}
+        </div>
       </div>
 
       {/* Orders List for Menu */}
@@ -108,6 +117,7 @@ export default function MenuMonitor({
                 setMenuName(menuOrder.menuName);
                 setMenuOrderId(menuOrder.id);
                 setTableName(menuOrder.tableName);
+                setPendingQuantity(menuOrder.pendingQuantity);
                 setMenuCompleteModalOpen(true);
               }}
             />
@@ -128,6 +138,7 @@ export default function MenuMonitor({
         menuName={menuName}
         tableName={tableName}
         menuOrderId={menuOrderId}
+        pendingQuantity={pendingQuantity}
       />
     </section>
   );

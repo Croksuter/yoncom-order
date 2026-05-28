@@ -6,6 +6,7 @@ import * as AdminTableResponse from "shared/types/responses/admin/table";
 import { dateDiffString } from "~/lib/date";
 import { useEffect, useState } from "react";
 import { getMenuOrderStatusIcon, getOrderStatusLabel } from "~/lib/order-status";
+import { getMenuOrderProgress } from "~/lib/menu-order-progress";
 
 export default function OrderInstance({
   order,
@@ -78,6 +79,8 @@ export default function OrderInstance({
       <div className="space-y-1.5 border-t border-slate-100 dark:border-slate-850 pt-2.5">
         {order.menuOrders.map((menuOrder) => {
           const menu = menus.find((menu) => menu.id === menuOrder.menuId);
+          const progress = getMenuOrderProgress(menuOrder);
+          const hasProgress = progress.readyQuantity > 0 || progress.pickedUpQuantity > 0;
 
           return (
             <div
@@ -88,7 +91,14 @@ export default function OrderInstance({
                 <span className="scale-90 opacity-80 flex-shrink-0">{getMenuOrderStatusIcon(menuOrder, order)}</span>
                 <span className="min-w-0 flex-1 truncate">{menu?.name}</span>
               </span>
-              <span className="flex-shrink-0 text-slate-800 dark:text-slate-200 font-black">x{menuOrder.quantity}</span>
+              <span className="flex flex-shrink-0 flex-col items-end text-right">
+                <span className="text-slate-800 dark:text-slate-200 font-black">x{menuOrder.quantity}</span>
+                {hasProgress && (
+                  <span className="text-[10px] font-extrabold text-slate-400 dark:text-slate-400">
+                    대기 {progress.pendingQuantity} · 조리 {progress.readyQuantity} · 수령 {progress.pickedUpQuantity}
+                  </span>
+                )}
+              </span>
             </div>
           );
         })}

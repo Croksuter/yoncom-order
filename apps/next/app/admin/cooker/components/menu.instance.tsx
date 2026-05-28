@@ -15,6 +15,8 @@ export default function MenuInstance({
     menuName: string;
     menuPrice: number;
     quantity: number;
+    totalQuantity?: number;
+    pendingQuantity?: number;
     status: string;
     tableName: string;
     timestamp: number;
@@ -49,6 +51,8 @@ export default function MenuInstance({
   const formattedTime = dateDiffString(now, order.timestamp).startsWith("-")
     ? "00:00"
     : dateDiffString(now, order.timestamp);
+  const visibleQuantity = order.pendingQuantity ?? order.quantity;
+  const totalQuantity = order.totalQuantity ?? order.quantity;
 
   return (
     <article
@@ -75,7 +79,7 @@ export default function MenuInstance({
 
         {/* Quantity display */}
         <span className="text-brand-500 dark:text-brand-700 text-3xl font-black tracking-tight self-center">
-          x{order.quantity}
+          x{totalQuantity > visibleQuantity ? `${visibleQuantity}/${totalQuantity}` : visibleQuantity}
         </span>
       </div>
 

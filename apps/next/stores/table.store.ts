@@ -249,11 +249,12 @@ const useTableStore = create<TableState>((set, get) => ({
     setter: set,
     onSuccess: (res) => {
       const bypass = get().orderWorkflowSettings?.autoPickUpOnCookComplete;
+      const quantityLabel = query.quantity ? `${query.quantity}개를 ` : "";
       toast({
         title: bypass ? "수령 완료" : "조리 완료",
         description: bypass
-          ? "해당 메뉴를 조리완료와 동시에 수령 완료로 변경했습니다."
-          : "해당 메뉴를 수령 대기 상태로 변경했습니다.",
+          ? `해당 메뉴 ${quantityLabel}조리완료와 동시에 수령 완료로 변경했습니다.`
+          : `해당 메뉴 ${quantityLabel}수령 대기 상태로 변경했습니다.`,
         duration: 3000,
       });
       get().load({});
@@ -266,9 +267,10 @@ const useTableStore = create<TableState>((set, get) => ({
     query,
     setter: set,
     onSuccess: () => {
+      const quantityLabel = query.quantity ? `${query.quantity}개를 ` : "";
       toast({
         title: "수령 완료",
-        description: "해당 메뉴를 고객 수령 완료로 변경했습니다.",
+        description: `해당 메뉴 ${quantityLabel}고객 수령 완료로 변경했습니다.`,
         duration: 3000,
       });
       get().load({});

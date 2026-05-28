@@ -1,9 +1,14 @@
+import { getMenuOrderDerivedStatus, getMenuOrderProgress } from "~/lib/menu-order-progress";
+
 type PaymentLike = {
   paid?: boolean | null;
   status?: string | null;
 };
 
 type MenuOrderLike = {
+  quantity?: number | null;
+  readyQuantity?: number | null;
+  pickedUpQuantity?: number | null;
   status?: string | null;
   deletedAt?: number | string | null;
 };
@@ -16,6 +21,7 @@ type OrderLike = {
 };
 
 const hasDeletedAt = (deletedAt: OrderLike["deletedAt"]) => deletedAt !== null && deletedAt !== undefined;
+const hasQuantity = (menuOrder: MenuOrderLike) => typeof menuOrder.quantity === "number";
 
 export const isActiveOrder = (order: OrderLike | null | undefined) => (
   !!order
@@ -60,7 +66,7 @@ export const getMenuOrderStatusLabel = (
   menuOrder: MenuOrderLike | string | null | undefined,
   order: OrderLike | null | undefined,
 ) => {
-  const status = typeof menuOrder === "string" ? menuOrder : menuOrder?.status;
+  const status = typeof menuOrder === "string" ? menuOrder : getMenuOrderDerivedStatus(menuOrder);
 
   if (order?.payment?.status === "REFUND_PENDING") return "환불 대기";
   if (order?.payment?.status === "REFUNDED") return "환불 완료";
@@ -94,8 +100,8 @@ export const getOrderStatusLabel = (order: OrderLike | null | undefined) => {
   if (!isKitchenOrder(order)) return paymentLabel;
 
   const activeMenuOrders = (order?.menuOrders ?? []).filter((menuOrder) => !hasDeletedAt(menuOrder.deletedAt));
-  if (activeMenuOrders.length > 0 && activeMenuOrders.every((menuOrder) => menuOrder.status === "PICKED_UP")) return "수령 완료";
-  if (activeMenuOrders.some((menuOrder) => menuOrder.status === "READY")) return "조리 완료";
-  if (activeMenuOrders.some((menuOrder) => menuOrder.status === "PENDING")) return "조리 중";
+  if (activeMenuOrders.length > 0 && activeMenuOrders.every((menuOrder) => getMenuOrderDerivedStatus(menuOrder) === "PICKED_UP")) return "수령 완료";
+  if (activeMenuOrders.some((menuOrder) => hasQuantity(menuOrder) ? getMenuOrderProgress(menuOrder).pendingQuantity > 0 : menuOrder.status === "PENDING")) return "조리 중";
+  if (activeMenuOrders.some((menuOrder) => hasQuantity(menuOrder) ? getMenuOrderProgress(menuOrder).readyQuantity > 0 : menuOrder.status === "READY")) return "조리 완료";
   return paymentLabel;
 };

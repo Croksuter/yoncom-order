@@ -8,6 +8,7 @@ import useMenuStore from "~/stores/menu.store";
 import * as AdminTableResponse from "shared/types/responses/admin/table";
 import useTableStore from "~/stores/table.store";
 import { getMenuOrderStatusLabel, getPaymentStatusLabel, isUnresolvedPaymentOrder } from "~/lib/order-status";
+import { getMenuOrderProgress } from "~/lib/menu-order-progress";
 
 export default function OrderDetailModal({
   openState, setOpenState,
@@ -19,6 +20,7 @@ export default function OrderDetailModal({
 }) {
   const { menus } = useMenuStore();
   const [cancelReason, setCancelReason] = useState("");
+  const [actionQuantities, setActionQuantities] = useState<Record<string, number>>({});
 
   const menuOrderInfos = order.menuOrders.map((menuOrder) => {
     const menu = menus.find((menu) => menu.id === menuOrder.menuId);
@@ -67,16 +69,42 @@ export default function OrderDetailModal({
     handleClose();
   }
 
-  const handlePickUp = async (menuOrderId: string) => {
+  const getActionQuantity = (key: string, maxQuantity: number) => {
+    const value = actionQuantities[key] ?? maxQuantity;
+    return Math.min(maxQuantity, Math.max(1, value));
+  };
+
+  const setActionQuantity = (key: string, nextQuantity: number, maxQuantity: number) => {
+    setActionQuantities((state) => ({
+      ...state,
+      [key]: Math.min(maxQuantity, Math.max(1, nextQuantity)),
+    }));
+  };
+
+  const renderQuantitySelect = (key: string, maxQuantity: number) => (
+    <select
+      value={getActionQuantity(key, maxQuantity)}
+      onChange={(event) => setActionQuantity(key, Number(event.target.value), maxQuantity)}
+      className="h-8 min-w-14 rounded-lg border border-slate-200 bg-white px-2 text-xs font-bold text-slate-700 shadow-sm outline-none focus:border-brand-400 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
+    >
+      {Array.from({ length: maxQuantity }, (_, index) => index + 1).map((quantity) => (
+        <option key={quantity} value={quantity}>{quantity}개</option>
+      ))}
+    </select>
+  );
+
+  const handlePickUp = async (menuOrderId: string, quantity?: number) => {
     await useTableStore.getState().adminPickUpOrder({
       menuOrderId,
+      quantity,
     });
     handleClose();
   }
 
-  const handleComplete = async (menuOrderId: string) => {
+  const handleComplete = async (menuOrderId: string, quantity?: number) => {
     await useTableStore.getState().adminCompleteOrder({
       menuOrderId,
+      quantity,
     });
     handleClose();
   }
@@ -142,6 +170,11 @@ export default function OrderDetailModal({
               <TableBody>
                 {menuOrderInfos.map((menuOrderInfo) => {
                   const menuOrder = order.menuOrders.find((item) => item.menuId === menuOrderInfo!.menuId);
+                  const progress = getMenuOrderProgress(menuOrder);
+                  const completeActionKey = menuOrder ? `complete:${menuOrder.id}` : "";
+                  const pickUpActionKey = menuOrder ? `pickup:${menuOrder.id}` : "";
+                  const completeQuantity = getActionQuantity(completeActionKey, progress.pendingQuantity);
+                  const pickUpQuantity = getActionQuantity(pickUpActionKey, progress.readyQuantity);
 
                   return (
                     <TableRow
@@ -153,27 +186,59 @@ export default function OrderDetailModal({
                       <TableCell className="text-right text-slate-800 dark:text-slate-200 px-4 py-3">x{menuOrderInfo!.quantity}</TableCell>
                       <TableCell className="text-right font-bold text-slate-800 dark:text-slate-100 px-4 py-3">{menuOrderInfo!.totalPrice.toLocaleString()}원</TableCell>
                       <TableCell className="text-center px-4 py-3">
-                        <span className="text-xs font-semibold text-slate-600 dark:text-slate-200">
-                          {menuOrder ? getMenuOrderStatusLabel(menuOrder, order) : "-"}
-                        </span>
+                        {menuOrder ? (
+                          <div className="flex flex-col items-center gap-1">
+                            <span className="text-xs font-semibold text-slate-600 dark:text-slate-200">
+                              {getMenuOrderStatusLabel(menuOrder, order)}
+                            </span>
+                            <div className="flex flex-wrap justify-center gap-1">
+                              {progress.pendingQuantity > 0 && (
+                                <span className="rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-extrabold text-amber-600 dark:bg-amber-950/20 dark:text-amber-300">
+                                  대기 {progress.pendingQuantity}
+                                </span>
+                              )}
+                              {progress.readyQuantity > 0 && (
+                                <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-extrabold text-emerald-600 dark:bg-emerald-950/20 dark:text-emerald-300">
+                                  조리 {progress.readyQuantity}
+                                </span>
+                              )}
+                              {progress.pickedUpQuantity > 0 && (
+                                <span className="rounded-md bg-brand-50 px-1.5 py-0.5 text-[10px] font-extrabold text-brand-600 dark:bg-brand-950/20 dark:text-brand-300">
+                                  수령 {progress.pickedUpQuantity}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ) : "-"}
                       </TableCell>
                       <TableCell className="text-center px-4 py-3">
-                        {menuOrder?.status === "PENDING" ? (
-                          <Button
-                            size="sm"
-                            className="bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl h-8 px-3.5 font-bold text-xs transition-all shadow-sm border-none shadow-emerald-500/10"
-                            onClick={() => handleComplete(menuOrder.id)}
-                          >
-                            조리 완료
-                          </Button>
-                        ) : menuOrder?.status === "READY" ? (
-                          <Button
-                            size="sm"
-                            className="bg-brand-500 hover:bg-brand-600 text-white rounded-xl h-8 px-3.5 font-bold text-xs transition-all shadow-sm border-none shadow-brand-500/10"
-                            onClick={() => handlePickUp(menuOrder.id)}
-                          >
-                            수령 완료
-                          </Button>
+                        {menuOrder && (progress.pendingQuantity > 0 || progress.readyQuantity > 0) ? (
+                          <div className="flex flex-col items-center gap-2">
+                            {progress.pendingQuantity > 0 && (
+                              <div className="flex items-center justify-center gap-1.5">
+                                {renderQuantitySelect(completeActionKey, progress.pendingQuantity)}
+                                <Button
+                                  size="sm"
+                                  className="bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl h-8 px-3.5 font-bold text-xs transition-all shadow-sm border-none shadow-emerald-500/10"
+                                  onClick={() => handleComplete(menuOrder.id, completeQuantity)}
+                                >
+                                  조리 완료
+                                </Button>
+                              </div>
+                            )}
+                            {progress.readyQuantity > 0 && (
+                              <div className="flex items-center justify-center gap-1.5">
+                                {renderQuantitySelect(pickUpActionKey, progress.readyQuantity)}
+                                <Button
+                                  size="sm"
+                                  className="bg-brand-500 hover:bg-brand-600 text-white rounded-xl h-8 px-3.5 font-bold text-xs transition-all shadow-sm border-none shadow-brand-500/10"
+                                  onClick={() => handlePickUp(menuOrder.id, pickUpQuantity)}
+                                >
+                                  수령 완료
+                                </Button>
+                              </div>
+                            )}
+                          </div>
                         ) : "-"}
                       </TableCell>
                     </TableRow>

@@ -11,6 +11,7 @@ import MenuMonitor from "./components/menu.monitor";
 import MenuRemoveModal from "./components/menu.remove.modal";
 import { menuOrderStatus } from "db/schema";
 import { isKitchenOrder } from "~/lib/order-status";
+import { getMenuOrderProgress } from "~/lib/menu-order-progress";
 import { Columns3, ListOrdered, Rows2 } from "lucide-react";
 
 const cookerViewModes = ["columns", "twoRows", "quick"] as const;
@@ -34,6 +35,8 @@ export default function AdminCookerPage() {
     menuName: string;
     menuPrice: number;
     quantity: number;
+    totalQuantity: number;
+    pendingQuantity: number;
     status: string;
     tableName: string;
     timestamp: number;
@@ -55,7 +58,11 @@ export default function AdminCookerPage() {
         }
 
         for (const menuOrder of order.menuOrders ?? []) {
-          if (menuOrder.deletedAt === null && menuOrder.status === "PENDING") {
+          if (
+            menuOrder.deletedAt === null
+            && menuOrder.status === "PENDING"
+            && getMenuOrderProgress(menuOrder).pendingQuantity > 0
+          ) {
             menuIds.add(menuOrder.menuId);
           }
         }
@@ -79,17 +86,21 @@ export default function AdminCookerPage() {
         .flatMap((order) => order.menuOrders
           .filter((menuOrder) => menuOrder.deletedAt === null)
           .filter((menuOrder) => menuOrder.status === menuOrderStatus.PENDING)
+          .filter((menuOrder) => getMenuOrderProgress(menuOrder).pendingQuantity > 0)
           .filter((menuOrder) => selectedMenuIds.has(menuOrder.menuId))
           .map((menuOrder) => {
             const menu = menusById.get(menuOrder.menuId);
             if (!menu) return null;
+            const progress = getMenuOrderProgress(menuOrder);
 
             return {
               id: menuOrder.id,
               menuId: menu.id,
               menuName: menu.name,
               menuPrice: menu.price,
-              quantity: menuOrder.quantity,
+              quantity: progress.pendingQuantity,
+              totalQuantity: menuOrder.quantity,
+              pendingQuantity: progress.pendingQuantity,
               status: menuOrder.status,
               tableName,
               timestamp: order.createdAt,
@@ -204,7 +215,7 @@ export default function AdminCookerPage() {
       {/* Kanban Board Layout for Kitchen Display System (Stitch canvas) */}
       {viewMode === "quick" ? (
         <div className="flex-1 overflow-y-auto p-2 min-h-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-          <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
+          <div className="grid w-full grid-cols-[repeat(auto-fit,minmax(260px,1fr))] items-start gap-3">
             {pendingMenuOrders.map((menuOrder) => (
               <MenuInstance
                 key={menuOrder.id}
@@ -217,13 +228,13 @@ export default function AdminCookerPage() {
               />
             ))}
             {monitoringMenus.length > 0 && pendingMenuOrders.length === 0 && (
-              <div className="flex flex-col items-center justify-center text-center py-20 bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800/80 rounded-3xl p-8 shadow-sm">
+              <div className="col-span-full flex flex-col items-center justify-center text-center py-20 bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800/80 rounded-3xl p-8 shadow-sm">
                 <span className="text-5xl">🍳</span>
                 <p className="text-base font-extrabold text-slate-800 dark:text-slate-200 mt-4">대기 주문이 없습니다</p>
               </div>
             )}
             {monitoringMenus.length === 0 && (
-              <div className="flex flex-col items-center justify-center text-center py-20 bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800/80 rounded-3xl p-8 shadow-sm">
+              <div className="col-span-full flex flex-col items-center justify-center text-center py-20 bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800/80 rounded-3xl p-8 shadow-sm">
                 <span className="text-5xl">🍳</span>
                 <p className="text-base font-extrabold text-slate-800 dark:text-slate-200 mt-4">모니터링 중인 메뉴가 없습니다</p>
                 <p className="text-xs text-slate-400 dark:text-slate-300 mt-1.5 font-semibold max-w-sm">
@@ -271,6 +282,7 @@ export default function AdminCookerPage() {
         menuName={quickCompleteOrder?.menuName ?? ""}
         tableName={quickCompleteOrder?.tableName ?? ""}
         menuOrderId={quickCompleteOrder?.id ?? ""}
+        pendingQuantity={quickCompleteOrder?.pendingQuantity ?? 0}
       />
     </div>
   );

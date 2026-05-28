@@ -1,3 +1,4 @@
+import { getMenuOrderProgress } from "~/lib/menu-order-progress";
 import { queryD1, hasD1Table } from "~/lib/server/db";
 
 type BaseRow = {
@@ -55,6 +56,8 @@ type PaymentRow = BaseRow & {
 
 type MenuOrderRow = BaseRow & {
   quantity: number;
+  readyQuantity?: number | null;
+  pickedUpQuantity?: number | null;
   status: string;
   orderId: string;
   menuId: string;
@@ -156,9 +159,14 @@ function normalizePayment(row: PaymentRow) {
 }
 
 function normalizeMenuOrder(row: MenuOrderRow) {
+  const status = row.status === "SERVED" ? "PICKED_UP" : row.status;
+  const progress = getMenuOrderProgress({ ...row, status });
+
   return {
     ...normalizeBase(row),
-    status: row.status === "SERVED" ? "PICKED_UP" : row.status,
+    status,
+    readyQuantity: progress.readyQuantity,
+    pickedUpQuantity: progress.pickedUpQuantity,
   };
 }
 

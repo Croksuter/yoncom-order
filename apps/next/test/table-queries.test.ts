@@ -68,6 +68,8 @@ describe("table relation query network simulation", () => {
           {
             id: "menuorder_123",
             quantity: 2,
+            readyQuantity: 0,
+            pickedUpQuantity: 0,
             status: "PENDING",
             orderId: "order_1234567",
             menuId: "menu_1234567890",
@@ -130,6 +132,8 @@ describe("table relation query network simulation", () => {
                   {
                     id: "menuorder_123",
                     quantity: 2,
+                    readyQuantity: 0,
+                    pickedUpQuantity: 0,
                     status: "PENDING",
                     orderId: "order_1234567",
                     menuId: "menu_1234567890",

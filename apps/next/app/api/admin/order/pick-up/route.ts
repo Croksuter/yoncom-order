@@ -13,7 +13,7 @@ export async function PUT(request: Request) {
   try {
     const query = await parseJsonBody(request, pickUpValidation);
     return await idempotentMutationResponse(request, "admin:order:pick-up", query, () =>
-      setMenuOrderStatus(query.menuOrderId, menuOrderStatus.PICKED_UP),
+      setMenuOrderStatus(query.menuOrderId, menuOrderStatus.PICKED_UP, { quantity: query.quantity }),
     );
   } catch (error) {
     return routeError(error);

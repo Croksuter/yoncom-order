@@ -6,6 +6,7 @@ import useMenuStore from "~/stores/menu.store";
 import { Clock, Plus } from "lucide-react";
 import TableDetailModal from "./table.detail.modal";
 import { getMenuOrderStatusIcon, isKitchenOrder, isUnresolvedPaymentOrder } from "~/lib/order-status";
+import { getMenuOrderProgress } from "~/lib/menu-order-progress";
 
 export default function TableInstance({
   table
@@ -72,18 +73,30 @@ export default function TableInstance({
 
             {/* Menu orders scrollable list */}
             <div className="flex-1 my-2 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] space-y-1 py-1 border-y border-slate-50 dark:border-slate-800/40">
-              {menuOrders.map(({ menuOrder, order }) => (
-                <div
-                  key={menuOrder.id}
-                  className="flex justify-between items-center text-xs font-semibold text-slate-650 dark:text-slate-100"
-                >
-                  <span className="flex min-w-0 flex-1 items-center gap-1 pr-1">
-                    <span className="scale-75 opacity-70 flex-shrink-0">{getMenuOrderStatusIcon(menuOrder, order)}</span>
-                    <span className="min-w-0 flex-1 truncate">{menuId2menu(menuOrder.menuId)?.name}</span>
-                  </span>
-                  <span className="text-slate-400 dark:text-white font-extrabold flex-shrink-0">x{menuOrder.quantity}</span>
-                </div>
-              ))}
+              {menuOrders.map(({ menuOrder, order }) => {
+                const progress = getMenuOrderProgress(menuOrder);
+                const hasProgress = progress.readyQuantity > 0 || progress.pickedUpQuantity > 0;
+
+                return (
+                  <div
+                    key={menuOrder.id}
+                    className="flex justify-between items-center text-xs font-semibold text-slate-650 dark:text-slate-100"
+                  >
+                    <span className="flex min-w-0 flex-1 items-center gap-1 pr-1">
+                      <span className="scale-75 opacity-70 flex-shrink-0">{getMenuOrderStatusIcon(menuOrder, order)}</span>
+                      <span className="min-w-0 flex-1 truncate">{menuId2menu(menuOrder.menuId)?.name}</span>
+                    </span>
+                    <span className="flex flex-shrink-0 flex-col items-end text-right">
+                      <span className="text-slate-400 dark:text-white font-extrabold">x{menuOrder.quantity}</span>
+                      {hasProgress && (
+                        <span className="text-[9px] font-extrabold text-slate-400 dark:text-slate-500">
+                          {progress.pendingQuantity}/{progress.readyQuantity}/{progress.pickedUpQuantity}
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
 
             {/* Bottom Section */}

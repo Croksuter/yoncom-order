@@ -156,7 +156,7 @@ function installCreateOrderMutationMock(options: {
       return tableInfo(["id", "tableId", "createdAt", "updatedAt", "deletedAt"]);
     }
     if (sql === "PRAGMA table_info(\"menuOrders\")") {
-      return tableInfo(["id", "quantity", "status", "orderId", "menuId", "createdAt", "updatedAt", "deletedAt"]);
+      return tableInfo(["id", "quantity", "readyQuantity", "pickedUpQuantity", "status", "orderId", "menuId", "createdAt", "updatedAt", "deletedAt"]);
     }
     if (sql.startsWith("SELECT * FROM payments WHERE deletedAt IS NULL AND paid = 0 AND expiresAt")) {
       return d1Success([]);
@@ -257,6 +257,10 @@ function installCompleteMenuOrderMock(options: {
   autoPickUpOnCookComplete?: boolean | number;
   isTakeout?: boolean | number;
   menuBlocker?: boolean;
+  quantity?: number;
+  readyQuantity?: number;
+  pickedUpQuantity?: number;
+  statusUpdateChanges?: number;
 }) {
   return installD1FetchMock(({ sql, params }: D1Request) => {
     const realtime = handleRealtimeSql(sql);
@@ -273,9 +277,12 @@ function installCompleteMenuOrderMock(options: {
       }]);
     }
     if (sql === "SELECT * FROM menuOrders WHERE id = ? AND deletedAt IS NULL LIMIT 1") {
+      const quantity = options.quantity ?? 1;
       return d1Success([{
         id: "menuorder_ready1",
-        quantity: 1,
+        quantity,
+        readyQuantity: options.readyQuantity ?? (options.sourceStatus === "READY" ? quantity : 0),
+        pickedUpQuantity: options.pickedUpQuantity ?? (options.sourceStatus === "PICKED_UP" ? quantity : 0),
         status: options.sourceStatus ?? "PENDING",
         orderId: "ord_paid_000001",
         menuId: "menu_e2e_000001",
@@ -288,7 +295,7 @@ function installCompleteMenuOrderMock(options: {
       return tableInfo(paymentColumns);
     }
     if (sql === "PRAGMA table_info(\"menuOrders\")") {
-      return tableInfo(["id", "quantity", "status", "orderId", "menuId", "createdAt", "updatedAt", "deletedAt"]);
+      return tableInfo(["id", "quantity", "readyQuantity", "pickedUpQuantity", "status", "orderId", "menuId", "createdAt", "updatedAt", "deletedAt"]);
     }
     if (sql === "PRAGMA table_info(\"tableContexts\")") {
       return tableInfo(["id", "tableId", "createdAt", "updatedAt", "deletedAt"]);
@@ -296,8 +303,14 @@ function installCompleteMenuOrderMock(options: {
     if (sql === "SELECT p.paid, p.status, o.status AS orderStatus FROM orders o INNER JOIN payments p ON p.orderId = o.id WHERE o.id = ? AND p.deletedAt IS NULL LIMIT 1") {
       return d1Success([{ paid: 1, status: "PAID", orderStatus: "ACTIVE" }]);
     }
-    if (sql === "UPDATE \"menuOrders\" SET \"status\" = ?, \"updatedAt\" = ? WHERE id = ? AND status = ?") {
-      return d1Success([], { duration: 1, changes: 1 });
+    if (sql.startsWith("UPDATE \"menuOrders\"") && sql.includes("\"readyQuantity\" = \"readyQuantity\" + ?")) {
+      return d1Success([], { duration: 1, changes: options.statusUpdateChanges ?? 1 });
+    }
+    if (sql.startsWith("UPDATE \"menuOrders\"") && sql.includes("\"pickedUpQuantity\" = \"pickedUpQuantity\" + ?")) {
+      return d1Success([], { duration: 1, changes: options.statusUpdateChanges ?? 1 });
+    }
+    if (sql.startsWith("UPDATE \"menuOrders\"") && sql.includes("\"readyQuantity\" = \"readyQuantity\" - ?")) {
+      return d1Success([], { duration: 1, changes: options.statusUpdateChanges ?? 1 });
     }
     if (sql === "SELECT * FROM tables WHERE id = ? AND deletedAt IS NULL LIMIT 1") {
       return d1Success([{
@@ -392,7 +405,7 @@ describe("implemented mutation route handlers", () => {
         return tableInfo(["id", "tableId", "createdAt", "updatedAt", "deletedAt"]);
       }
       if (sql === "PRAGMA table_info(\"menuOrders\")") {
-        return tableInfo(["id", "quantity", "status", "orderId", "menuId", "createdAt", "updatedAt", "deletedAt"]);
+        return tableInfo(["id", "quantity", "readyQuantity", "pickedUpQuantity", "status", "orderId", "menuId", "createdAt", "updatedAt", "deletedAt"]);
       }
       if (sql.startsWith("SELECT * FROM payments WHERE deletedAt IS NULL AND paid = 0 AND expiresAt")) {
         return d1Success([]);
@@ -519,7 +532,7 @@ describe("implemented mutation route handlers", () => {
         return tableInfo(["id", "tableId", "createdAt", "updatedAt", "deletedAt"]);
       }
       if (sql === "PRAGMA table_info(\"menuOrders\")") {
-        return tableInfo(["id", "quantity", "status", "orderId", "menuId", "createdAt", "updatedAt", "deletedAt"]);
+        return tableInfo(["id", "quantity", "readyQuantity", "pickedUpQuantity", "status", "orderId", "menuId", "createdAt", "updatedAt", "deletedAt"]);
       }
       if (sql.startsWith("SELECT * FROM payments WHERE deletedAt IS NULL AND paid = 0 AND expiresAt")) {
         return d1Success([]);
@@ -838,6 +851,79 @@ describe("implemented mutation route handlers", () => {
     expect(requests.some((request) => request.sql === "SELECT * FROM firstOrderRules WHERE id = ? LIMIT 1")).toBe(false);
   });
 
+  it("completeMenuOrder can mark a partial pending quantity as ready", async () => {
+    const { requests } = installCompleteMenuOrderMock({
+      autoPickUpOnCookComplete: 0,
+      isTakeout: 1,
+      menuBlocker: true,
+      quantity: 4,
+    });
+
+    const { completeMenuOrder } = await import("~/lib/server/d1-mutations");
+    const result = await completeMenuOrder("menuorder_ready1", 1);
+
+    expect(result.error).toBeUndefined();
+    expect(result.status).toBe(200);
+    const statusUpdate = requests.find((request) => request.sql.startsWith("UPDATE \"menuOrders\"") && request.sql.includes("\"readyQuantity\" = \"readyQuantity\" + ?"));
+    expect(statusUpdate?.params[0]).toBe(1);
+    expect(statusUpdate?.params[1]).toBe("PENDING");
+    expect(requests.some((request) => request.sql === "UPDATE \"tableContexts\" SET \"deletedAt\" = ?, \"updatedAt\" = ? WHERE id = ?")).toBe(false);
+  });
+
+  it("completeMenuOrder marks the row ready when the last pending quantity is completed", async () => {
+    const { requests } = installCompleteMenuOrderMock({
+      autoPickUpOnCookComplete: 0,
+      isTakeout: 1,
+      menuBlocker: false,
+      quantity: 4,
+      readyQuantity: 1,
+    });
+
+    const { completeMenuOrder } = await import("~/lib/server/d1-mutations");
+    const result = await completeMenuOrder("menuorder_ready1", 3);
+
+    expect(result.error).toBeUndefined();
+    expect(result.status).toBe(200);
+    const statusUpdate = requests.find((request) => request.sql.startsWith("UPDATE \"menuOrders\"") && request.sql.includes("\"readyQuantity\" = \"readyQuantity\" + ?"));
+    expect(statusUpdate?.params[0]).toBe(3);
+    expect(statusUpdate?.params[1]).toBe("READY");
+  });
+
+  it("completeMenuOrder rejects quantities greater than the pending quantity", async () => {
+    const { requests } = installCompleteMenuOrderMock({
+      autoPickUpOnCookComplete: 0,
+      isTakeout: 1,
+      quantity: 4,
+      readyQuantity: 1,
+    });
+
+    const { completeMenuOrder } = await import("~/lib/server/d1-mutations");
+    const result = await completeMenuOrder("menuorder_ready1", 4);
+
+    expect(result.error).toBe("Menu order does not have enough pending quantity");
+    expect(result.status).toBe(409);
+    expect(requests.some((request) => request.sql.startsWith("UPDATE \"menuOrders\""))).toBe(false);
+  });
+
+  it("setMenuOrderStatus can pick up only part of the ready quantity", async () => {
+    const { requests } = installCompleteMenuOrderMock({
+      sourceStatus: "READY",
+      isTakeout: 0,
+      quantity: 4,
+      readyQuantity: 3,
+    });
+
+    const { setMenuOrderStatus } = await import("~/lib/server/d1-mutations");
+    const result = await setMenuOrderStatus("menuorder_ready1", "PICKED_UP", { quantity: 1 });
+
+    expect(result.error).toBeUndefined();
+    expect(result.status).toBe(200);
+    const statusUpdate = requests.find((request) => request.sql.startsWith("UPDATE \"menuOrders\"") && request.sql.includes("\"readyQuantity\" = \"readyQuantity\" - ?"));
+    expect(statusUpdate?.params[0]).toBe(1);
+    expect(statusUpdate?.params[1]).toBe(1);
+    expect(statusUpdate?.params[2]).toBe("PENDING");
+  });
+
   it("completeMenuOrder auto-vacates takeout tables after the last pending item becomes ready", async () => {
     const { requests } = installCompleteMenuOrderMock({
       autoPickUpOnCookComplete: 0,
@@ -850,8 +936,9 @@ describe("implemented mutation route handlers", () => {
 
     expect(result.error).toBeUndefined();
     expect(result.status).toBe(200);
-    const statusUpdate = requests.find((request) => request.sql === "UPDATE \"menuOrders\" SET \"status\" = ?, \"updatedAt\" = ? WHERE id = ? AND status = ?");
-    expect(statusUpdate?.params[0]).toBe("READY");
+    const statusUpdate = requests.find((request) => request.sql.startsWith("UPDATE \"menuOrders\"") && request.sql.includes("\"readyQuantity\" = \"readyQuantity\" + ?"));
+    expect(statusUpdate?.params[0]).toBe(1);
+    expect(statusUpdate?.params[1]).toBe("READY");
     expect(requests.some((request) => request.sql === "UPDATE \"tableContexts\" SET \"deletedAt\" = ?, \"updatedAt\" = ? WHERE id = ?")).toBe(true);
   });
 
@@ -867,8 +954,9 @@ describe("implemented mutation route handlers", () => {
 
     expect(result.error).toBeUndefined();
     expect(result.status).toBe(200);
-    const statusUpdate = requests.find((request) => request.sql === "UPDATE \"menuOrders\" SET \"status\" = ?, \"updatedAt\" = ? WHERE id = ? AND status = ?");
-    expect(statusUpdate?.params[0]).toBe("PICKED_UP");
+    const statusUpdate = requests.find((request) => request.sql.startsWith("UPDATE \"menuOrders\"") && request.sql.includes("\"pickedUpQuantity\" = \"pickedUpQuantity\" + ?"));
+    expect(statusUpdate?.params[0]).toBe(1);
+    expect(statusUpdate?.params[1]).toBe("PICKED_UP");
     expect(requests.some((request) => request.sql === "UPDATE \"tableContexts\" SET \"deletedAt\" = ?, \"updatedAt\" = ? WHERE id = ?")).toBe(true);
   });
 
@@ -1242,7 +1330,7 @@ describe("implemented mutation route handlers", () => {
         return tableInfo(paymentColumns);
       }
       if (sql === "PRAGMA table_info(\"menuOrders\")") {
-        return tableInfo(["id", "quantity", "status", "orderId", "menuId", "createdAt", "updatedAt", "deletedAt"]);
+        return tableInfo(["id", "quantity", "readyQuantity", "pickedUpQuantity", "status", "orderId", "menuId", "createdAt", "updatedAt", "deletedAt"]);
       }
       if (sql === "PRAGMA table_info(\"orders\")") {
         return tableInfo(orderColumns);
@@ -1689,7 +1777,7 @@ describe("implemented mutation route handlers", () => {
         return tableInfo(paymentColumns);
       }
       if (sql === "PRAGMA table_info(\"menuOrders\")") {
-        return tableInfo(["id", "quantity", "status", "orderId", "menuId", "createdAt", "updatedAt", "deletedAt"]);
+        return tableInfo(["id", "quantity", "readyQuantity", "pickedUpQuantity", "status", "orderId", "menuId", "createdAt", "updatedAt", "deletedAt"]);
       }
       if (sql === "PRAGMA table_info(\"orders\")") {
         return tableInfo(orderColumns);

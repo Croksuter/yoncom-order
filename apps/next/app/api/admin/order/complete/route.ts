@@ -12,7 +12,7 @@ export async function PUT(request: Request) {
   try {
     const query = await parseJsonBody(request, completeValidation);
     return await idempotentMutationResponse(request, "admin:order:complete", query, () =>
-      completeMenuOrder(query.menuOrderId),
+      completeMenuOrder(query.menuOrderId, query.quantity),
     );
   } catch (error) {
     return routeError(error);

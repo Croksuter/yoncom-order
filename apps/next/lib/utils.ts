@@ -2,9 +2,9 @@ import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import * as ClientTableResponse from "shared/types/responses/client/table";
 import * as AdminTableResponse from "shared/types/responses/admin/table";
-import { menuOrderStatus } from "db/schema";
 import * as AdminMenuResponse from "shared/types/responses/admin/menu";
 import { isPaymentPaid } from "./order-status";
+import { getMenuOrderProgress } from "./menu-order-progress";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -40,7 +40,9 @@ export function filterOrders(orders: ClientTableResponse.Get["result"]["tableCon
         || (option.cancelled ? order.deletedAt !== null : order.deletedAt === null)
       ) && (
         (option.done === undefined) 
-        || (option.done ? order.menuOrders.every((mO) => mO.status !== menuOrderStatus.PENDING) : order.menuOrders.some((mO) => mO.status === menuOrderStatus.PENDING))
+        || (option.done
+          ? order.menuOrders.every((mO) => getMenuOrderProgress(mO).pendingQuantity === 0)
+          : order.menuOrders.some((mO) => getMenuOrderProgress(mO).pendingQuantity > 0))
       )
     );
   });
@@ -50,7 +52,7 @@ export function filterMenuOrders(menuOrders: ClientTableResponse.Get["result"]["
   done: boolean;
 }) {
   return menuOrders.filter((menuOrder) => {
-    return option.done ? menuOrder.status !== menuOrderStatus.PENDING : menuOrder.status === menuOrderStatus.PENDING
+    return option.done ? getMenuOrderProgress(menuOrder).pendingQuantity === 0 : getMenuOrderProgress(menuOrder).pendingQuantity > 0
   });
 }
 

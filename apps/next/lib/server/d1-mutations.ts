@@ -2,6 +2,7 @@ import { generateId } from "lucia";
 import { bankTransactionStatus, menuOrderStatus, orderStatus, paymentStatus } from "db/schema";
 import type { ClientNoticeSettings, OrderWorkflowSettings, PaymentSettings } from "db/schema";
 import { executeD1, hasD1Table, queryD1 } from "~/lib/server/db";
+import { getMenuOrderProgress } from "~/lib/menu-order-progress";
 import { defaultPaymentSettings, normalizePaymentSettings } from "~/lib/payment-settings";
 import { revokeTableSessions } from "~/lib/server/table-session";
 import { appendDomainEvent, tableScope, venueScope, type DomainEventRecord } from "~/lib/server/sync-events";
@@ -120,6 +121,8 @@ type PaymentRow = BaseRow & {
 
 type MenuOrderRow = BaseRow & {
   quantity: number;
+  readyQuantity?: number | null;
+  pickedUpQuantity?: number | null;
   status: string;
   orderId: string;
   menuId: string;
@@ -189,6 +192,7 @@ let firstOrderRuleTablesEnsured = false;
 let menuBundleTableEnsured = false;
 let clientNoticeSettingsTableEnsured = false;
 let orderWorkflowSettingsTableEnsured = false;
+let menuOrderProgressColumnsEnsured = false;
 
 export function quoteIdentifier(identifier: string) {
   return `"${identifier.replaceAll("\"", "\"\"")}"`;
@@ -434,6 +438,44 @@ async function ensureOrderWorkflowSettingsTable() {
     )
   `);
   orderWorkflowSettingsTableEnsured = true;
+}
+
+async function ensureMenuOrderProgressColumns() {
+  if (menuOrderProgressColumnsEnsured) {
+    return;
+  }
+
+  const columns = await getD1Columns("menuOrders");
+  let addedReadyQuantity = false;
+  let addedPickedUpQuantity = false;
+
+  if (!columns.has("readyQuantity")) {
+    await executeD1(`ALTER TABLE ${quoteIdentifier("menuOrders")} ADD ${quoteIdentifier("readyQuantity")} INTEGER DEFAULT 0 NOT NULL`);
+    columns.add("readyQuantity");
+    addedReadyQuantity = true;
+  }
+
+  if (!columns.has("pickedUpQuantity")) {
+    await executeD1(`ALTER TABLE ${quoteIdentifier("menuOrders")} ADD ${quoteIdentifier("pickedUpQuantity")} INTEGER DEFAULT 0 NOT NULL`);
+    columns.add("pickedUpQuantity");
+    addedPickedUpQuantity = true;
+  }
+
+  if (addedReadyQuantity) {
+    await executeD1(
+      `UPDATE ${quoteIdentifier("menuOrders")} SET ${quoteIdentifier("readyQuantity")} = ${quoteIdentifier("quantity")} WHERE ${quoteIdentifier("status")} = ?`,
+      [menuOrderStatus.READY],
+    );
+  }
+
+  if (addedPickedUpQuantity) {
+    await executeD1(
+      `UPDATE ${quoteIdentifier("menuOrders")} SET ${quoteIdentifier("pickedUpQuantity")} = ${quoteIdentifier("quantity")} WHERE ${quoteIdentifier("status")} IN (?, ?)`,
+      [menuOrderStatus.PICKED_UP, "SERVED"],
+    );
+  }
+
+  menuOrderProgressColumnsEnsured = true;
 }
 
 async function getVenueAndTableScopes() {
@@ -1486,6 +1528,8 @@ async function createClientOrderInternal(
         orderId,
         menuId: menuOrder.menuId,
         quantity: menuOrder.quantity,
+        readyQuantity: 0,
+        pickedUpQuantity: 0,
         status: menuOrderStatus.PENDING,
         createdAt: timestamp,
         updatedAt: timestamp,
@@ -1971,6 +2015,7 @@ export async function ignoreBankTransaction(bankTransactionId: string): Promise<
 type SetMenuOrderStatusOptions = {
   allowPendingPickup?: boolean;
   autoVacateTakeout?: boolean;
+  quantity?: number;
 };
 
 export async function setMenuOrderStatus(
@@ -1978,6 +2023,8 @@ export async function setMenuOrderStatus(
   status: string,
   options: SetMenuOrderStatusOptions = {},
 ): Promise<MutationResult> {
+  await ensureMenuOrderProgressColumns();
+
   const menuOrder = (await queryD1<MenuOrderRow>(
     "SELECT * FROM menuOrders WHERE id = ? AND deletedAt IS NULL LIMIT 1",
     [menuOrderId],
@@ -1987,18 +2034,38 @@ export async function setMenuOrderStatus(
     return { error: "Menu Order Not Found", status: 404 };
   }
 
-  if (status === menuOrderStatus.READY && menuOrder.status !== menuOrderStatus.PENDING) {
-    return { error: "Menu order must be pending before ready", status: 409 };
+  if (menuOrder.status === menuOrderStatus.CANCELLED) {
+    return { error: "Menu order is cancelled", status: 409 };
   }
 
-  const canPickUp = options.allowPendingPickup
-    ? menuOrder.status === menuOrderStatus.PENDING || menuOrder.status === menuOrderStatus.READY
-    : menuOrder.status === menuOrderStatus.READY;
-  if (status === menuOrderStatus.PICKED_UP && !canPickUp) {
-    return { error: "Menu order must be ready before pickup", status: 409 };
+  if (status !== menuOrderStatus.READY && status !== menuOrderStatus.PICKED_UP) {
+    return { error: "Invalid menu order status", status: 400 };
   }
 
-  if (status === menuOrderStatus.READY || (status === menuOrderStatus.PICKED_UP && menuOrder.status === menuOrderStatus.PENDING)) {
+  const progress = getMenuOrderProgress(menuOrder);
+  const availableQuantity = status === menuOrderStatus.READY
+    ? progress.pendingQuantity
+    : options.allowPendingPickup
+      ? progress.pendingQuantity
+      : progress.readyQuantity;
+  const selectedQuantity = options.quantity ?? availableQuantity;
+
+  if (!Number.isInteger(selectedQuantity) || selectedQuantity < 1) {
+    return { error: "Invalid quantity", status: 400 };
+  }
+
+  if (selectedQuantity > availableQuantity) {
+    return {
+      error: status === menuOrderStatus.READY
+        ? "Menu order does not have enough pending quantity"
+        : options.allowPendingPickup
+          ? "Menu order does not have enough pending quantity"
+        : "Menu order does not have enough ready quantity",
+      status: 409,
+    };
+  }
+
+  if (status === menuOrderStatus.READY || status === menuOrderStatus.PICKED_UP) {
     const paymentJoin = await paymentJoinSql("o", "p");
     const paidOrders = await queryD1<{ paid: boolean | number; status?: string | null; orderStatus?: string | null }>(
       `SELECT p.paid, p.status, o.status AS orderStatus FROM orders o INNER JOIN payments p ON ${paymentJoin} WHERE o.id = ? AND p.deletedAt IS NULL LIMIT 1`,
@@ -2012,14 +2079,60 @@ export async function setMenuOrderStatus(
     }
   }
 
-  const statusUpdate = await updateD1Rows(
-    "menuOrders",
-    { status, updatedAt: now() },
-    "id = ? AND status = ?",
-    [menuOrderId, menuOrder.status],
-  );
+  const timestamp = now();
+  const nextReadyQuantity = status === menuOrderStatus.READY
+    ? progress.readyQuantity + selectedQuantity
+    : options.allowPendingPickup
+      ? progress.readyQuantity
+      : progress.readyQuantity - selectedQuantity;
+  const nextPickedUpQuantity = status === menuOrderStatus.PICKED_UP
+    ? progress.pickedUpQuantity + selectedQuantity
+    : progress.pickedUpQuantity;
+  const nextStatus = nextPickedUpQuantity >= progress.totalQuantity
+    ? menuOrderStatus.PICKED_UP
+    : progress.totalQuantity - nextReadyQuantity - nextPickedUpQuantity > 0
+      ? menuOrderStatus.PENDING
+      : nextReadyQuantity > 0
+        ? menuOrderStatus.READY
+        : menuOrder.status;
+  const statusUpdate = status === menuOrderStatus.READY
+    ? await executeD1(
+      `UPDATE ${quoteIdentifier("menuOrders")}
+       SET ${quoteIdentifier("readyQuantity")} = ${quoteIdentifier("readyQuantity")} + ?,
+        ${quoteIdentifier("status")} = ?,
+        ${quoteIdentifier("updatedAt")} = ?
+       WHERE id = ?
+        AND deletedAt IS NULL
+        AND status != ?
+        AND (${quoteIdentifier("quantity")} - ${quoteIdentifier("readyQuantity")} - ${quoteIdentifier("pickedUpQuantity")}) >= ?`,
+      [selectedQuantity, nextStatus, timestamp, menuOrderId, menuOrderStatus.CANCELLED, selectedQuantity],
+    )
+    : options.allowPendingPickup
+      ? await executeD1(
+        `UPDATE ${quoteIdentifier("menuOrders")}
+         SET ${quoteIdentifier("pickedUpQuantity")} = ${quoteIdentifier("pickedUpQuantity")} + ?,
+          ${quoteIdentifier("status")} = ?,
+          ${quoteIdentifier("updatedAt")} = ?
+         WHERE id = ?
+          AND deletedAt IS NULL
+          AND status != ?
+          AND (${quoteIdentifier("quantity")} - ${quoteIdentifier("readyQuantity")} - ${quoteIdentifier("pickedUpQuantity")}) >= ?`,
+        [selectedQuantity, nextStatus, timestamp, menuOrderId, menuOrderStatus.CANCELLED, selectedQuantity],
+      )
+      : await executeD1(
+        `UPDATE ${quoteIdentifier("menuOrders")}
+         SET ${quoteIdentifier("readyQuantity")} = ${quoteIdentifier("readyQuantity")} - ?,
+          ${quoteIdentifier("pickedUpQuantity")} = ${quoteIdentifier("pickedUpQuantity")} + ?,
+          ${quoteIdentifier("status")} = ?,
+          ${quoteIdentifier("updatedAt")} = ?
+         WHERE id = ?
+          AND deletedAt IS NULL
+          AND status != ?
+          AND ${quoteIdentifier("readyQuantity")} >= ?`,
+        [selectedQuantity, selectedQuantity, nextStatus, timestamp, menuOrderId, menuOrderStatus.CANCELLED, selectedQuantity],
+      );
   if (!statusUpdate || statusUpdate.changed <= 0) {
-    return { error: "Menu order status changed", status: 409 };
+    return { error: "Menu order quantity changed", status: 409 };
   }
   const scopeInfo = await getTableIdForMenuOrder(menuOrderId);
   const result = await withDomainEvent(
@@ -2029,7 +2142,14 @@ export async function setMenuOrderStatus(
       scopes: [venueScope, ...(scopeInfo?.tableId ? [tableScope(scopeInfo.tableId)] : [])],
       entityType: "menuOrder",
       entityId: menuOrderId,
-      payload: { tableId: scopeInfo?.tableId ?? null, orderId: scopeInfo?.orderId ?? menuOrder.orderId, status },
+      payload: {
+        tableId: scopeInfo?.tableId ?? null,
+        orderId: scopeInfo?.orderId ?? menuOrder.orderId,
+        status: nextStatus,
+        quantity: selectedQuantity,
+        readyQuantity: nextReadyQuantity,
+        pickedUpQuantity: nextPickedUpQuantity,
+      },
     },
   );
   if (options.autoVacateTakeout && scopeInfo?.tableId && scopeInfo.tableContextId) {
@@ -2043,7 +2163,7 @@ export async function setMenuOrderStatus(
   return result;
 }
 
-export async function completeMenuOrder(menuOrderId: string): Promise<MutationResult> {
+export async function completeMenuOrder(menuOrderId: string, quantity?: number): Promise<MutationResult> {
   const settings = await getOrderWorkflowSettings();
   return await setMenuOrderStatus(
     menuOrderId,
@@ -2051,6 +2171,7 @@ export async function completeMenuOrder(menuOrderId: string): Promise<MutationRe
     {
       allowPendingPickup: settings.autoPickUpOnCookComplete,
       autoVacateTakeout: true,
+      quantity,
     },
   );
 }
@@ -2087,11 +2208,11 @@ async function hasAutoVacatePaymentBlocker(tableContextId: string) {
 
 async function hasAutoVacateMenuBlocker(tableContextId: string, completedStatus: string) {
   const statusSql = completedStatus === menuOrderStatus.READY
-    ? "mo.status = ?"
-    : "mo.status NOT IN (?, ?)";
+    ? `(mo.status != ? AND (mo.quantity - mo.readyQuantity - mo.pickedUpQuantity) > 0)`
+    : `(mo.status != ? AND mo.pickedUpQuantity < mo.quantity)`;
   const statusParams = completedStatus === menuOrderStatus.READY
-    ? [menuOrderStatus.PENDING]
-    : [menuOrderStatus.PICKED_UP, menuOrderStatus.CANCELLED];
+    ? [menuOrderStatus.CANCELLED]
+    : [menuOrderStatus.CANCELLED];
   const rows = await queryD1<{ id: string }>(
     `SELECT mo.id
      FROM menuOrders mo

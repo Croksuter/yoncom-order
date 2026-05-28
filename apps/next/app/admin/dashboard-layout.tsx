@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { PublicSessionUser } from "shared/types/responses/client/admin";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -18,7 +18,9 @@ import {
   ChefHat,
   LogOut,
   Sun,
-  Moon
+  Moon,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 
 function getProfileInitials(name: string) {
@@ -43,6 +45,7 @@ export default function DashboardLayout({
   const { theme, toggleTheme, isDark, mounted } = useTheme();
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
 
@@ -87,9 +90,27 @@ export default function DashboardLayout({
 
   // Dynamic header titles based on pathname
   const isCooker = pathname === "/admin/cooker";
+  const isPos = pathname === "/admin/pos";
+  const canCollapseHeader = isPos || isCooker;
+  const headerCollapseStorageKey = isCooker ? "admin_cooker_header_collapsed" : "admin_pos_header_collapsed";
   const title = isCooker ? "Kitchen Monitor" : "Dashboard Overview";
   const subtitle = isCooker ? "메뉴별 실시간 대기열 모니터링" : "POS Dashboard & Live Status";
   const profileInitials = getProfileInitials(user.name);
+
+  useEffect(() => {
+    if (!canCollapseHeader) {
+      setIsHeaderCollapsed(false);
+      return;
+    }
+
+    setIsHeaderCollapsed(localStorage.getItem(headerCollapseStorageKey) === "true");
+  }, [canCollapseHeader, headerCollapseStorageKey]);
+
+  const toggleHeaderCollapsed = () => {
+    const nextCollapsed = !isHeaderCollapsed;
+    setIsHeaderCollapsed(nextCollapsed);
+    localStorage.setItem(headerCollapseStorageKey, String(nextCollapsed));
+  };
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-slate-50 dark:bg-slate-950 font-sans transition-colors duration-300 relative">
@@ -251,15 +272,31 @@ export default function DashboardLayout({
       {/* Main Workspace (Top Header + POS/Kitchen content) */}
       <main className="flex-1 flex flex-col h-full overflow-hidden md:pl-16 pl-0 z-10 transition-all duration-300">
         {/* Top Header Section */}
-        <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80 h-20 flex-shrink-0 flex justify-between items-center px-6 z-10 transition-colors duration-300">
-          <div className="flex flex-col">
-            <h2 className="font-extrabold text-xl sm:text-2xl text-slate-800 dark:text-white tracking-tight">
-              {title}
-            </h2>
-            <p className="text-xs text-slate-400 dark:text-slate-300 font-medium">{subtitle}</p>
+        <header className={`bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80 flex-shrink-0 flex justify-between items-center px-6 z-10 transition-all duration-300 ${
+          isHeaderCollapsed && canCollapseHeader ? "h-10" : "h-20"
+        }`}>
+          <div className="flex min-w-0 items-center gap-3">
+            <div className={`flex flex-col transition-all duration-200 ${
+              isHeaderCollapsed && canCollapseHeader ? "opacity-0 pointer-events-none w-0 overflow-hidden" : "opacity-100"
+            }`}>
+              <h2 className="font-extrabold text-xl sm:text-2xl text-slate-800 dark:text-white tracking-tight">
+                {title}
+              </h2>
+              <p className="text-xs text-slate-400 dark:text-slate-300 font-medium">{subtitle}</p>
+            </div>
+            {isHeaderCollapsed && canCollapseHeader && (
+              <span className="truncate text-xs font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-300">
+                {title}
+              </span>
+            )}
           </div>
 
-          <div className="flex items-center gap-4 sm:gap-6">
+          <div className={`flex items-center gap-4 sm:gap-6 transition-all duration-200 ${
+            isHeaderCollapsed && canCollapseHeader ? "gap-2 sm:gap-2" : ""
+          }`}>
+            <div className={`contents ${
+              isHeaderCollapsed && canCollapseHeader ? "[&>*]:hidden" : ""
+            }`}>
             <div className="flex flex-col items-end">
               <span className="text-xs sm:text-sm font-bold text-slate-400 dark:text-slate-300 uppercase tracking-wider">Total Sales</span>
               <span className="text-lg sm:text-xl font-black text-brand-600 dark:text-brand-700">
@@ -298,6 +335,17 @@ export default function DashboardLayout({
                   {isDark ? <Sun className="h-4.5 w-4.5 text-amber-500" /> : <Moon className="h-4.5 w-4.5 text-slate-500" />}
                 </button>
               </>
+            )}
+            </div>
+            {canCollapseHeader && (
+              <button
+                type="button"
+                onClick={toggleHeaderCollapsed}
+                className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-750 border border-slate-200/80 dark:border-slate-800 text-slate-600 dark:text-slate-200 transition-all duration-200 flex items-center justify-center active:scale-95 shadow-sm shrink-0"
+                title={isHeaderCollapsed ? "헤더 펼치기" : "헤더 접기"}
+              >
+                {isHeaderCollapsed ? <ChevronDown className="h-4.5 w-4.5" /> : <ChevronUp className="h-4.5 w-4.5" />}
+              </button>
             )}
           </div>
         </header>

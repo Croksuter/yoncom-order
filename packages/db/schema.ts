@@ -549,6 +549,8 @@ export const menuOrders = sqliteTable("menuOrders", {
     .notNull()
     .$defaultFn(() => generateId(15)),
   quantity: integer("quantity").notNull(),
+  readyQuantity: integer("readyQuantity").notNull().default(0),
+  pickedUpQuantity: integer("pickedUpQuantity").notNull().default(0),
   status: text("status")
     .notNull()
     .$type<MenuOrderStatus>()

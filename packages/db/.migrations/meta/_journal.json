@@ -71,6 +71,13 @@
       "when": 1779897600000,
       "tag": "0009_takeout_order_workflow",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1779984000000,
+      "tag": "0010_partial_menu_order_progress",
+      "breakpoints": true
     }
   ]
 }
