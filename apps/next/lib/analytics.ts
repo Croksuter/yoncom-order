@@ -42,6 +42,7 @@ export type AnalyticsPayment = {
   expectedTransferAmount?: number | null;
   paymentCode?: number | null;
   refundAmount?: number | null;
+  refundNote?: string | null;
   paidAt?: number | string | null;
   refundedAt?: number | string | null;
   createdAt?: number | string | null;
@@ -53,6 +54,7 @@ export type AnalyticsOrder = {
   id: string;
   displayNumber?: number | null;
   status?: string | null;
+  cancelReason?: string | null;
   createdAt: number | string;
   updatedAt?: number | string;
   deletedAt?: number | string | null;
@@ -92,11 +94,13 @@ type CountedOrder = {
   order: AnalyticsOrder;
   timestamp: number;
   grossSales: number;
+  operatingRevenue: number;
   completedRefundAmount: number;
   refundPendingAmount: number;
   estimatedCost: number;
   estimatedProfit: number;
   itemCount: number;
+  isOperatingSale: boolean;
 };
 
 export function normalizeTime(value: number | string | null | undefined) {
@@ -196,6 +200,26 @@ function isCountedPaymentStatus(status: string | null | undefined) {
   return status === "PAID" || status === "REFUND_PENDING" || status === "REFUNDED";
 }
 
+function isOperatingSale(order: AnalyticsOrder) {
+  return order.status !== "CANCELLED" && (order.payment?.status === "PAID" || order.payment?.status === "REFUND_PENDING");
+}
+
+function getOrderCostAndItemCount(
+  order: AnalyticsOrder,
+  menusById: Map<string, AnalyticsMenu>,
+  bundleItemsByBundleId: Map<string, AnalyticsMenuBundleItem[]>,
+) {
+  return order.menuOrders.reduce((acc, menuOrder) => {
+    if (normalizeTime(menuOrder.deletedAt) !== null) return acc;
+    const menu = menusById.get(menuOrder.menuId);
+    if (!menu) return acc;
+    return {
+      estimatedCost: acc.estimatedCost + getAppliedUnitCost(menu, menusById, bundleItemsByBundleId) * menuOrder.quantity,
+      itemCount: acc.itemCount + menuOrder.quantity,
+    };
+  }, { estimatedCost: 0, itemCount: 0 });
+}
+
 function getComparableRange(from: number, to: number) {
   const duration = to - from;
   return { from: Math.max(0, from - duration), to: from };
@@ -238,31 +262,28 @@ function summarizeOrders(
     })
     .map((order): CountedOrder => {
       const grossSales = getOrderAmount(order, menusById);
+      const operatingSale = isOperatingSale(order);
       const completedRefundAmount = order.payment?.status === "REFUNDED"
         ? order.payment.refundAmount ?? grossSales
         : 0;
       const refundPendingAmount = order.payment?.status === "REFUND_PENDING"
         ? order.payment.refundAmount ?? grossSales
         : 0;
-      const { estimatedCost, itemCount } = order.menuOrders.reduce((acc, menuOrder) => {
-        if (normalizeTime(menuOrder.deletedAt) !== null) return acc;
-        const menu = menusById.get(menuOrder.menuId);
-        if (!menu) return acc;
-        return {
-          estimatedCost: acc.estimatedCost + getAppliedUnitCost(menu, menusById, bundleItemsByBundleId) * menuOrder.quantity,
-          itemCount: acc.itemCount + menuOrder.quantity,
-        };
-      }, { estimatedCost: 0, itemCount: 0 });
+      const { estimatedCost: rawEstimatedCost, itemCount: rawItemCount } = getOrderCostAndItemCount(order, menusById, bundleItemsByBundleId);
+      const operatingRevenue = operatingSale ? grossSales : 0;
+      const estimatedCost = operatingSale ? rawEstimatedCost : 0;
 
       return {
         order,
         timestamp: getSalesTimestamp(order),
         grossSales,
+        operatingRevenue,
         completedRefundAmount,
         refundPendingAmount,
         estimatedCost,
-        estimatedProfit: grossSales - completedRefundAmount - estimatedCost,
-        itemCount,
+        estimatedProfit: operatingRevenue - estimatedCost,
+        itemCount: operatingSale ? rawItemCount : 0,
+        isOperatingSale: operatingSale,
       };
     });
 }
@@ -293,15 +314,13 @@ function buildRecordRows(
         const refundAmount = order.payment?.status === "REFUNDED" || order.payment?.status === "REFUND_PENDING"
           ? order.payment.refundAmount ?? grossSales
           : 0;
-        const { estimatedCost, itemCount } = order.menuOrders.reduce((acc, menuOrder) => {
-          if (normalizeTime(menuOrder.deletedAt) !== null) return acc;
-          const menu = menusById.get(menuOrder.menuId);
-          if (!menu) return acc;
-          return {
-            estimatedCost: acc.estimatedCost + getAppliedUnitCost(menu, menusById, bundleItemsByBundleId) * menuOrder.quantity,
-            itemCount: acc.itemCount + menuOrder.quantity,
-          };
-        }, { estimatedCost: 0, itemCount: 0 });
+        const refundReason = refundAmount > 0
+          ? order.payment?.refundNote?.trim() || order.cancelReason?.trim() || null
+          : null;
+        const operatingSale = isOperatingSale(order);
+        const { estimatedCost: rawEstimatedCost, itemCount } = getOrderCostAndItemCount(order, menusById, bundleItemsByBundleId);
+        const estimatedCost = operatingSale ? rawEstimatedCost : 0;
+        const operatingRevenue = operatingSale ? grossSales : 0;
         const completedRefundAmount = order.payment?.status === "REFUNDED" ? refundAmount : 0;
         const paymentAmount = order.payment?.amount ?? 0;
 
@@ -320,8 +339,9 @@ function buildRecordRows(
           grossSales,
           netSales: grossSales - completedRefundAmount,
           refundAmount,
+          refundReason,
           estimatedCost,
-          estimatedProfit: grossSales - completedRefundAmount - estimatedCost,
+          estimatedProfit: operatingRevenue - estimatedCost,
           itemCount,
           paymentAmount,
           expectedTransferAmount: order.payment?.expectedTransferAmount ?? null,
@@ -354,6 +374,7 @@ export function buildAdminAnalytics(input: BuildAnalyticsInput): AdminAnalyticsR
     orders.reduce((total, row) => total + row[key], 0);
 
   const grossSales = sum(countedOrders, "grossSales");
+  const operatingRevenue = countedOrders.reduce((total, row) => total + row.operatingRevenue, 0);
   const completedRefundAmount = sum(countedOrders, "completedRefundAmount");
   const estimatedCost = sum(countedOrders, "estimatedCost");
   const estimatedProfit = sum(countedOrders, "estimatedProfit");
@@ -389,8 +410,10 @@ export function buildAdminAnalytics(input: BuildAnalyticsInput): AdminAnalyticsR
       point.netSales += counted.grossSales - counted.completedRefundAmount;
       point.estimatedCost += counted.estimatedCost;
       point.estimatedProfit += counted.estimatedProfit;
-      point.orderCount += 1;
+      point.orderCount += counted.isOperatingSale ? 1 : 0;
     }
+
+    if (!counted.isOperatingSale) continue;
 
     for (const menuOrder of counted.order.menuOrders) {
       if (normalizeTime(menuOrder.deletedAt) !== null) continue;
@@ -534,8 +557,8 @@ export function buildAdminAnalytics(input: BuildAnalyticsInput): AdminAnalyticsR
       refundAmount: moneyKpi(completedRefundAmount, previousCompletedRefundAmount),
       estimatedCost: moneyKpi(estimatedCost, previousEstimatedCost),
       estimatedProfit: moneyKpi(estimatedProfit, previousEstimatedProfit),
-      costRate: grossSales > 0 ? estimatedCost / grossSales : null,
-      orderCount: countedOrders.length,
+      costRate: operatingRevenue > 0 ? estimatedCost / operatingRevenue : null,
+      orderCount: countedOrders.filter((order) => order.isOperatingSale).length,
       soldItemCount: countedOrders.reduce((total, order) => total + order.itemCount, 0),
     },
     series: [...bucketSeries.values()],

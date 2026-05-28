@@ -80,6 +80,7 @@ export type RecordRow = {
   grossSales: number;
   netSales: number;
   refundAmount: number;
+  refundReason: string | null;
   estimatedCost: number;
   estimatedProfit: number;
   itemCount: number;

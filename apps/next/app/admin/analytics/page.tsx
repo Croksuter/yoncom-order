@@ -5,6 +5,9 @@ import type { ComponentType } from "react";
 import type * as AdminAnalyticsResponse from "shared/types/responses/admin/analytics";
 import { api } from "~/lib/query";
 import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
   AlertTriangle,
   Banknote,
   Download,
@@ -14,6 +17,7 @@ import {
   ReceiptText,
   RefreshCw,
   Scale,
+  Search,
   Trash2,
   TrendingUp,
   WalletCards,
@@ -42,6 +46,22 @@ type ExpenseRow = {
 type RangeValue = {
   from: number;
   to: number;
+};
+
+type SortDirection = "asc" | "desc";
+type MenuSortKey =
+  | "menuName"
+  | "quantity"
+  | "revenue"
+  | "appliedUnitCost"
+  | "estimatedProfit"
+  | "costRate"
+  | "currentPrice"
+  | "recommendedPrice";
+type MenuProfitabilityRow = AdminAnalyticsResponse.MenuRow & {
+  recommendedRevenue: number;
+  recommendedProfit: number;
+  priceGap: number;
 };
 
 const defaultExpenseRows: ExpenseRow[] = [
@@ -167,6 +187,61 @@ function parseExpenseAmount(value: string) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 }
 
+function normalizeSearchText(value: string | number | null | undefined) {
+  return String(value ?? "").trim().toLocaleLowerCase("ko-KR");
+}
+
+function getMenuSortValue(row: MenuProfitabilityRow, key: MenuSortKey) {
+  if (key === "menuName") return row.menuName;
+  if (key === "quantity") return row.quantity;
+  if (key === "revenue") return row.revenue;
+  if (key === "appliedUnitCost") return row.appliedUnitCost;
+  if (key === "estimatedProfit") return row.estimatedProfit;
+  if (key === "costRate") return row.costRate;
+  if (key === "currentPrice") return row.currentPrice;
+  return row.recommendedPrice;
+}
+
+function compareMenuRows(a: MenuProfitabilityRow, b: MenuProfitabilityRow, key: MenuSortKey, direction: SortDirection) {
+  const leftValue = getMenuSortValue(a, key);
+  const rightValue = getMenuSortValue(b, key);
+  const directionFactor = direction === "asc" ? 1 : -1;
+
+  if (typeof leftValue === "string" || typeof rightValue === "string") {
+    return normalizeSearchText(leftValue).localeCompare(normalizeSearchText(rightValue), "ko-KR") * directionFactor;
+  }
+
+  const leftNumber = leftValue ?? (direction === "asc" ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY);
+  const rightNumber = rightValue ?? (direction === "asc" ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY);
+  if (leftNumber === rightNumber) return a.menuName.localeCompare(b.menuName, "ko-KR");
+  return (leftNumber - rightNumber) * directionFactor;
+}
+
+function recordMatchesSearch(row: AdminAnalyticsResponse.RecordRow, query: string) {
+  const normalizedQuery = normalizeSearchText(query);
+  if (!normalizedQuery) return true;
+
+  return [
+    formatKstDateTime(row.timestamp),
+    row.tableName,
+    row.displayNumber,
+    row.orderId,
+    row.paymentId,
+    row.orderStatus,
+    row.paymentStatus,
+    row.refundReason,
+    row.grossSales,
+    row.netSales,
+    row.refundAmount,
+    row.estimatedCost,
+    row.estimatedProfit,
+    row.itemCount,
+    row.paymentAmount,
+    row.expectedTransferAmount,
+    row.paymentCode,
+  ].some((value) => normalizeSearchText(value).includes(normalizedQuery));
+}
+
 function csvValue(value: string | number | null) {
   return `"${String(value ?? "").replaceAll("\"", "\"\"")}"`;
 }
@@ -280,6 +355,8 @@ function AnalyticsPage() {
   const [isRangeHydrated, setIsRangeHydrated] = useState(false);
   const [targetMarginPercent, setTargetMarginPercent] = useState(defaultTargetMarginPercent);
   const [expenseRows, setExpenseRows] = useState<ExpenseRow[]>(defaultExpenseRows);
+  const [menuSort, setMenuSort] = useState<{ key: MenuSortKey; direction: SortDirection }>({ key: "revenue", direction: "desc" });
+  const [recordSearchQuery, setRecordSearchQuery] = useState("");
   const [selectedRecordIds, setSelectedRecordIds] = useState<Set<string>>(new Set());
   const [data, setData] = useState<AdminAnalyticsResponse.Get["result"] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -337,15 +414,17 @@ function AnalyticsPage() {
   );
   const adjustedFinancials = useMemo(() => {
     const grossSales = data?.summary.grossSales.value ?? 0;
+    const operatingRevenue = data?.menuRows.reduce((sum, row) => sum + row.revenue, 0) ?? 0;
     const estimatedCost = data?.summary.estimatedCost.value ?? 0;
     const estimatedProfit = data?.summary.estimatedProfit.value ?? 0;
     const adjustedCost = estimatedCost + extraExpenseTotal;
     return {
       grossSales,
+      operatingRevenue,
       estimatedCost,
       adjustedCost,
       adjustedProfit: estimatedProfit - extraExpenseTotal,
-      adjustedCostRate: grossSales > 0 ? adjustedCost / grossSales : null,
+      adjustedCostRate: operatingRevenue > 0 ? adjustedCost / operatingRevenue : null,
     };
   }, [data, extraExpenseTotal]);
 
@@ -399,7 +478,7 @@ function AnalyticsPage() {
 
   const simulatedMenuRows = useMemo(() => {
     if (!data) return [];
-    return data.menuRows.map((row) => {
+    return data.menuRows.map((row): MenuProfitabilityRow => {
       const simulatedRecommendedPrice = recommendedPrice(row.appliedUnitCost, targetMarginBps);
       return {
         ...row,
@@ -410,6 +489,10 @@ function AnalyticsPage() {
       };
     });
   }, [data, targetMarginBps]);
+  const sortedMenuRows = useMemo(
+    () => [...simulatedMenuRows].sort((a, b) => compareMenuRows(a, b, menuSort.key, menuSort.direction)),
+    [menuSort.direction, menuSort.key, simulatedMenuRows],
+  );
 
   const pricingSummary = useMemo(() => {
     const currentRevenue = simulatedMenuRows.reduce((sum, row) => sum + row.revenue, 0);
@@ -432,6 +515,23 @@ function AnalyticsPage() {
     if (!data) return [];
     return data.recordRows.filter((row) => selectedRecordIds.has(row.recordId));
   }, [data, selectedRecordIds]);
+  const filteredRecordRows = useMemo(() => {
+    if (!data) return [];
+    return data.recordRows.filter((row) => recordMatchesSearch(row, recordSearchQuery));
+  }, [data, recordSearchQuery]);
+  const selectedVisibleRecordCount = useMemo(
+    () => filteredRecordRows.filter((row) => selectedRecordIds.has(row.recordId)).length,
+    [filteredRecordRows, selectedRecordIds],
+  );
+
+  const toggleMenuSort = (key: MenuSortKey) => {
+    setMenuSort((prev) => {
+      if (prev.key === key) {
+        return { key, direction: prev.direction === "desc" ? "asc" : "desc" };
+      }
+      return { key, direction: key === "menuName" ? "asc" : "desc" };
+    });
+  };
 
   const toggleRecordSelection = (recordId: string) => {
     setSelectedRecordIds((prev) => {
@@ -446,10 +546,16 @@ function AnalyticsPage() {
   };
 
   const toggleAllRecords = () => {
-    if (!data) return;
+    if (filteredRecordRows.length === 0) return;
     setSelectedRecordIds((prev) => {
-      if (prev.size === data.recordRows.length) return new Set();
-      return new Set(data.recordRows.map((row) => row.recordId));
+      const visibleRecordIds = filteredRecordRows.map((row) => row.recordId);
+      const next = new Set(prev);
+      if (visibleRecordIds.every((recordId) => next.has(recordId))) {
+        visibleRecordIds.forEach((recordId) => next.delete(recordId));
+        return next;
+      }
+      visibleRecordIds.forEach((recordId) => next.add(recordId));
+      return next;
     });
   };
 
@@ -522,7 +628,7 @@ function AnalyticsPage() {
       row.estimatedProfit,
     ]));
 
-    downloadCsvFile(`sales-records-${suffix}.csv`, ["시각", "테이블", "주문번호", "오더ID", "페이먼트ID", "오더상태", "결제상태", "매출", "순매출", "환불", "추정원가", "추정이윤", "상품수", "결제코드"], data.recordRows.map((row) => [
+    downloadCsvFile(`sales-records-${suffix}.csv`, ["시각", "테이블", "주문번호", "오더ID", "페이먼트ID", "오더상태", "결제상태", "매출", "순매출", "환불", "환불사유", "추정원가", "추정이윤", "상품수", "결제코드"], data.recordRows.map((row) => [
       formatKstDateTime(row.timestamp),
       row.tableName,
       row.displayNumber ?? "",
@@ -533,6 +639,7 @@ function AnalyticsPage() {
       row.grossSales,
       row.netSales,
       row.refundAmount,
+      row.refundReason ?? "",
       row.estimatedCost,
       row.estimatedProfit,
       row.itemCount,
@@ -544,6 +651,25 @@ function AnalyticsPage() {
       ["합계", extraExpenseTotal],
     ]);
   };
+
+  const SortIcon = ({ sortKey }: { sortKey: MenuSortKey }) => {
+    if (menuSort.key !== sortKey) return <ArrowUpDown className="h-3 w-3 text-slate-300" />;
+    return menuSort.direction === "asc"
+      ? <ArrowUp className="h-3 w-3 text-brand-500" />
+      : <ArrowDown className="h-3 w-3 text-brand-500" />;
+  };
+
+  const SortHeader = ({ sortKey, label, align = "right" }: { sortKey: MenuSortKey; label: string; align?: "left" | "right" }) => (
+    <button
+      type="button"
+      onClick={() => toggleMenuSort(sortKey)}
+      className={`flex w-full items-center gap-1.5 ${align === "right" ? "justify-end" : "justify-start"} rounded-lg text-xs font-black transition-colors hover:text-brand-500`}
+      aria-label={`${label} 기준 정렬`}
+    >
+      <span>{label}</span>
+      <SortIcon sortKey={sortKey} />
+    </button>
+  );
 
   return (
     <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950 p-3 sm:p-4 lg:p-6">
@@ -761,18 +887,18 @@ function AnalyticsPage() {
                     <table className="w-full text-left">
                       <thead>
                         <tr className="bg-slate-50 text-xs font-black text-slate-400 dark:bg-slate-800/40 dark:text-slate-300">
-                          <th className="px-4 py-3">메뉴</th>
-                          <th className="px-4 py-3 text-right">판매수량</th>
-                          <th className="px-4 py-3 text-right">매출</th>
-                          <th className="px-4 py-3 text-right">적용 원가</th>
-                          <th className="px-4 py-3 text-right">이윤</th>
-                          <th className="px-4 py-3 text-right">원가율</th>
-                          <th className="px-4 py-3 text-right">현재가</th>
-                          <th className="px-4 py-3 text-right">권장가</th>
+                          <th className="px-4 py-3"><SortHeader sortKey="menuName" label="메뉴" align="left" /></th>
+                          <th className="px-4 py-3 text-right"><SortHeader sortKey="quantity" label="판매수량" /></th>
+                          <th className="px-4 py-3 text-right"><SortHeader sortKey="revenue" label="매출" /></th>
+                          <th className="px-4 py-3 text-right"><SortHeader sortKey="appliedUnitCost" label="적용 원가" /></th>
+                          <th className="px-4 py-3 text-right"><SortHeader sortKey="estimatedProfit" label="이윤" /></th>
+                          <th className="px-4 py-3 text-right"><SortHeader sortKey="costRate" label="원가율" /></th>
+                          <th className="px-4 py-3 text-right"><SortHeader sortKey="currentPrice" label="현재가" /></th>
+                          <th className="px-4 py-3 text-right"><SortHeader sortKey="recommendedPrice" label="권장가" /></th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
-                        {simulatedMenuRows.slice(0, 12).map((row) => (
+                        {sortedMenuRows.slice(0, 12).map((row) => (
                           <tr key={row.menuId} className="hover:bg-slate-50/80 dark:hover:bg-slate-850/60">
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-2">
@@ -863,24 +989,35 @@ function AnalyticsPage() {
                   <h3 className="text-base font-black text-slate-850 dark:text-white">오더/페이먼트 기록</h3>
                   <p className="text-xs font-bold text-slate-400 dark:text-slate-300">조회 기간 내 주문과 결제 기록을 확인하고 선택 삭제할 수 있습니다.</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={deleteSelectedRecords}
-                  disabled={selectedRecords.length === 0 || isDeletingRecords}
-                  className="flex h-9 items-center justify-center gap-2 rounded-xl bg-rose-500 px-3 text-xs font-black text-white hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  {isDeletingRecords ? "삭제 중" : `선택 삭제 ${selectedRecords.length}`}
-                </button>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <label className="flex h-9 min-w-[260px] items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200">
+                    <Search className="h-3.5 w-3.5 text-slate-400" />
+                    <input
+                      value={recordSearchQuery}
+                      onChange={(event) => setRecordSearchQuery(event.target.value)}
+                      placeholder="기록 검색"
+                      className="min-w-0 flex-1 bg-transparent text-xs font-bold text-slate-700 outline-none placeholder:text-slate-400 dark:text-slate-100"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={deleteSelectedRecords}
+                    disabled={selectedRecords.length === 0 || isDeletingRecords}
+                    className="flex h-9 items-center justify-center gap-2 rounded-xl bg-rose-500 px-3 text-xs font-black text-white hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    {isDeletingRecords ? "삭제 중" : `선택 삭제 ${selectedRecords.length}`}
+                  </button>
+                </div>
               </div>
               <div className="max-h-[420px] overflow-auto">
-                <table className="w-full min-w-[1080px] text-left">
+                <table className="w-full min-w-[1240px] text-left">
                   <thead className="sticky top-0 z-10">
                     <tr className="bg-slate-50 text-xs font-black text-slate-400 dark:bg-slate-800 dark:text-slate-300">
                       <th className="px-4 py-3">
                         <input
                           type="checkbox"
-                          checked={data.recordRows.length > 0 && selectedRecordIds.size === data.recordRows.length}
+                          checked={filteredRecordRows.length > 0 && selectedVisibleRecordCount === filteredRecordRows.length}
                           onChange={toggleAllRecords}
                           aria-label="전체 기록 선택"
                         />
@@ -891,13 +1028,14 @@ function AnalyticsPage() {
                       <th className="px-4 py-3 text-right">매출</th>
                       <th className="px-4 py-3 text-right">순매출</th>
                       <th className="px-4 py-3 text-right">환불</th>
+                      <th className="px-4 py-3">환불 사유</th>
                       <th className="px-4 py-3 text-right">추정 원가</th>
                       <th className="px-4 py-3 text-right">추정 이윤</th>
                       <th className="px-4 py-3 text-right">상품수</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
-                    {data.recordRows.map((row) => (
+                    {filteredRecordRows.map((row) => (
                       <tr key={row.recordId} className="hover:bg-slate-50/80 dark:hover:bg-slate-850/60">
                         <td className="px-4 py-3">
                           <input
@@ -927,6 +1065,7 @@ function AnalyticsPage() {
                         <td className="px-4 py-3 text-right text-sm font-black text-slate-850 dark:text-white">{formatWon(row.grossSales)}</td>
                         <td className="px-4 py-3 text-right text-sm font-bold text-slate-600 dark:text-slate-200">{formatWon(row.netSales)}</td>
                         <td className="px-4 py-3 text-right text-sm font-bold text-rose-500">{formatWon(row.refundAmount)}</td>
+                        <td className="px-4 py-3 text-xs font-bold text-slate-500 dark:text-slate-300">{row.refundReason ?? "-"}</td>
                         <td className="px-4 py-3 text-right text-sm font-bold text-slate-600 dark:text-slate-200">{formatWon(row.estimatedCost)}</td>
                         <td className="px-4 py-3 text-right text-sm font-black text-emerald-600 dark:text-emerald-400">{formatWon(row.estimatedProfit)}</td>
                         <td className="px-4 py-3 text-right text-sm font-bold text-slate-600 dark:text-slate-200">{row.itemCount}</td>
@@ -936,6 +1075,9 @@ function AnalyticsPage() {
                 </table>
                 {data.recordRows.length === 0 && (
                   <div className="p-8 text-center text-sm font-bold text-slate-400">선택한 기간의 오더/페이먼트 기록이 없습니다.</div>
+                )}
+                {data.recordRows.length > 0 && filteredRecordRows.length === 0 && (
+                  <div className="p-8 text-center text-sm font-bold text-slate-400">검색 조건과 일치하는 기록이 없습니다.</div>
                 )}
               </div>
             </div>

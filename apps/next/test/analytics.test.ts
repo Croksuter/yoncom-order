@@ -107,11 +107,25 @@ describe("admin analytics calculations", () => {
     expect(result.summary.grossSales.value).toBe(27000);
     expect(result.summary.refundAmount.value).toBe(9000);
     expect(result.paymentFlow.refundPendingAmount).toBe(9000);
-    expect(result.summary.estimatedCost.value).toBe(9000);
-    expect(result.summary.estimatedProfit.value).toBe(9000);
+    expect(result.summary.estimatedCost.value).toBe(6000);
+    expect(result.summary.estimatedProfit.value).toBe(12000);
+    expect(result.summary.costRate).toBe(1 / 3);
+    expect(result.summary.orderCount).toBe(2);
+    expect(result.summary.soldItemCount).toBe(2);
+    expect(result.series[0]).toEqual(expect.objectContaining({
+      estimatedCost: 6000,
+      estimatedProfit: 12000,
+      orderCount: 2,
+    }));
+    expect(result.menuRows[0]).toEqual(expect.objectContaining({
+      quantity: 2,
+      revenue: 18000,
+      estimatedCost: 6000,
+      estimatedProfit: 12000,
+    }));
   });
 
-  it("adds category revenue share and order/payment record rows", () => {
+  it("excludes completed refunds from profitability while keeping refund records visible", () => {
     const from = Date.parse("2026-05-28T00:00:00.000Z");
     const paidAt = from + 1000;
     const main = menu({ id: "menu_main0001", menuCategoryId: "cat_main", price: 9000, unitCost: 3000 });
@@ -136,18 +150,61 @@ describe("admin analytics calculations", () => {
               id: "ctx_1",
               orders: [
                 {
-                  id: "order_share",
-                  displayNumber: 12,
+                  id: "order_paid_share",
+                  displayNumber: 11,
                   status: "ACTIVE",
                   createdAt: paidAt,
                   deletedAt: null,
                   payment: {
-                    id: "payment_share",
+                    id: "payment_paid_share",
                     status: "PAID",
                     amount: 12000,
                     originalAmount: 12000,
-                    paymentCode: 7,
+                    paymentCode: 6,
                     paidAt,
+                    deletedAt: null,
+                  },
+                  menuOrders: [
+                    { menuId: main.id, quantity: 1, deletedAt: null },
+                    { menuId: drink.id, quantity: 1, deletedAt: null },
+                  ],
+                },
+                {
+                  id: "order_refunded_share",
+                  displayNumber: 12,
+                  status: "CANCELLED",
+                  cancelReason: "주문 취소",
+                  createdAt: paidAt + 1,
+                  deletedAt: null,
+                  payment: {
+                    id: "payment_refunded_share",
+                    status: "REFUNDED",
+                    amount: 12000,
+                    originalAmount: 12000,
+                    refundAmount: 12000,
+                    refundNote: "계좌 환불 완료",
+                    paymentCode: 7,
+                    paidAt: paidAt + 1,
+                    deletedAt: null,
+                  },
+                  menuOrders: [
+                    { menuId: main.id, quantity: 1, deletedAt: null },
+                    { menuId: drink.id, quantity: 1, deletedAt: null },
+                  ],
+                },
+                {
+                  id: "order_pending_share",
+                  displayNumber: 13,
+                  status: "ACTIVE",
+                  createdAt: paidAt + 2,
+                  deletedAt: null,
+                  payment: {
+                    id: "payment_pending_share",
+                    status: "PENDING",
+                    amount: 12000,
+                    originalAmount: 12000,
+                    paymentCode: 8,
+                    updatedAt: paidAt + 2,
                     deletedAt: null,
                   },
                   menuOrders: [
@@ -162,20 +219,43 @@ describe("admin analytics calculations", () => {
       ],
     });
 
+    expect(result.summary.grossSales.value).toBe(24000);
+    expect(result.summary.refundAmount.value).toBe(12000);
+    expect(result.summary.estimatedCost.value).toBe(4000);
+    expect(result.summary.estimatedProfit.value).toBe(8000);
+    expect(result.summary.costRate).toBe(1 / 3);
+    expect(result.summary.orderCount).toBe(1);
+    expect(result.summary.soldItemCount).toBe(2);
     expect(result.categoryRows).toEqual([
       expect.objectContaining({ categoryName: "메인", revenueShare: 0.75 }),
       expect.objectContaining({ categoryName: "음료", revenueShare: 0.25 }),
     ]);
-    expect(result.recordRows[0]).toEqual(expect.objectContaining({
-      orderId: "order_share",
-      paymentId: "payment_share",
+    expect(result.menuRows).toEqual([
+      expect.objectContaining({ menuId: main.id, quantity: 1, revenue: 9000, estimatedCost: 3000, estimatedProfit: 6000 }),
+      expect.objectContaining({ menuId: drink.id, quantity: 1, revenue: 3000, estimatedCost: 1000, estimatedProfit: 2000 }),
+    ]);
+    expect(result.recordRows.find((row) => row.orderId === "order_refunded_share")).toEqual(expect.objectContaining({
+      orderId: "order_refunded_share",
+      paymentId: "payment_refunded_share",
       tableName: "A1",
       displayNumber: 12,
       grossSales: 12000,
-      estimatedCost: 4000,
-      estimatedProfit: 8000,
+      refundAmount: 12000,
+      refundReason: "계좌 환불 완료",
+      estimatedCost: 0,
+      estimatedProfit: 0,
       itemCount: 2,
       paymentCode: 7,
+    }));
+    expect(result.recordRows.find((row) => row.orderId === "order_pending_share")).toEqual(expect.objectContaining({
+      orderId: "order_pending_share",
+      paymentId: "payment_pending_share",
+      grossSales: 12000,
+      refundAmount: 0,
+      estimatedCost: 0,
+      estimatedProfit: 0,
+      itemCount: 2,
+      paymentCode: 8,
     }));
   });
 });
@@ -279,5 +359,48 @@ describe("admin analytics route", () => {
 
     expect(response.status).toBe(200);
     expect(deleteAdminAnalyticsRecords).toHaveBeenCalledWith({ orderIds: ["order_1"], paymentIds: ["payment_1"] });
+  });
+
+  it("deletes analytics records when legacy payments do not have orderId", async () => {
+    vi.doUnmock("~/lib/server/admin-analytics");
+    vi.doMock("~/lib/server/sync-events", () => ({ venueScope: "venue" }));
+    vi.doMock("~/lib/server/table-queries", () => ({ getTablesWithRelations: vi.fn() }));
+    vi.doMock("~/lib/server/db", () => ({
+      getDb: vi.fn(),
+      queryD1: vi.fn(async (sql: string) => {
+        if (sql.includes("FROM \"payments\"")) return [{ id: "payment_legacy" }];
+        return [];
+      }),
+      executeD1: vi.fn(async () => undefined),
+    }));
+    const updateD1Rows = vi.fn(async () => undefined);
+    vi.doMock("~/lib/server/d1-mutations", () => ({
+      enrichMenuCategoriesWithBundles: vi.fn(),
+      ensureMenuProfitabilityColumns: vi.fn(),
+      getD1Columns: vi.fn(async () => new Set(["id", "deletedAt"])),
+      now: vi.fn(() => 123),
+      quoteIdentifier: (identifier: string) => `"${identifier}"`,
+      updateD1Rows,
+    }));
+
+    const { queryD1, executeD1 } = await import("~/lib/server/db");
+    const { deleteAdminAnalyticsRecords } = await import("~/lib/server/admin-analytics");
+    const result = await deleteAdminAnalyticsRecords({ orderIds: ["order_legacy"], paymentIds: [] });
+
+    expect(result.status).toBe(200);
+    expect(queryD1).toHaveBeenCalledWith(
+      "SELECT id FROM \"payments\" WHERE id IN (?) AND deletedAt IS NULL",
+      ["order_legacy"],
+    );
+    expect(updateD1Rows).toHaveBeenCalledWith(
+      "payments",
+      expect.objectContaining({ status: "CANCELLED", deletedAt: 123 }),
+      "id IN (?) AND deletedAt IS NULL",
+      ["payment_legacy"],
+    );
+    expect(executeD1).toHaveBeenCalledWith(
+      "DELETE FROM \"paymentCodeLeases\" WHERE paymentId IN (?)",
+      ["payment_legacy"],
+    );
   });
 });

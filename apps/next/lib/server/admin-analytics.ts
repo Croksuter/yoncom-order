@@ -1,7 +1,7 @@
 import { isNull } from "drizzle-orm";
 import { bankTransactionStatus, bankTransactions, menuBundleItems, menuCategories, menuOrderStatus, orderStatus, paymentStatus } from "db/schema";
 import { buildAdminAnalytics } from "~/lib/analytics";
-import { enrichMenuCategoriesWithBundles, ensureMenuProfitabilityColumns, now, quoteIdentifier, updateD1Rows } from "~/lib/server/d1-mutations";
+import { enrichMenuCategoriesWithBundles, ensureMenuProfitabilityColumns, getD1Columns, now, quoteIdentifier, updateD1Rows } from "~/lib/server/d1-mutations";
 import { executeD1, queryD1, getDb } from "~/lib/server/db";
 import { venueScope } from "~/lib/server/sync-events";
 import { getTablesWithRelations } from "~/lib/server/table-queries";
@@ -46,12 +46,18 @@ export async function deleteAdminAnalyticsRecords(query: AdminAnalyticsRequest.D
   }
 
   const timestamp = now();
-  const orderPaymentRows = orderIds.length > 0
+  const paymentColumns = await getD1Columns("payments");
+  const orderPaymentRows = orderIds.length > 0 && paymentColumns.has("orderId")
     ? await queryD1<{ id: string }>(
-      `SELECT id FROM ${quoteIdentifier("payments")} WHERE orderId IN (${placeholders(orderIds.length)}) AND deletedAt IS NULL`,
-      orderIds,
+      `SELECT id FROM ${quoteIdentifier("payments")} WHERE (orderId IN (${placeholders(orderIds.length)}) OR id IN (${placeholders(orderIds.length)})) AND deletedAt IS NULL`,
+      [...orderIds, ...orderIds],
     )
-    : [];
+    : orderIds.length > 0
+      ? await queryD1<{ id: string }>(
+        `SELECT id FROM ${quoteIdentifier("payments")} WHERE id IN (${placeholders(orderIds.length)}) AND deletedAt IS NULL`,
+        orderIds,
+      )
+      : [];
   const paymentIds = uniqueIds([...directPaymentIds, ...orderPaymentRows.map((row) => row.id)]);
 
   if (orderIds.length > 0) {
