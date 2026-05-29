@@ -224,6 +224,38 @@ function getOrderCostAndItemCount(
   }, { estimatedCost: 0, itemCount: 0 });
 }
 
+function buildRecordMenuItems(
+  order: AnalyticsOrder,
+  operatingSale: boolean,
+  menusById: Map<string, AnalyticsMenu>,
+  categoriesById: Map<string, AnalyticsCategory>,
+  bundleItemsByBundleId: Map<string, AnalyticsMenuBundleItem[]>,
+): AdminAnalyticsResponse.RecordMenuItemRow[] {
+  return order.menuOrders.flatMap((menuOrder) => {
+    if (normalizeTime(menuOrder.deletedAt) !== null) return [];
+    const menu = menusById.get(menuOrder.menuId);
+    if (!menu) return [];
+    const appliedUnitCost = getAppliedUnitCost(menu, menusById, bundleItemsByBundleId);
+    const grossSales = menu.price * menuOrder.quantity;
+    const estimatedCost = operatingSale ? appliedUnitCost * menuOrder.quantity : 0;
+    const category = categoriesById.get(menu.menuCategoryId);
+
+    return [{
+      menuId: menu.id,
+      menuName: menu.name,
+      categoryId: menu.menuCategoryId,
+      categoryName: category?.name ?? "미분류",
+      quantity: menuOrder.quantity,
+      unitPrice: menu.price,
+      grossSales,
+      appliedUnitCost,
+      estimatedCost,
+      estimatedProfit: operatingSale ? grossSales - estimatedCost : 0,
+      fallbackCostUsed: menu.unitCost === null || menu.unitCost === undefined,
+    }];
+  });
+}
+
 function getComparableRange(from: number, to: number) {
   const duration = to - from;
   return { from: Math.max(0, from - duration), to: from };
@@ -297,6 +329,7 @@ function buildRecordRows(
   from: number,
   to: number,
   menusById: Map<string, AnalyticsMenu>,
+  categoriesById: Map<string, AnalyticsCategory>,
   bundleItemsByBundleId: Map<string, AnalyticsMenuBundleItem[]>,
 ): AdminAnalyticsResponse.RecordRow[] {
   const rows: AdminAnalyticsResponse.RecordRow[] = [];
@@ -327,6 +360,7 @@ function buildRecordRows(
         const operatingRevenue = operatingSale ? grossSales : 0;
         const completedRefundAmount = order.payment?.status === "REFUNDED" ? refundAmount : 0;
         const paymentAmount = order.payment?.amount ?? 0;
+        const items = buildRecordMenuItems(order, operatingSale, menusById, categoriesById, bundleItemsByBundleId);
 
         rows.push({
           recordId: `${order.id}:${order.payment?.id ?? "no-payment"}`,
@@ -350,6 +384,7 @@ function buildRecordRows(
           paymentAmount,
           expectedTransferAmount: order.payment?.expectedTransferAmount ?? null,
           paymentCode: order.payment?.paymentCode ?? null,
+          items,
         });
       }
     }
@@ -506,7 +541,7 @@ export function buildAdminAnalytics(input: BuildAnalyticsInput): AdminAnalyticsR
       revenueShare: categoryRevenueTotal > 0 ? row.revenue / categoryRevenueTotal : 0,
     }))
     .sort((a, b) => b.revenue - a.revenue);
-  const recordRows = buildRecordRows(input.tables, input.from, input.to, menusById, bundleItemsByBundleId);
+  const recordRows = buildRecordRows(input.tables, input.from, input.to, menusById, categoriesById, bundleItemsByBundleId);
   const fallbackCostCount = menus.filter((menu) => menu.unitCost === null || menu.unitCost === undefined).length;
   const highSalesFallback = menuRows.find((row) => row.fallbackCostUsed && row.quantity >= 3);
   const lowMarginMenu = menuRows.find((row) => row.costRate !== null && row.costRate > 0.5 && row.quantity > 0);

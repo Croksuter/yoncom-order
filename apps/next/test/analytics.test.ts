@@ -257,6 +257,10 @@ describe("admin analytics calculations", () => {
       expect.objectContaining({ menuId: main.id, quantity: 1, revenue: 9000, estimatedCost: 3000, estimatedProfit: 6000 }),
       expect.objectContaining({ menuId: drink.id, quantity: 1, revenue: 3000, estimatedCost: 1000, estimatedProfit: 2000 }),
     ]);
+    expect(result.recordRows.find((row) => row.orderId === "order_paid_share")?.items).toEqual([
+      expect.objectContaining({ menuId: main.id, menuName: main.name, categoryName: "메인", quantity: 1, unitPrice: 9000, grossSales: 9000, estimatedCost: 3000, estimatedProfit: 6000 }),
+      expect.objectContaining({ menuId: drink.id, menuName: drink.name, categoryName: "음료", quantity: 1, unitPrice: 3000, grossSales: 3000, estimatedCost: 1000, estimatedProfit: 2000 }),
+    ]);
     expect(result.recordRows.find((row) => row.orderId === "order_refunded_share")).toEqual(expect.objectContaining({
       orderId: "order_refunded_share",
       paymentId: "payment_refunded_share",
@@ -270,6 +274,10 @@ describe("admin analytics calculations", () => {
       itemCount: 2,
       paymentCode: 7,
     }));
+    expect(result.recordRows.find((row) => row.orderId === "order_refunded_share")?.items).toEqual([
+      expect.objectContaining({ menuId: main.id, grossSales: 9000, estimatedCost: 0, estimatedProfit: 0 }),
+      expect.objectContaining({ menuId: drink.id, grossSales: 3000, estimatedCost: 0, estimatedProfit: 0 }),
+    ]);
     expect(result.recordRows.find((row) => row.orderId === "order_pending_share")).toEqual(expect.objectContaining({
       orderId: "order_pending_share",
       paymentId: "payment_pending_share",

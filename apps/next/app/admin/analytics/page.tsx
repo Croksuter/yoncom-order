@@ -257,6 +257,16 @@ function recordMatchesSearch(row: AdminAnalyticsResponse.RecordRow, query: strin
     row.paymentAmount,
     row.expectedTransferAmount,
     row.paymentCode,
+    ...row.items.flatMap((item) => [
+      item.categoryName,
+      item.menuName,
+      item.quantity,
+      item.unitPrice,
+      item.grossSales,
+      item.appliedUnitCost,
+      item.estimatedCost,
+      item.estimatedProfit,
+    ]),
   ].some((value) => normalizeSearchText(value).includes(normalizedQuery));
 }
 
@@ -691,6 +701,30 @@ function AnalyticsPage() {
       row.itemCount,
       row.paymentCode ?? "",
     ]));
+
+    downloadCsvFile(`sales-table-order-menu-records-${suffix}.csv`, ["시각", "테이블", "주문번호", "오더ID", "페이먼트ID", "오더상태", "결제상태", "환불사유", "카테고리", "메뉴ID", "메뉴", "수량", "단가", "메뉴매출", "적용원가", "원가합계", "추정이윤", "원가기준", "결제코드"], data.recordRows.flatMap((row) =>
+      row.items.map((item) => [
+        formatKstDateTime(row.timestamp),
+        row.tableName,
+        row.displayNumber ?? "",
+        row.orderId,
+        row.paymentId ?? "",
+        row.orderStatus ?? "",
+        row.paymentStatus ?? "",
+        row.refundReason ?? "",
+        item.categoryName,
+        item.menuId,
+        item.menuName,
+        item.quantity,
+        item.unitPrice,
+        item.grossSales,
+        item.appliedUnitCost,
+        item.estimatedCost,
+        item.estimatedProfit,
+        item.fallbackCostUsed ? "자동" : "수동",
+        row.paymentCode ?? "",
+      ]),
+    ));
 
     downloadCsvFile(`sales-expenses-${suffix}.csv`, ["비용 항목", "금액"], [
       ...expenseRows.map((row) => [row.label, parseExpenseAmount(row.amount)] as [string, number]),

@@ -65,6 +65,20 @@ export type CategoryRow = {
   revenueShare: number;
 };
 
+export type RecordMenuItemRow = {
+  menuId: string;
+  menuName: string;
+  categoryId: string;
+  categoryName: string;
+  quantity: number;
+  unitPrice: number;
+  grossSales: number;
+  appliedUnitCost: number;
+  estimatedCost: number;
+  estimatedProfit: number;
+  fallbackCostUsed: boolean;
+};
+
 export type RecordRow = {
   recordId: string;
   orderId: string;
@@ -87,6 +101,7 @@ export type RecordRow = {
   paymentAmount: number;
   expectedTransferAmount: number | null;
   paymentCode: number | null;
+  items: RecordMenuItemRow[];
 };
 
 export type Alert = {
